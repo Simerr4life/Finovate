@@ -1,3 +1,4 @@
+auth0-server-python==1.0.0b19
 Authlib==1.8.0
 Django==6.1.2
 psycopg==3.3.6

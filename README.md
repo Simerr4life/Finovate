@@ -58,12 +58,15 @@ Both are off by default — the app runs fully on local demo auth + SQLite
 with no configuration. To turn either on, add to `.env`:
 
 ```bash
-# Auth0 — enables the "Log in with Auth0" button. Create a "Regular Web
-# Application" in your Auth0 tenant; set its Allowed Callback URL to
-# <your-url>/accounts/auth0/callback/ and Allowed Logout URL to <your-url>/.
+# Auth0 — enables the "Log in with Auth0" button. Credentials live in
+# .env.local (written by Auth0 onboarding). The app callback is
+# <APP_BASE_URL>/callback. Run the server on that same origin, for example:
+#   python manage.py runserver localhost:5000
 AUTH0_DOMAIN=your-tenant.us.auth0.com
 AUTH0_CLIENT_ID=...
 AUTH0_CLIENT_SECRET=...
+AUTH0_SECRET=...
+APP_BASE_URL=http://localhost:5000
 
 # Supabase/Postgres — switches off SQLite. Use the pooled connection
 # string from Project Settings -> Database in your Supabase project.

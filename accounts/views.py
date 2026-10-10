@@ -1,15 +1,14 @@
-from urllib.parse import urlencode
-
-from django.conf import settings
+from asgiref.sync import async_to_sync
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.shortcuts import redirect, render
-from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .auth0 import auth0_configured, get_auth0_client
+from auth0_server_python.auth_types import LogoutOptions, StartInteractiveLoginOptions
+
+from .auth0 import apply_auth0_cookies, auth0_configured, get_auth0_client, logout_return_url
 from .forms import OnboardingForm, ProfileSettingsForm, SignUpForm
 from .models import Profile
 
@@ -37,15 +36,27 @@ def auth0_login(request):
     if client is None:
         messages.error(request, "Auth0 isn't configured yet. Use local login/signup instead.")
         return redirect("accounts:login")
-    redirect_uri = request.build_absolute_uri(reverse("accounts:auth0_callback"))
-    return client.authorize_redirect(request, redirect_uri)
+    authorization_params = {}
+    screen_hint = request.GET.get("screen_hint")
+    if screen_hint:
+        authorization_params["screen_hint"] = screen_hint
+    try:
+        url = async_to_sync(client.start_interactive_login)(
+            options=StartInteractiveLoginOptions(
+                authorization_params=authorization_params or None
+            ),
+            store_options={"request": request},
+        )
+    except Exception:
+        messages.error(request, "Auth0 sign-in could not be started. Please try again.")
+        return redirect("accounts:login")
+    return apply_auth0_cookies(request, redirect(url))
 
 
 def auth0_callback(request):
-    """Exchange the authorization code for tokens and validate the ID
-    token (signature/issuer/audience/expiry, via authlib + Auth0's JWKS),
-    then map the verified `sub` claim to a Finovate user -- creating one
-    on first login, never by matching email.
+    """Finish the Auth0 login (code exchange and token checks are done by
+    the Auth0 SDK), then map the verified `sub` claim to a Finovate user.
+    A new user is created on first login and is never matched by email.
     """
     client = get_auth0_client()
     if client is None:
@@ -53,12 +64,15 @@ def auth0_callback(request):
         return redirect("accounts:login")
 
     try:
-        token = client.authorize_access_token(request)
+        result = async_to_sync(client.complete_interactive_login)(
+            url=request.build_absolute_uri(),
+            store_options={"request": request},
+        )
     except Exception:
         messages.error(request, "Auth0 sign-in failed or was cancelled. Please try again.")
         return redirect("accounts:login")
 
-    claims = token.get("userinfo")
+    claims = _claims(result)
     if not claims or not claims.get("sub"):
         messages.error(request, "Auth0 didn't return a verified identity. Please try again.")
         return redirect("accounts:login")
@@ -69,31 +83,47 @@ def auth0_callback(request):
         user = profile.user
     else:
         base_username = f"auth0_{sub}".replace("|", "_")[:150]
-        user = User.objects.create_user(username=base_username, email=claims.get("email", ""))
+        user = User.objects.create_user(username=base_username, email=claims.get("email") or "")
         user.profile.auth0_sub = sub
         user.profile.save(update_fields=["auth0_sub", "updated_at"])
 
     login(request, user)
     request.session["logged_in_via_auth0"] = True
     if not user.profile.onboarding_completed:
-        return redirect("accounts:onboarding")
-    return redirect("dashboard")
+        response = redirect("accounts:onboarding")
+    else:
+        response = redirect("dashboard")
+    return apply_auth0_cookies(request, response)
+
+
+def _claims(result):
+    state = (result or {}).get("state_data") or {}
+    if hasattr(state, "model_dump"):
+        state = state.model_dump()
+    user = state.get("user") or {}
+    if hasattr(user, "model_dump"):
+        user = user.model_dump()
+    return user
 
 
 @require_POST
 def auth0_logout(request):
-    """Clear the Django session, then federated-log-out of Auth0 too if
-    that's how this session was established (so a shared browser doesn't
-    silently stay signed into Auth0 after leaving Finovate).
+    """Clear the Django session, then log out of Auth0 too if that's how
+    this session was established.
     """
     from django.contrib.auth import logout as django_logout
 
     came_from_auth0 = request.session.get("logged_in_via_auth0")
+    client = get_auth0_client() if came_from_auth0 and auth0_configured() else None
+    logout_url = None
+    if client is not None:
+        logout_url = async_to_sync(client.logout)(
+            options=LogoutOptions(return_to=logout_return_url()),
+            store_options={"request": request},
+        )
     django_logout(request)
-    if came_from_auth0 and auth0_configured():
-        return_to = request.build_absolute_uri(reverse("landing"))
-        params = urlencode({"returnTo": return_to, "client_id": settings.AUTH0_CLIENT_ID})
-        return redirect(f"https://{settings.AUTH0_DOMAIN}/v2/logout?{params}")
+    if logout_url:
+        return apply_auth0_cookies(request, redirect(logout_url))
     return redirect("landing")
 
 

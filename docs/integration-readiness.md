@@ -36,25 +36,37 @@ that's a decision for whoever owns credentials and legal/consent review.
   shared-email accounts aren't merged, failed token exchange creates no
   user, missing `sub` claim creates no user, federated logout redirect.
 
-## 1b. Database — Supabase/hosted Postgres (now implemented)
+## 1b. Database — Supabase/hosted Postgres (live)
 
-**Update:** built. Full writeup in
+**Update:** a real Supabase project is now provisioned and migrated, not
+just the connectivity code. Full writeup, including exactly what was
+verified vs. assumed, in
 [docs/architecture-auth0-supabase.md](architecture-auth0-supabase.md).
 
+- **Project:** `finovate` (ref `rhhotkojxkajsfozfrtn`), free tier, region
+  `us-east-1`, created and migrated this session.
 - **Where it plugs in:** `finovate/settings.py::_postgres_config_from_url`.
-  Setting `DATABASE_URL` or `SUPABASE_DB_URL` switches `DATABASES` from
-  local SQLite to Postgres; nothing else changes, since Django's existing
-  migrations create the same schema on either engine.
-- **Config required to activate:** a connection string from your
-  Supabase project (Project Settings → Database → Connection string,
-  pooled URI recommended) in `DATABASE_URL` or `SUPABASE_DB_URL`.
-- **Not implemented, and why:** Supabase Row Level Security and a
-  client-side Supabase SDK. Both assume a browser talking to Supabase
-  directly; this app is server-rendered Django with one trusted backend
-  credential, so authorization is enforced in Python (already tested
-  via per-user ownership checks) rather than in Postgres policies. See
-  the architecture doc for an optional, non-required RLS script if that
-  assumption ever changes.
+  `DATABASE_URL` (set on Vercel now) switches `DATABASES` from local
+  SQLite to this Postgres project; nothing else changes, since Django's
+  existing migrations created the same 29-table schema here that they
+  create in SQLite.
+- **RLS:** enabled on all 29 tables with no policies (locks out
+  Supabase's PostgREST API entirely; Django's connection bypasses RLS as
+  table owner and remains the sole enforcement point, consistent with
+  the server-rendered architecture — see the doc above). Supabase's
+  security advisor confirmed this took the finding from critical to
+  informational.
+- **Verified live:** `python manage.py migrate` ran against the real
+  project (29/29 migrations OK); a real Django ORM create/read/delete
+  round-trip succeeded after RLS was enabled, confirming the app's role
+  still has full access.
+- **Known leftover:** a second, pre-existing Supabase project (different
+  account) is also connected to the same Vercel project via Vercel's
+  native marketplace integration, with its own `POSTGRES_URL`/
+  `SUPABASE_*` env vars already populated. Those are inert (Django never
+  reads them) but weren't removed — no delete capability was available
+  for Vercel env vars in this session. Remove manually via the Vercel
+  dashboard if that old integration is no longer wanted.
 - **Tests:** `accounts/tests.py::PostgresUrlParsingTests` — connection
   string parsing including percent-encoded passwords (a real bug caught
   and fixed while building this: `urlparse` does not decode the

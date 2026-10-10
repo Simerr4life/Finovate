@@ -16,7 +16,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load variables from a local .env file if present. This file is
 # git-ignored; .env.example documents the placeholder names only.
+# Auth0 onboarding writes credentials to .env.local; that file wins
+# when both define the same key.
 load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env.local", override=True)
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -196,13 +199,14 @@ LOGGING = {
     },
 }
 
-# --- Integration placeholders (unconfigured) ---------------------------
-# These settings exist so the codebase has one documented place to look
-# for future integration config. None of them are read by any running
-# code path yet; see docs/integration-readiness.md for details.
+# --- Auth0 -------------------------------------------------------------
+# Empty unless .env / .env.local sets them. The login button stays hidden
+# until domain, client id, client secret, and the session secret are all set.
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "")
 AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID", "")
 AUTH0_CLIENT_SECRET = os.environ.get("AUTH0_CLIENT_SECRET", "")
+AUTH0_SECRET = os.environ.get("AUTH0_SECRET", "")
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://127.0.0.1:8000")
 
 BANK_PROVIDER_API_KEY = os.environ.get("BANK_PROVIDER_API_KEY", "")
 BROKERAGE_PROVIDER_API_KEY = os.environ.get("BROKERAGE_PROVIDER_API_KEY", "")

@@ -48,23 +48,26 @@ account and later logs in via Auth0 gets a **second**, separate Finovate
 account unless they're explicitly linked (not built — out of scope until
 there's a real need, to avoid speculative complexity).
 
-**Token validation:** handled by `authlib`'s OIDC client
-(`authlib.integrations.django_client.OAuth`), not hand-rolled JWT
-parsing. `authorize_access_token()` fetches Auth0's JWKS via the
-`.well-known/openid-configuration` metadata URL and validates the ID
-token's signature, issuer, audience, and expiration as part of the
-standard OIDC flow — this is deliberately not reimplemented by hand,
-since hand-rolled JWT validation is a common source of real
-vulnerabilities (e.g. accepting `alg: none`).
+**Token validation:** handled by Auth0's own official
+`auth0-server-python` SDK (`accounts/auth0.py`'s `ServerClient`), not
+hand-rolled JWT parsing — `complete_interactive_login()` performs the
+code exchange and validates the ID token's signature, issuer, audience,
+and expiration internally (the SDK depends on `authlib` for this). Login
+state and the post-login session are kept in encrypted, httponly cookies
+(`DjangoCookieStore` in `accounts/auth0.py`), applied to the response via
+`apply_auth0_cookies()`.
 
 ## Fallback behavior (no Auth0 configured)
 
-`accounts/auth0.py` only builds the OAuth client when `AUTH0_DOMAIN`,
-`AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` are all set. When they're
-not, the "Log in with Auth0" button doesn't render (see
+`accounts/auth0.py::auth0_configured()` requires `AUTH0_DOMAIN`,
+`AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_SECRET` (the
+session-cookie encryption key) to all be set. When they're not, the "Log
+in with Auth0" button doesn't render (see
 `core/context_processors.py`'s `AUTH0_ENABLED`), and the existing local
 demo signup/login flow is the only path — exactly as before this
 integration. Nothing breaks for local/demo use without credentials.
+Auth0's registered callback URL must be `<APP_BASE_URL>/callback` exactly
+(a top-level route in `finovate/urls.py`, not under `/accounts/`).
 
 ## Database connectivity (Supabase)
 
@@ -79,45 +82,78 @@ migrations (`*/migrations/0001_initial.py` etc.) create the same tables
 in Postgres that they create in SQLite. No new Supabase-specific tables,
 clients, or access patterns were introduced.
 
-## Migrating existing local data to Supabase (documented, not executed)
+## Live status (as of this session)
 
-This repo's local `db.sqlite3` has no production users in it (it's a
-hackathon demo project), so there's no real migration to perform. If
-that changes, the safe path is:
+A real Supabase project now backs this app — not just the connectivity
+code, the actual project:
+
+- **Project:** `finovate`, ref `rhhotkojxkajsfozfrtn`, org "Simerr4life's
+  Org", region `us-east-1`, free tier ($0/month, confirmed before
+  creation).
+- **Schema:** all 29 tables (Django's built-ins plus every app's models)
+  created by running the real `python manage.py migrate` against the
+  project's pooled connection — not a hand-written parallel schema. This
+  is the authoritative migration history; `sqlmigrate` against a live
+  Postgres target was tried first but requires an actual connection to
+  generate correct dialect SQL (it hung against a fake host), so the
+  owner provided the real connection string and I ran `migrate` directly.
+- **Verified live**, not just "migration ran": a real INSERT/SELECT/DELETE
+  round-trip via Django ORM succeeded after RLS was enabled, confirming
+  the app's connection (table owner) is unaffected by RLS as expected.
+- **RLS:** enabled on all 29 tables with zero policies, applied via
+  Supabase's `apply_migration` after Supabase's own security advisor
+  flagged all-tables-RLS-disabled as **critical** (anon/authenticated
+  PostgREST access was wide open). Re-running the advisor after
+  confirmed the finding dropped to informational
+  ("RLS enabled, no policies" — expected and fine, since nothing uses
+  PostgREST here). The Django connection (table owner) bypasses RLS, so
+  authorization still lives entirely in Python, as designed above.
+- **Vercel:** `DATABASE_URL` set on the `finovate` Vercel project
+  (production/preview/development) as a `sensitive` (write-only) env var
+  pointing at this project's transaction-pooler connection string.
+
+**A second, pre-existing Supabase project is also connected to this
+Vercel project**, via Vercel's native Supabase marketplace integration
+(`POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, etc. — all already
+populated, under a different Supabase account than the one used above).
+Django reads `DATABASE_URL`/`SUPABASE_DB_URL` only, so these legacy vars
+are inert today, but they're real secrets sitting unused in the project.
+No tool available in this session could delete them (Vercel's env API
+exposed here has no delete endpoint) — **remove them manually** via the
+Vercel dashboard (Project Settings → Environment Variables) if that old
+integration isn't needed, or disconnect the integration itself if you're
+fully moving to the project this session set up.
+
+**If you ever need to migrate real user data between Supabase projects**
+(not needed today — this project had zero rows before the owner's own
+data):
 
 ```bash
-# 1. Export everything from the current database
 python manage.py dumpdata --natural-foreign --natural-primary \
   --exclude contenttypes --exclude auth.permission > backup.json
-
-# 2. Point DATABASE_URL at the new Postgres target, run migrations
-export DATABASE_URL="postgresql://..."
-python manage.py migrate
-
-# 3. Load the data into the new database
+# point DATABASE_URL at the target, run migrate, then:
 python manage.py loaddata backup.json
-
-# 4. Spot-check row counts before cutting over traffic
-python manage.py shell -c "from django.contrib.auth.models import User; print(User.objects.count())"
 ```
 
-Do this against a non-production Supabase project first. Never run
-`loaddata` against a database that already has independent data in it —
-it does not deduplicate.
+Never run `loaddata` against a database that already has independent
+data in it — it does not deduplicate.
 
-## Row-level security — documented stance, not implemented
+## Row-level security — enabled, no policies (by design)
 
-Given the trusted-single-backend architecture above, RLS policies aren't
-load-bearing here. If you want defense-in-depth anyway (e.g. in case a
-future feature does add direct client access), a starting policy for the
-`transactions_transaction` table would look like:
+RLS is enabled on every table with no policies, which means Supabase's
+PostgREST API (the thing `anon`/`authenticated` roles reach through) can
+read or write nothing — fully locked out, matching the fact that nothing
+in this app uses that API. Django's own Postgres role owns the tables
+and bypasses RLS entirely, which is why authorization must keep living
+in Python (already true, already tested) rather than in RLS policies.
+
+If a future feature ever needs direct browser-to-Supase access, a
+starting ownership policy would look like:
 
 ```sql
--- Optional, NOT required by this architecture. Only meaningful once
--- something other than the Django backend's single DB credential
--- connects to Supabase directly, with a per-user JWT Postgres can
--- verify (not built here).
-alter table transactions_transaction enable row level security;
+-- Only meaningful once something other than Django's backend connects
+-- directly, with a per-user JWT Postgres can verify (not built here).
 create policy "owner can access own transactions"
   on transactions_transaction
   using (user_id = current_setting('app.current_user_id')::int);
@@ -125,8 +161,7 @@ create policy "owner can access own transactions"
 
 That `current_setting('app.current_user_id')` would need the backend to
 `SET` it per connection/request — not implemented, since nothing
-currently needs it. Documented here so it's not forgotten if the
-architecture changes later.
+currently needs it.
 
 ## What this integration does NOT do
 
