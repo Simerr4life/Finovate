@@ -277,7 +277,7 @@ select, .field-label input { min-height: 40px; padding: 0 12px; border: 1px soli
   .mobile-menu { position: fixed; z-index: 35; inset: 58px 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 12px; background: var(--navy); box-shadow: 0 12px 30px rgba(0,0,0,.2); }
   .mobile-menu a, .mobile-menu button { display: flex; align-items: center; gap: 10px; padding: 12px; border: 0; border-radius: 9px; background: transparent; color: #b8c8c3; font-size: 12px; text-align: left; }
   .mobile-menu a.active, .mobile-menu button.active { color: white; background: rgba(255,255,255,.08); }
-  .bottom-nav { position: fixed; z-index: 50; inset: auto 0 0; height: 66px; padding-bottom: env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
+  .bottom-nav { position: fixed; z-index: 50; inset: auto 0 0; height: 66px; padding-bottom: env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid var(--border); background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
   .bottom-nav a, .bottom-nav button { display: grid; place-content: center; justify-items: center; gap: 3px; border: 0; background: none; color: #84918e; font-size: 8px; text-decoration: none; }
   .bottom-nav a.active, .bottom-nav button.active { color: var(--green); }
   .bottom-nav svg { width: 19px; }

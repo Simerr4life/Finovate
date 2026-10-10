@@ -34,6 +34,27 @@ def index(request):
 
 
 @login_required
+def pools(request):
+    goals = list(Goal.objects.filter(user=request.user))
+    pool_rows = [
+        {"goal": goal, "estimated_completion": estimate_completion_date(goal)}
+        for goal in goals
+    ]
+    saved_total = sum((goal.current_amount for goal in goals), Decimal("0"))
+    target_total = sum((goal.target_amount for goal in goals), Decimal("0"))
+    return render(
+        request,
+        "savings/pools.html",
+        {
+            "pool_rows": pool_rows,
+            "saved_total": saved_total,
+            "target_total": target_total,
+            "pool_count": len(pool_rows),
+        },
+    )
+
+
+@login_required
 def goals(request):
     goals = Goal.objects.filter(user=request.user)
     goal_rows = [
@@ -73,6 +94,9 @@ def goals(request):
 
 @login_required
 def goal_add(request):
+    return_to_pools = (
+        request.GET.get("from") == "pools" or request.POST.get("from") == "pools"
+    )
     if request.method == "POST":
         form = GoalForm(request.POST)
         if form.is_valid():
@@ -80,24 +104,35 @@ def goal_add(request):
             goal.user = request.user
             goal.save()
             messages.success(request, "Savings goal created.")
-            return redirect("savings:index")
+            return redirect("savings:pools" if return_to_pools else "savings:index")
     else:
         form = GoalForm()
-    return render(request, "savings/goal_form.html", {"form": form, "mode": "add"})
+    return render(
+        request,
+        "savings/goal_form.html",
+        {"form": form, "mode": "add", "return_to_pools": return_to_pools},
+    )
 
 
 @login_required
 def goal_edit(request, pk):
     goal = get_object_or_404(Goal, pk=pk, user=request.user)
+    return_to_pools = (
+        request.GET.get("from") == "pools" or request.POST.get("from") == "pools"
+    )
     if request.method == "POST":
         form = GoalForm(request.POST, instance=goal)
         if form.is_valid():
             form.save()
             messages.success(request, "Goal updated.")
-            return redirect("savings:index")
+            return redirect("savings:pools" if return_to_pools else "savings:index")
     else:
         form = GoalForm(instance=goal)
-    return render(request, "savings/goal_form.html", {"form": form, "mode": "edit"})
+    return render(
+        request,
+        "savings/goal_form.html",
+        {"form": form, "mode": "edit", "return_to_pools": return_to_pools},
+    )
 
 
 @login_required
