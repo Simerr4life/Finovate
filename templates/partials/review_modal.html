@@ -1,0 +1,34 @@
+{% load finovate %}
+<div class="modal-backdrop hidden" id="review-modal" role="presentation">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Review proposed plan">
+    <div class="modal-header">
+      <div class="section-title">Review proposed plan</div>
+      <button class="icon-button" type="button" data-close-review aria-label="Close">{% include "partials/icon.html" with name="x" %}</button>
+    </div>
+    {% if user.is_authenticated and surplus %}
+    <form method="post" action="{% url 'investing:propose_surplus' %}">
+      {% csrf_token %}
+      <input type="hidden" name="amount" value="{{ surplus.investable_surplus }}">
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <div class="review-amount">
+        <span>Amount to consider</span>
+        <div class="money">{{ surplus.investable_surplus|money }}</div>
+        <span class="pill">Estimated</span>
+      </div>
+      <div class="breakdown">
+        <div><span>Cash balance</span><strong>{{ surplus.cash_balance|money }}</strong></div>
+        <div><span>Minimum reserve</span><strong>{{ surplus.minimum_cash_reserve|money }}</strong></div>
+        <div><span>Goal allocations</span><strong>{{ surplus.goal_allocations|money }}</strong></div>
+        <div><span>Bills buffer</span><strong>{{ surplus.upcoming_bills_buffer|money }}</strong></div>
+      </div>
+      <div class="callout">{% include "partials/icon.html" with name="shield" %}<span>Saving this proposal creates a pending simulated order. It does not transfer or invest funds until you approve it on Investments.</span></div>
+      <div class="modal-actions">
+        <button class="button ghost" type="button" data-close-review>Cancel</button>
+        <button class="button" type="submit" {% if surplus.investable_surplus <= 0 %}disabled{% endif %}>Save proposed plan</button>
+      </div>
+    </form>
+    {% else %}
+    <p class="muted">Open this from a signed-in page after your records produce an investable surplus.</p>
+    {% endif %}
+  </div>
+</div>

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load finovate %}
+{% block title %}Insights — Finovate{% endblock %}
+{% block crumb %}Insights{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">FINOVATE</div>
+    <div class="page-title">Insights &amp; Analytics</div>
+    <div class="page-subtitle">Patterns from recorded income, spending, and savings. Missing months stay at zero.</div>
+  </div>
+  <a class="button secondary" href="{% url 'budgets:index' %}">Edit budgets</a>
+</div>
+
+<div class="summary-grid compact">
+  <section class="card summary-card">
+    <div class="label">Average monthly income</div>
+    <div class="money">{{ avg_income|money }}</div>
+    <div class="summary-detail">Months in the last six with income</div>
+  </section>
+  <section class="card summary-card">
+    <div class="label">Average monthly spending</div>
+    <div class="money">{{ avg_expense|money }}</div>
+    <div class="summary-detail">Months in the last six with expenses</div>
+  </section>
+  <section class="card summary-card">
+    <div class="label">This month's cash change</div>
+    <div class="money">{% if savings_rate != None %}{{ savings_rate }}%{% else %}—{% endif %}</div>
+    <div class="summary-detail">Income minus spending, this month{% if savings_rate == None %} · no income recorded{% endif %}</div>
+  </section>
+</div>
+
+<div class="two-column insights-layout">
+  <section class="card" style="padding:23px;">
+    <div class="section-title">Income vs. expenses</div>
+    <div class="muted">Last six months from your transactions</div>
+    {% if has_transactions %}
+    <div class="bar-chart">
+      {% for bar in bars %}
+      <div class="bar-group">
+        <i class="income-bar" style="height: {{ bar.income_h }}%"></i>
+        <i class="expense-bar" style="height: {{ bar.expense_h }}%"></i>
+        <span>{{ bar.label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="legend"><span><i class="dot green"></i>Income</span><span><i class="dot gold"></i>Expenses</span></div>
+    {% else %}
+    <p class="empty">No transactions yet.</p>
+    {% endif %}
+  </section>
+  <section class="card" style="padding:23px;">
+    <div class="section-title">Spending by category</div>
+    <div class="muted">This month</div>
+    {% if categories %}
+    <div class="donut-wrap">
+      <div class="donut spending" style="background: {{ donut_style }}">
+        <div><strong>{{ category_total|money }}</strong><span>This month</span></div>
+      </div>
+      <div class="allocation-list">
+        {% for item in categories %}
+        <label><span><i class="dot" style="background: {{ item.color }}"></i>{{ item.name }}</span><strong>{{ item.percent }}%</strong></label>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <p class="empty">No categorized expenses this month.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card" style="padding:23px;margin-top:18px;">
+  <div class="section-title">What changed this month</div>
+  <div class="insight-strip">
+    <div>
+      <span class="pill {% if decreased %}good{% endif %}">{% if decreased %}Lower{% else %}Spending{% endif %}</span>
+      <strong>{% if decreased %}{{ decreased.name }} changed by {{ decreased.delta|money }}{% else %}No category decreased{% endif %}</strong>
+      <span>Compared with last month's categorized expenses.</span>
+    </div>
+    <div>
+      <span class="pill {% if increased %}warning{% endif %}">{% if increased %}Higher{% else %}Spending{% endif %}</span>
+      <strong>{% if increased %}{{ increased.name }} changed by {{ increased.delta|money }}{% else %}No category increased{% endif %}</strong>
+      <span>Compared with last month's categorized expenses.</span>
+    </div>
+    <div>
+      <span class="pill">Recurring</span>
+      <strong>{% if recurring %}{{ recurring|length }} active recurring expense{{ recurring|length|pluralize }}{% else %}No recurring expenses{% endif %}</strong>
+      <span>{% for exp in recurring %}{{ exp.name }}{% if not forloop.last %}, {% endif %}{% empty %}Add them on the budgets page to include a bills buffer.{% endfor %}</span>
+    </div>
+  </div>
+</section>
+{% endblock %}

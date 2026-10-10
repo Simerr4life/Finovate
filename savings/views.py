@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.contrib import messages
+from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -12,14 +15,59 @@ from .services import MILESTONES, estimate_completion_date
 
 @login_required
 def index(request):
+    from investing.services import compute_investable_surplus
+
+    goals = list(Goal.objects.filter(user=request.user))
+    saved = sum((g.current_amount for g in goals), Decimal("0"))
+    emergency = next((g for g in goals if g.category == Goal.Category.EMERGENCY), None)
+    surplus = compute_investable_surplus(request.user)
+    return render(
+        request,
+        "savings/index.html",
+        {
+            "goals": goals,
+            "saved_total": saved,
+            "emergency": emergency,
+            "surplus": surplus,
+        },
+    )
+
+
+@login_required
+def goals(request):
     goals = Goal.objects.filter(user=request.user)
     goal_rows = [
         {"goal": g, "estimated_completion": estimate_completion_date(g)} for g in goals
     ]
+    saved = sum((row["goal"].current_amount for row in goal_rows), start=0)
+    monthly = Decimal("0")
+    on_track = 0
+    for row in goal_rows:
+        goal = row["goal"]
+        if goal.achieved_at or goal.progress_percent >= 100:
+            on_track += 1
+        elif row["estimated_completion"]:
+            on_track += 1
+        if goal.target_date and not goal.achieved_at:
+            months = max(
+                ((goal.target_date.year - timezone.now().date().year) * 12)
+                + (goal.target_date.month - timezone.now().date().month),
+                1,
+            )
+            row["monthly"] = (goal.remaining_amount / months).quantize(Decimal("0.01"))
+            monthly += row["monthly"]
+        else:
+            row["monthly"] = None
     return render(
         request,
-        "savings/index.html",
-        {"goal_rows": goal_rows, "form": GoalForm()},
+        "savings/goals.html",
+        {
+            "goal_rows": goal_rows,
+            "saved_total": saved,
+            "monthly_total": monthly,
+            "on_track": on_track,
+            "goal_count": len(goal_rows),
+        },
     )
 
 

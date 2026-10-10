@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load finovate %}
+{% block title %}Financial Goals — Finovate{% endblock %}
+{% block crumb %}Financial Goals{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">FINOVATE</div>
+    <div class="page-title">Financial Goals</div>
+    <div class="page-subtitle">Turn important plans into cash you have actually recorded.</div>
+  </div>
+  <a class="button" href="{% url 'savings:goal_add' %}">{% include "partials/icon.html" with name="plus" size=17 %} Create a goal</a>
+</div>
+
+<div class="goal-overview">
+  <div><span>Total saved toward goals</span><div class="money">{{ saved_total|money }}</div></div>
+  <div><span>Planned monthly contributions</span><div class="money">{{ monthly_total|money }}</div></div>
+  <div><span>Goals with a pace or completion</span><div class="money">{{ on_track }} of {{ goal_count }}</div></div>
+</div>
+
+{% if goal_rows %}
+<div class="goals-grid">
+  {% for row in goal_rows %}
+  {% with g=row.goal %}
+  <article class="card goal-card">
+    <div class="goal-icon">{% include "partials/icon.html" with name="target" %}</div>
+    <a class="goal-menu" href="{% url 'savings:goal_edit' g.pk %}" aria-label="Edit {{ g.name }}">Edit</a>
+    <div class="recommend-title">{{ g.name }}</div>
+    <div class="goal-money"><strong>{{ g.current_amount|money }}</strong><span>of {{ g.target_amount|money }}</span></div>
+    <div class="progress"><i style="width: {{ g.progress_percent }}%"></i></div>
+    <div class="progress-label"><strong>{{ g.progress_percent }}% complete</strong><span>{{ g.remaining_amount|money }} remaining</span></div>
+    <div class="goal-footer">
+      <span>{% if g.target_date %}Target · {{ g.target_date|date:"F Y" }}{% elif row.estimated_completion %}Estimate · {{ row.estimated_completion|date:"F Y" }}{% else %}No target date{% endif %}</span>
+      <strong>{% if row.monthly %}{{ row.monthly|money }}/month{% elif g.achieved_at %}Complete{% else %}No pace yet{% endif %}</strong>
+    </div>
+    <a class="text-link" href="{% url 'savings:goal_detail' g.pk %}">Open goal {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+  </article>
+  {% endwith %}
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty">No savings goals yet. <a class="text-link" href="{% url 'savings:goal_add' %}">Create your first one</a></p>
+{% endif %}
+<p class="muted">Amounts here are cash tracked toward each goal, not invested market value.</p>
+{% endblock %}

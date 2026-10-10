@@ -1,165 +1,91 @@
 {% extends "base.html" %}
 {% block title %}Budgeting — Finovate{% endblock %}
+{% block crumb %}Insights{% endblock %}
 {% block content %}
-<div class="flex justify-between items-center mb-6">
-  <h1 class="text-2xl font-bold">Budgeting</h1>
-  <a href="{% url 'budgets:transaction_list' %}" class="bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-700 focus-ring">View all transactions</a>
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">FINOVATE</div>
+    <div class="page-title">Budgeting</div>
+    <div class="page-subtitle">Estimate only. Recalculated from your income, recurring expenses, and goals.</div>
+  </div>
+  <a class="button" href="{% url 'budgets:transaction_list' %}">View transactions</a>
 </div>
 
-<!-- Budget plan -->
-<section class="bg-white rounded-2xl border border-slate-200 p-6 mb-8">
-  <h2 class="font-semibold text-lg mb-1">Your budget plan</h2>
-  <p class="text-xs text-slate-400 mb-4">Estimate only — not guaranteed financial advice. Recalculates automatically whenever your income, recurring expenses, or goals change.</p>
-  <div class="grid sm:grid-cols-4 gap-4 mb-4">
-    <div class="bg-mint-500/10 rounded-xl p-4">
-      <p class="text-xs text-slate-500">Monthly income</p>
-      <p class="text-xl font-bold text-mint-600">${{ plan.monthly_income }}</p>
-    </div>
-    <div class="bg-coral-500/10 rounded-xl p-4">
-      <p class="text-xs text-slate-500">Recurring expenses</p>
-      <p class="text-xl font-bold text-coral-600">${{ plan.monthly_recurring_expenses }}</p>
-    </div>
-    <div class="bg-brand-500/10 rounded-xl p-4">
-      <p class="text-xs text-slate-500">Suggested toward goals</p>
-      <p class="text-xl font-bold text-brand-700">${{ plan.suggested_monthly_savings }}</p>
-    </div>
-    <div class="bg-slate-100 rounded-xl p-4">
-      <p class="text-xs text-slate-500">Left over</p>
-      <p class="text-xl font-bold {% if plan.leftover_after_plan < 0 %}text-coral-600{% else %}text-slate-700{% endif %}">${{ plan.leftover_after_plan }}</p>
-    </div>
+<section class="card padded">
+  <div class="section-title">Your budget plan</div>
+  <div class="summary-grid" style="margin-top:16px;">
+    <div class="card summary-card"><div class="label">Monthly income</div><div class="money">{{ plan.monthly_income }}</div></div>
+    <div class="card summary-card"><div class="label">Recurring expenses</div><div class="money">{{ plan.monthly_recurring_expenses }}</div></div>
+    <div class="card summary-card"><div class="label">Suggested toward goals</div><div class="money">{{ plan.suggested_monthly_savings }}</div></div>
+    <div class="card summary-card"><div class="label">Left over</div><div class="money">{{ plan.leftover_after_plan }}</div></div>
   </div>
-  <details class="text-sm text-slate-500">
-    <summary class="cursor-pointer font-medium text-slate-600">Assumptions behind this plan</summary>
-    <ul class="list-disc ml-5 mt-2 space-y-1">
-      {% for a in plan.assumptions %}<li>{{ a }}</li>{% endfor %}
-    </ul>
+  <details class="assumptions">
+    <summary>Assumptions behind this plan</summary>
+    <ul>{% for a in plan.assumptions %}<li>{{ a }}</li>{% endfor %}</ul>
   </details>
 </section>
 
-<div class="grid lg:grid-cols-2 gap-8">
-  <!-- Income sources -->
-  <section class="bg-white rounded-2xl border border-slate-200 p-6">
-    <h2 class="font-semibold text-lg mb-4">Income sources</h2>
-    <ul class="space-y-2 mb-4">
+<div class="two-column" style="margin-top:18px;">
+  <section class="card padded">
+    <div class="section-title">Income sources</div>
+    <ul class="list-plain">
       {% for src in income_sources %}
-      <li class="flex justify-between items-center text-sm border border-slate-100 rounded-lg px-3 py-2">
-        <span>{{ src.name }} — ${{ src.amount }} / {{ src.get_cadence_display }}{% if not src.is_active %} (inactive){% endif %}</span>
-        <form method="post" action="{% url 'budgets:income_delete' src.pk %}">{% csrf_token %}<button class="text-coral-600 hover:underline">Remove</button></form>
-      </li>
-      {% empty %}<li class="text-sm text-slate-400 italic">No income sources yet.</li>
-      {% endfor %}
+      <li class="list-row"><span>{{ src.name }} — ${{ src.amount }} / {{ src.get_cadence_display }}{% if not src.is_active %} (inactive){% endif %}</span><form method="post" action="{% url 'budgets:income_delete' src.pk %}">{% csrf_token %}<button class="danger-link">Remove</button></form></li>
+      {% empty %}<li class="empty">No income sources yet.</li>{% endfor %}
     </ul>
-    <form method="post" action="{% url 'budgets:income_add' %}" class="grid grid-cols-2 gap-3">
-      {% csrf_token %}
-      {% for field in income_form %}
-      <div class="{% if field.name == 'name' %}col-span-2{% endif %}">
-        <label class="block text-xs font-medium text-slate-500 mb-1">{{ field.label }}</label>
-        {{ field }}
-      </div>
-      {% endfor %}
-      <button type="submit" class="col-span-2 bg-brand-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-brand-700 focus-ring">Add income source</button>
+    <form method="post" action="{% url 'budgets:income_add' %}">{% csrf_token %}
+      {% for field in income_form %}<label class="field-label">{{ field.label }}{{ field }}</label>{% endfor %}
+      <button type="submit" class="button" style="margin-top:12px;">Add income source</button>
     </form>
   </section>
-
-  <!-- Recurring expenses -->
-  <section class="bg-white rounded-2xl border border-slate-200 p-6">
-    <h2 class="font-semibold text-lg mb-4">Recurring expenses</h2>
-    <ul class="space-y-2 mb-4">
+  <section class="card padded">
+    <div class="section-title">Recurring expenses</div>
+    <ul class="list-plain">
       {% for exp in recurring_expenses %}
-      <li class="flex justify-between items-center text-sm border border-slate-100 rounded-lg px-3 py-2">
-        <span>{{ exp.name }} — ${{ exp.amount }} / {{ exp.get_cadence_display }}{% if not exp.is_active %} (inactive){% endif %}</span>
-        <form method="post" action="{% url 'budgets:expense_delete' exp.pk %}">{% csrf_token %}<button class="text-coral-600 hover:underline">Remove</button></form>
-      </li>
-      {% empty %}<li class="text-sm text-slate-400 italic">No recurring expenses yet.</li>
-      {% endfor %}
+      <li class="list-row"><span>{{ exp.name }} — ${{ exp.amount }} / {{ exp.get_cadence_display }}{% if not exp.is_active %} (inactive){% endif %}</span><form method="post" action="{% url 'budgets:expense_delete' exp.pk %}">{% csrf_token %}<button class="danger-link">Remove</button></form></li>
+      {% empty %}<li class="empty">No recurring expenses yet.</li>{% endfor %}
     </ul>
-    <form method="post" action="{% url 'budgets:expense_add' %}" class="grid grid-cols-2 gap-3">
-      {% csrf_token %}
-      {% for field in expense_form %}
-      <div class="{% if field.name == 'name' %}col-span-2{% endif %}">
-        <label class="block text-xs font-medium text-slate-500 mb-1">{{ field.label }}</label>
-        {{ field }}
-      </div>
-      {% endfor %}
-      <button type="submit" class="col-span-2 bg-brand-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-brand-700 focus-ring">Add recurring expense</button>
+    <form method="post" action="{% url 'budgets:expense_add' %}">{% csrf_token %}
+      {% for field in expense_form %}<label class="field-label">{{ field.label }}{{ field }}</label>{% endfor %}
+      <button type="submit" class="button" style="margin-top:12px;">Add recurring expense</button>
     </form>
   </section>
 </div>
 
-<!-- Categories -->
-<section class="bg-white rounded-2xl border border-slate-200 p-6 mt-8">
-  <h2 class="font-semibold text-lg mb-4">Categories</h2>
-  <ul class="flex flex-wrap gap-2 mb-4">
+<section class="card padded" style="margin-top:18px;">
+  <div class="section-title">Categories</div>
+  <ul class="list-plain">
     {% for cat in categories %}
-    <li class="flex items-center gap-2 text-sm border border-slate-200 rounded-full pl-3 pr-1 py-1">
-      <span class="w-2.5 h-2.5 rounded-full" style="background:{{ cat.color }}"></span>
-      {{ cat.name }} <span class="text-xs text-slate-400">({{ cat.get_kind_display }})</span>
-      <form method="post" action="{% url 'budgets:category_delete' cat.pk %}" class="inline">{% csrf_token %}<button class="text-coral-600 text-xs px-1" aria-label="Delete {{ cat.name }}">✕</button></form>
-    </li>
-    {% empty %}<li class="text-sm text-slate-400 italic">No categories yet.</li>
-    {% endfor %}
+    <li class="list-row"><span><i class="swatch" style="background:{{ cat.color }}"></i> {{ cat.name }} ({{ cat.get_kind_display }})</span><form method="post" action="{% url 'budgets:category_delete' cat.pk %}">{% csrf_token %}<button class="danger-link" aria-label="Delete {{ cat.name }}">Remove</button></form></li>
+    {% empty %}<li class="empty">No categories yet.</li>{% endfor %}
   </ul>
-  <form method="post" action="{% url 'budgets:category_add' %}" class="flex gap-3 items-end flex-wrap">
-    {% csrf_token %}
-    {% for field in category_form %}
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">{{ field.label }}</label>
-      {{ field }}
-    </div>
-    {% endfor %}
-    <button type="submit" class="bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-700 focus-ring">Add category</button>
+  <form method="post" action="{% url 'budgets:category_add' %}" class="inline-fields">{% csrf_token %}
+    {% for field in category_form %}<label class="field-label">{{ field.label }}{{ field }}</label>{% endfor %}
+    <button type="submit" class="button">Add category</button>
   </form>
 </section>
 
-<!-- Budget periods and limits -->
-<section class="bg-white rounded-2xl border border-slate-200 p-6 mt-8">
-  <h2 class="font-semibold text-lg mb-4">Budget periods</h2>
-  <ul class="flex flex-wrap gap-2 mb-6">
+<section class="card padded" style="margin-top:18px;">
+  <div class="section-title">Budget periods</div>
+  <ul class="list-plain">
     {% for p in periods %}
-    <li class="text-sm border border-slate-200 rounded-full px-3 py-1 {% if p.is_active %}bg-brand-500/10 border-brand-300 font-semibold{% endif %}">
-      {{ p.name }} {% if p.is_active %}· active{% endif %}
-    </li>
-    {% empty %}<li class="text-sm text-slate-400 italic">No budget periods yet — create one below.</li>
-    {% endfor %}
+    <li class="list-row"><span>{{ p.name }}{% if p.is_active %} · active{% endif %}</span></li>
+    {% empty %}<li class="empty">No budget periods yet.</li>{% endfor %}
   </ul>
-  <form method="post" action="{% url 'budgets:period_add' %}" class="grid sm:grid-cols-4 gap-3 items-end mb-8">
-    {% csrf_token %}
-    {% for field in period_form %}
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">{{ field.label }}</label>
-      {{ field }}
-    </div>
-    {% endfor %}
-    <button type="submit" class="bg-brand-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-brand-700 focus-ring">Create period</button>
+  <form method="post" action="{% url 'budgets:period_add' %}" class="inline-fields">{% csrf_token %}
+    {% for field in period_form %}<label class="field-label">{{ field.label }}{{ field }}</label>{% endfor %}
+    <button type="submit" class="button">Create period</button>
   </form>
-
-  <h3 class="font-semibold mb-3">Category limits {% if active_period %}for {{ active_period.name }}{% endif %}</h3>
-  {% if not active_period %}
-  <p class="text-sm text-slate-400 italic mb-4">Create and activate a budget period above to set category limits.</p>
-  {% endif %}
-  <ul class="space-y-3 mb-4">
-    {% for b in budgets %}
-    <li>
-      <div class="flex justify-between text-sm mb-1">
-        <span class="font-medium">{{ b.category_name }} — limit ${{ b.limit_amount }}, warn at {{ b.warning_threshold_percent }}%</span>
-        <form method="post" action="{% url 'budgets:budget_delete' b.budget_id %}">{% csrf_token %}<button class="text-coral-600 hover:underline">Remove</button></form>
-      </div>
-      <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
-        <div class="h-full {% if b.is_over %}bg-coral-500{% elif b.is_warning %}bg-sunset-500{% else %}bg-mint-500{% endif %}" style="width: {{ b.percent_used }}%"></div>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
+  <h3 class="section-title" style="margin-top:22px;">Category limits {% if active_period %}for {{ active_period.name }}{% endif %}</h3>
+  {% if not active_period %}<p class="muted">Create a budget period above to set category limits.</p>{% endif %}
+  {% for b in budgets %}
+  <div class="progress-label"><span>{{ b.category_name }} — limit ${{ b.limit_amount }}</span><form method="post" action="{% url 'budgets:budget_delete' b.budget_id %}">{% csrf_token %}<button class="danger-link">Remove</button></form></div>
+  <div class="progress {% if b.is_over %}over{% elif b.is_warning %}warn{% endif %}"><i style="width: {% if b.percent_used > 100 %}100{% else %}{{ b.percent_used }}{% endif %}%"></i></div>
+  {% endfor %}
   {% if active_period %}
-  <form method="post" action="{% url 'budgets:budget_add' %}" class="grid sm:grid-cols-4 gap-3 items-end">
-    {% csrf_token %}
-    {% for field in budget_form %}
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">{{ field.label }}</label>
-      {{ field }}
-    </div>
-    {% endfor %}
-    <button type="submit" class="bg-brand-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-brand-700 focus-ring">Add limit</button>
+  <form method="post" action="{% url 'budgets:budget_add' %}" class="inline-fields" style="margin-top:16px;">{% csrf_token %}
+    {% for field in budget_form %}<label class="field-label">{{ field.label }}{{ field }}</label>{% endfor %}
+    <button type="submit" class="button">Add limit</button>
   </form>
   {% endif %}
 </section>

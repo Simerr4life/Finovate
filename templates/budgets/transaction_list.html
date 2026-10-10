@@ -1,47 +1,55 @@
 {% extends "base.html" %}
+{% load finovate %}
 {% block title %}Transactions — Finovate{% endblock %}
+{% block crumb %}Transactions{% endblock %}
 {% block content %}
-<div class="flex justify-between items-center mb-6">
-  <h1 class="text-2xl font-bold">Transactions</h1>
-  <div class="flex gap-2">
-    <a href="{% url 'budgets:index' %}" class="border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 focus-ring">← Budgeting</a>
-    <a href="{% url 'budgets:transaction_add' %}" class="bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-700 focus-ring">+ Add transaction</a>
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">FINOVATE</div>
+    <div class="page-title">Transactions</div>
+    <div class="page-subtitle">Review, categorize, and understand every recorded transaction.</div>
+  </div>
+  <div class="button-row">
+    <a class="button secondary" href="{% url 'budgets:transaction_export' %}?q={{ query }}&amp;category={{ category_id }}&amp;month={{ month }}">Export CSV</a>
+    <a class="button" href="{% url 'budgets:transaction_add' %}">{% include "partials/icon.html" with name="plus" size=17 %} Add transaction</a>
   </div>
 </div>
 
-{% if transactions %}
-<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-  <table class="w-full text-sm">
-    <thead class="bg-slate-50 text-slate-500 text-left">
-      <tr>
-        <th class="px-4 py-3">Date</th>
-        <th class="px-4 py-3">Description</th>
-        <th class="px-4 py-3">Category</th>
-        <th class="px-4 py-3">Source</th>
-        <th class="px-4 py-3 text-right">Amount</th>
-        <th class="px-4 py-3"></th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-slate-100">
-      {% for t in transactions %}
-      <tr>
-        <td class="px-4 py-3">{{ t.occurred_on }}</td>
-        <td class="px-4 py-3">{{ t.description|default:"—" }}</td>
-        <td class="px-4 py-3">{{ t.category.name|default:"Uncategorized" }}</td>
-        <td class="px-4 py-3">{% if t.is_demo %}<span class="text-xs bg-slate-100 px-2 py-0.5 rounded-full">demo</span>{% else %}{{ t.get_source_display }}{% endif %}</td>
-        <td class="px-4 py-3 text-right font-semibold {% if t.kind == 'income' %}text-mint-600{% endif %}">
-          {% if t.kind == 'income' %}+{% else %}-{% endif %}${{ t.amount }}
-        </td>
-        <td class="px-4 py-3 text-right whitespace-nowrap">
-          <a href="{% url 'budgets:transaction_edit' t.pk %}" class="text-brand-700 hover:underline mr-3">Edit</a>
-          <a href="{% url 'budgets:transaction_delete' t.pk %}" class="text-coral-600 hover:underline">Delete</a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="summary-grid compact">
+  <section class="card summary-card"><div class="label">Spent this month</div><div class="money">{{ month_spent|money }}</div><div class="summary-detail">Recorded expenses since the 1st</div></section>
+  <section class="card summary-card"><div class="label">Income this month</div><div class="money">{{ month_income|money }}</div><div class="summary-detail">{{ income_count }} deposit{{ income_count|pluralize }}</div></section>
+  <section class="card summary-card"><div class="label">Recurring expenses</div><div class="money">{{ recurring_total|money }}</div><div class="summary-detail">{{ recurring_count }} active payment{{ recurring_count|pluralize }}</div></section>
 </div>
-{% else %}
-<p class="text-sm text-slate-400 italic py-10 text-center">No transactions yet.</p>
-{% endif %}
+
+<section class="card">
+  <form class="filter-row" method="get">
+    <label class="search-box">{% include "partials/icon.html" with name="search" size=18 %}<input name="q" value="{{ query }}" placeholder="Search merchants or categories" aria-label="Search transactions"></label>
+    <input type="month" name="month" value="{{ month }}" aria-label="Filter date">
+    <select name="category" aria-label="Filter category">
+      <option value="">All categories</option>
+      {% for cat in categories %}
+      <option value="{{ cat.pk }}" {% if category_id == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="button secondary" type="submit">Filters</button>
+  </form>
+  <div class="table-head"><span>Merchant</span><span>Category</span><span>Date</span><span>Amount</span><span></span></div>
+  {% if transactions %}
+  <div class="transaction-list full">
+    {% for t in transactions %}
+    <a class="transaction-row" href="{% url 'budgets:transaction_edit' t.pk %}">
+      <span class="merchant-mark">{% if t.description %}{{ t.description|merchant_mark }}{% elif t.category %}{{ t.category.name|merchant_mark }}{% else %}TX{% endif %}</span>
+      <span class="transaction-name"><strong>{% if t.description %}{{ t.description }}{% elif t.category %}{{ t.category.name }}{% else %}Transaction{% endif %}</strong><small>{% if t.account %}{{ t.account.institution_name }} {{ t.account.masked_number }}{% else %}Manual entry{% endif %}{% if t.is_demo %} · demo{% endif %}</small></span>
+      <span class="pill">{% if t.category %}{{ t.category.name }}{% else %}Uncategorized{% endif %}</span>
+      <span class="date-cell">{{ t.occurred_on|date:"M j, Y" }}</span>
+      <span class="amount {% if t.kind == 'income' %}positive{% endif %}">{% if t.kind == 'income' %}+{% else %}-{% endif %}{{ t.amount|money }}</span>
+      {% include "partials/icon.html" with name="chevron" size=16 %}
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">No transactions yet.</p>
+  {% endif %}
+</section>
+<p class="muted"><a class="text-link" href="{% url 'budgets:index' %}">Edit budgets and categories</a></p>
 {% endblock %}

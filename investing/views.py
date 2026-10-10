@@ -63,6 +63,17 @@ def index(request):
     surplus = compute_investable_surplus(request.user)
     pools = investable_pools(request.user)
     pool_summaries = pool_investment_summaries(request.user)
+    market_rows = []
+    for row in MarketPrice.objects.all().order_by("symbol", "-date"):
+        if not any(existing["symbol"] == row.symbol for existing in market_rows):
+            market_rows.append(
+                {
+                    "symbol": row.symbol,
+                    "date": row.date,
+                    "close": row.close,
+                    "source_note": row.source_note,
+                }
+            )
 
     context = {
         "form": form,
@@ -77,6 +88,8 @@ def index(request):
         "surplus": surplus,
         "investable_pools": pools,
         "pool_summaries": pool_summaries,
+        "market_rows": market_rows,
+        "tab": request.GET.get("tab", "portfolio"),
     }
     return render(request, "investing/index.html", context)
 
@@ -100,6 +113,9 @@ def propose_surplus(request):
             messages.success(request, f"Proposed investing ${amount} into {target} — pending your approval below.")
         else:
             messages.info(request, "No investable surplus available to propose right now.")
+        next_url = request.POST.get("next", "")
+        if next_url.startswith("/") and not next_url.startswith("//"):
+            return redirect(next_url)
     return redirect("investing:index")
 
 

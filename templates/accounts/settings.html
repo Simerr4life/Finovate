@@ -1,53 +1,101 @@
 {% extends "base.html" %}
+{% load finovate %}
 {% block title %}Settings — Finovate{% endblock %}
+{% block crumb %}Settings{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Settings</h1>
-
-<div class="grid md:grid-cols-2 gap-6">
-  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-    <h2 class="font-semibold text-lg mb-4">Preferences</h2>
-    <form method="post" class="space-y-4" novalidate>
-      {% csrf_token %}
-      {% for field in form %}
-      <div>
-        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
-        {{ field }}
-        {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">FINOVATE</div>
+    <div class="page-title">Settings</div>
+    <div class="page-subtitle">Manage your preferences, connections, and privacy.</div>
+  </div>
+</div>
+<div class="settings-layout">
+  <nav class="card settings-nav" aria-label="Settings sections">
+    <a class="active" href="#profile">Profile {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+    <a href="#accounts">Connected accounts {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+    <a href="#savings">Savings preferences {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+    <a href="#investing">Investment preferences {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+    <a href="#notifications">Notifications {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+    <a href="#security">Security &amp; privacy {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+  </nav>
+  <div class="stack">
+    <section class="card settings-panel" id="profile">
+      <div class="section-title">Profile</div>
+      <div class="muted">You are always in control of your information and preferences.</div>
+      <div class="settings-form">
+        <div class="profile-large">
+          <span class="avatar">{{ user_initials }}</span>
+          <div><strong>{{ user_display_name }}</strong><span>Local account</span></div>
+        </div>
+        <div class="form-grid">
+          <label class="field-label">Username<input value="{{ user.username }}" readonly></label>
+          <label class="field-label">Email address<input value="{{ user.email }}" readonly></label>
+        </div>
       </div>
-      {% endfor %}
-      <button type="submit" class="bg-brand-600 text-white font-medium px-5 py-2 rounded-lg hover:bg-brand-700 focus-ring">Save preferences</button>
-    </form>
-  </section>
-
-  <div class="space-y-6">
-    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-      <h2 class="font-semibold text-lg mb-4">Connected accounts</h2>
-      <p class="text-sm text-slate-500 mb-4">No bank or brokerage is connected. This is expected in local/demo mode — see the integration-readiness guide for what connecting one later would involve.</p>
-      {% if connected_accounts %}
-      <ul class="space-y-2">
-        {% for acc in connected_accounts %}
-        <li class="flex justify-between items-center text-sm border border-slate-100 rounded-lg px-3 py-2">
-          <span>{{ acc.display_name }}</span>
-          <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600">{{ acc.get_status_display }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}
-      <p class="text-sm text-slate-400 italic">No connected-account records yet.</p>
-      {% endif %}
     </section>
 
-    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-      <h2 class="font-semibold text-lg mb-4">Automation controls</h2>
-      {% if roundup_settings %}
-      <p class="text-sm text-slate-600">
-        Round-ups are currently
-        <strong>{% if roundup_settings.is_paused %}paused{% elif roundup_settings.enabled %}enabled{% else %}disabled{% endif %}</strong>.
-      </p>
-      <a href="{% url 'investing:index' %}" class="inline-block mt-3 text-sm font-medium text-brand-700 hover:underline">Manage round-up settings →</a>
-      {% else %}
-      <p class="text-sm text-slate-400 italic">Visit the Investing page to configure round-ups.</p>
-      {% endif %}
+    <section class="card settings-panel" id="accounts">
+      <div class="section-title">Connected accounts</div>
+      <div class="muted">No bank or brokerage connection is implied unless a record is marked connected.</div>
+      <div class="account-list">
+        {% for acc in connected_accounts %}
+        <div class="account-row">
+          <span class="merchant-mark">{{ acc.display_name|merchant_mark }}</span>
+          <div>
+            <strong>{{ acc.display_name }}</strong>
+            <span>{% if acc.status == 'connected' %}<i class="status-dot"></i> Connected{% else %}{{ acc.get_status_display }}{% endif %}</span>
+          </div>
+        </div>
+        {% empty %}
+        <p class="empty">No connected-account records yet.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <form method="post" class="card settings-panel" id="preferences" novalidate>
+      {% csrf_token %}
+      <div id="savings">
+        <div class="section-title">Savings preferences</div>
+        {% for field in form %}
+          {% if field.name == 'income_cadence' or field.name == 'cash_reserve_target' or field.name == 'budget_warning_threshold_percent' %}
+          <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div id="investing" style="margin-top:28px;">
+        <div class="section-title">Investment preferences</div>
+        {% for field in form %}
+          {% if field.name == 'risk_comfort' %}
+          <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}</label>
+          {% endif %}
+        {% endfor %}
+        <p class="muted">{% if roundup_settings %}Round-ups are {% if roundup_settings.is_paused %}paused{% elif roundup_settings.enabled %}enabled{% else %}disabled{% endif %}.{% else %}Round-up settings are created when you open Investments.{% endif %}</p>
+        <a class="text-link" href="{% url 'investing:index' %}">Manage round-up settings {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+      </div>
+      <div id="notifications" style="margin-top:28px;">
+        <div class="section-title">Notifications</div>
+        <div class="preference-list">
+          {% for field in form %}
+            {% if field.name == 'notify_budget_warnings' or field.name == 'notify_goal_milestones' %}
+            <label class="toggle-row">
+              <span><strong>{{ field.label }}</strong><small>Stored on your profile. Delivery is local only.</small></span>
+              {{ field }}
+            </label>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      <button class="button" type="submit" style="margin-top:18px;">Save changes</button>
+    </form>
+
+    <section class="card settings-panel" id="security">
+      <div class="section-title">Security &amp; privacy</div>
+      <div class="muted">This prototype uses a local Django session. It does not store bank credentials.</div>
+      <form method="post" action="{% url 'accounts:logout' %}" style="margin-top:16px;">
+        {% csrf_token %}
+        <button class="button secondary" type="submit">Log out</button>
+      </form>
     </section>
   </div>
 </div>

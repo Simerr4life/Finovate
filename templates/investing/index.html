@@ -1,165 +1,227 @@
 {% extends "base.html" %}
-{% block title %}Investing (simulated) — Finovate{% endblock %}
+{% load finovate %}
+{% block title %}Investments — Finovate{% endblock %}
+{% block crumb %}Investments{% endblock %}
 {% block content %}
-<div class="flex justify-between items-center mb-2">
-  <h1 class="text-2xl font-bold">Investing</h1>
-  <span class="flex gap-4">
-    <a href="{% url 'investing:market_data' %}" class="text-sm font-medium text-brand-700 hover:underline">Verified market data</a>
-    <a href="{% url 'investing:historical_demo' %}" class="text-sm font-medium text-brand-700 hover:underline">Hypothetical scenario →</a>
-  </span>
-</div>
-<div class="bg-sunset-500/10 border border-sunset-500/30 rounded-xl p-4 text-sm text-sunset-700 mb-6">
-  <strong>Everything on this page is simulated.</strong> No brokerage account is connected, no real orders are placed, and no money actually moves.
-  ETFs carry market risk — their value can go down as well as up, and there is no guarantee they will outperform a savings account's interest rate.
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">FINOVATE</div>
+    <div class="page-title">Investments</div>
+    <div class="page-subtitle">Simulated portfolio tools only. No brokerage is connected and no real order is placed.</div>
+  </div>
+  <button class="button" type="button" data-open-review {% if surplus.investable_surplus <= 0 %}disabled{% endif %}>Review investment plan</button>
 </div>
 
-<div class="grid lg:grid-cols-3 gap-6 mb-8">
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Pending round-ups</p>
-    <p class="text-2xl font-bold text-sunset-600">${{ pending_total|floatformat:2 }}</p>
-  </div>
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Net contributions (simulated)</p>
-    <p class="text-2xl font-bold text-slate-700">${{ latest_snapshot.net_contributions|default:"0.00" }}</p>
-  </div>
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Market value (simulated)</p>
-    <p class="text-2xl font-bold text-slate-700">${{ latest_snapshot.market_value|default:"0.00" }}</p>
-  </div>
+<div class="top-tabs" role="tablist">
+  <a href="?tab=portfolio" class="{% if tab == 'portfolio' %}active{% endif %}">Portfolio</a>
+  <a href="?tab=explore" class="{% if tab == 'explore' %}active{% endif %}">Explore</a>
+  <a href="?tab=calculator" class="{% if tab == 'calculator' %}active{% endif %}">Calculator</a>
 </div>
 
-<div class="grid lg:grid-cols-2 gap-6">
-  <section class="bg-white rounded-2xl border border-slate-200 p-6">
-    <h2 class="font-semibold text-lg mb-4">Round-up settings</h2>
-    <form method="post" class="space-y-4" novalidate>
-      {% csrf_token %}
-      {% for field in form %}
-      <div class="{% if field.name == 'enabled' or field.name == 'is_paused' %}flex items-center gap-2{% endif %}">
-        {% if field.name == 'enabled' or field.name == 'is_paused' %}
-          {{ field }}<label for="{{ field.id_for_label }}" class="text-sm font-medium text-slate-700">{{ field.label }}</label>
-        {% else %}
-          <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
-          {{ field }}
-        {% endif %}
+{% if tab == 'explore' %}
+<section class="card">
+  <div class="filter-row">
+    <p class="muted">Verified prices already stored in Finovate. Rows are omitted when a date was not verified.</p>
+    <a class="button secondary" href="{% url 'investing:market_data' %}">Market data</a>
+  </div>
+  {% if market_rows %}
+  <div class="etf-list">
+    {% for row in market_rows %}
+    <a class="etf-row" href="{% url 'investing:market_data' %}">
+      <span class="ticker">{{ row.symbol }}</span>
+      <span><strong>{{ row.symbol }}</strong><small>{{ row.source_note }}</small></span>
+      <span><small>Latest close</small><strong>{{ row.close }}</strong></span>
+      <span><small>As of</small><strong>{{ row.date }}</strong></span>
+      <span class="pill">Verified price</span>
+      {% include "partials/icon.html" with name="chevron" size=16 %}
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">No verified market prices are loaded. Seed market data before this list can show symbols.</p>
+  {% endif %}
+  <div class="estimate-note">Closes are source-cited prices, not a projection of your portfolio.</div>
+</section>
+
+{% elif tab == 'calculator' %}
+<div class="calculator-grid">
+  <section class="card">
+    <div class="section-title">Adjust assumptions</div>
+    <p class="muted">These inputs are hypothetical. They are not your account balance.</p>
+    <label class="field-label">Time horizon <strong id="calc-years-label">10 years</strong></label>
+    <input id="calc-years" type="range" min="1" max="30" value="10" data-start="0" data-monthly="0" data-rate="0.06">
+    <label class="field-label">Starting balance <input id="calc-start" type="number" min="0" step="0.01" value="0"></label>
+    <label class="field-label">Monthly contribution <input id="calc-monthly" type="number" min="0" step="0.01" value="0"></label>
+    <label class="field-label">Assumed annual return <input id="calc-rate" type="number" min="0" max="20" step="0.1" value="6"></label>
+    <p class="muted"><a class="text-link" href="{% url 'investing:historical_demo' %}">Open the price-based hypothetical scenario</a></p>
+  </section>
+  <section class="card projection">
+    <div class="eyebrow">HYPOTHETICAL PROJECTION</div>
+    <div class="muted" id="calc-horizon">Estimated value in 10 years</div>
+    <div class="money" id="calc-projection">$0</div>
+    <div class="disclosure">These outputs are estimates, not predictions. Returns can change, and investments can lose value. Nothing here is executed.</div>
+  </section>
+</div>
+
+{% else %}
+<div class="summary-grid compact">
+  <section class="card summary-card">
+    <div class="label">Simulated portfolio value</div>
+    <div class="money">{% if latest_snapshot %}{{ latest_snapshot.market_value|money }}{% else %}$0.00{% endif %}</div>
+    <div class="summary-detail">General bucket only. Pool values are listed below.</div>
+  </section>
+  <section class="card summary-card">
+    <div class="label">Contributed</div>
+    <div class="money">{% if latest_snapshot %}{{ latest_snapshot.net_contributions|money }}{% else %}$0.00{% endif %}</div>
+    <div class="summary-detail">Simulated deposits, separate from market value</div>
+  </section>
+  <section class="card summary-card">
+    <div class="label">Pending round-ups</div>
+    <div class="money">{{ pending_total|money }}</div>
+    <div class="summary-detail">Not swept. Not part of cash or portfolio value.</div>
+  </section>
+</div>
+
+<div class="two-column">
+  <section class="card">
+    <div class="section-title">Portfolio snapshot</div>
+    {% if latest_snapshot %}
+    <div class="card-metric">{{ latest_snapshot.market_value|money }} <span>as of {{ latest_snapshot.as_of }}</span></div>
+    <p class="muted">Gain or loss versus contributions: {{ latest_snapshot.gain_loss|money }}. Simulated performance only.</p>
+    {% else %}
+    <p class="empty">No simulated portfolio snapshot yet.</p>
+    {% endif %}
+    {% if orders %}
+    <div class="transaction-list">
+      {% for o in orders %}
+      <div class="transaction-row" style="cursor:default;">
+        <span class="merchant-mark">{{ o.get_order_type_display|merchant_mark }}</span>
+        <span class="transaction-name"><strong>{{ o.get_order_type_display }} · {{ o.pool.name|default:"General" }}</strong><small>{{ o.created_at|date:"M j, Y" }} · {{ o.get_status_display }}</small></span>
+        <span class="amount">{{ o.amount|money }}</span>
       </div>
       {% endfor %}
-      <button type="submit" name="save_settings" value="1" class="bg-brand-600 text-white font-medium px-5 py-2 rounded-lg hover:bg-brand-700 focus-ring">Save settings</button>
-    </form>
-    <form method="post" action="{% url 'investing:sweep_now' %}" class="mt-4">
-      {% csrf_token %}
-      <button type="submit" class="w-full border border-brand-300 text-brand-700 font-medium py-2 rounded-lg hover:bg-brand-50 focus-ring">Simulate a sweep now</button>
-    </form>
-    <p class="text-xs text-slate-400 mt-2">Sweeps respect your contribution cap and minimum cash reserve, and never dip into money reserved as cash.</p>
+    </div>
+    {% endif %}
   </section>
+  <section class="card">
+    <div class="section-title">Investable surplus</div>
+    <div class="waterfall">
+      <div><span>Cash balance</span><strong>{{ surplus.cash_balance|money }}</strong></div>
+      <div><span>Cash reserve</span><strong>-{{ surplus.minimum_cash_reserve|money }}</strong></div>
+      <div><span>Goal allocations</span><strong>-{{ surplus.goal_allocations|money }}</strong></div>
+      <div><span>Bills buffer</span><strong>-{{ surplus.upcoming_bills_buffer|money }}</strong></div>
+      <div class="total"><span>Investable surplus</span><strong>{{ surplus.investable_surplus|money }}</strong></div>
+    </div>
+    <form method="post" action="{% url 'investing:propose_surplus' %}" class="stack" style="margin-top:16px;">
+      {% csrf_token %}
+      <label class="field-label">Amount to propose investing
+        <input type="number" step="0.01" min="0" name="amount" value="{{ surplus.investable_surplus }}">
+      </label>
+      <label class="field-label">Into savings pool
+        <select name="pool">
+          <option value="">General / unassigned</option>
+          {% for pool in investable_pools %}<option value="{{ pool.pk }}">{{ pool.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <button class="button secondary" type="submit">Propose (requires approval)</button>
+    </form>
+  </section>
+</div>
+<div class="disclosure">{% include "partials/icon.html" with name="shield" size=18 %} Investment values can rise or fall. Past performance does not guarantee future results. Everything on this page is simulated.</div>
 
-  <section class="bg-white rounded-2xl border border-slate-200 p-6">
-    <h2 class="font-semibold text-lg mb-4">Round-up ledger</h2>
-    {% if recent_entries %}
-    <ul class="divide-y divide-slate-100 text-sm">
-      {% for e in recent_entries %}
-      <li class="py-2 flex justify-between items-center">
-        <span>
-          ${{ e.eligible_amount }} purchase → +${{ e.round_up_amount }}
-          <span class="text-xs text-slate-400">({{ e.source_transaction.description|default:e.source_transaction.category.name|default:"transaction" }})</span>
-        </span>
-        <span class="text-xs px-2 py-1 rounded-full
-          {% if e.status == 'pending' %}bg-sunset-500/10 text-sunset-600
-          {% elif e.status == 'swept' %}bg-mint-500/10 text-mint-600
-          {% else %}bg-slate-100 text-slate-500{% endif %}">
-          {{ e.get_status_display }}
-        </span>
-      </li>
+{% if pending_orders %}
+<section class="card padded" style="margin-top:18px;">
+  <div class="section-title">Pending your approval</div>
+  {% for o in pending_orders %}
+  <div class="list-row" style="margin-top:12px;">
+    <span>Proposed {{ o.get_order_type_display|lower }} of {{ o.amount|money }} into {% if o.pool %}{{ o.pool.name }}{% else %}the general bucket{% endif %}</span>
+    <span class="button-row">
+      <form method="post" action="{% url 'investing:approve_order' o.pk %}">{% csrf_token %}<button class="button" type="submit">Approve</button></form>
+      <form method="post" action="{% url 'investing:reject_order' o.pk %}">{% csrf_token %}<button class="button secondary" type="submit">Reject</button></form>
+    </span>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<div class="two-column" style="margin-top:18px;">
+  <section class="card">
+    <div class="section-title">Round-up settings</div>
+    <form method="post" class="stack" novalidate>
+      {% csrf_token %}
+      {% for field in form %}
+      <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}</label>
       {% endfor %}
-    </ul>
+      <button type="submit" name="save_settings" value="1" class="button">Save settings</button>
+    </form>
+    <form method="post" action="{% url 'investing:sweep_now' %}" style="margin-top:12px;">
+      {% csrf_token %}
+      <button type="submit" class="button secondary">Simulate a sweep now</button>
+    </form>
+  </section>
+  <section class="card">
+    <div class="section-title">Round-up ledger</div>
+    {% if recent_entries %}
+    <div class="transaction-list">
+      {% for e in recent_entries %}
+      <div class="transaction-row" style="cursor:default;">
+        <span class="transaction-name"><strong>{{ e.eligible_amount|money }} purchase</strong><small>{{ e.source_transaction.description|default:"transaction" }} · {{ e.get_status_display }}</small></span>
+        <span class="amount positive">+{{ e.round_up_amount|money }}</span>
+      </div>
+      {% endfor %}
+    </div>
     {% else %}
-    <p class="text-sm text-slate-400 italic">No round-ups yet. They're created from expense transactions once round-ups are enabled.</p>
+    <p class="empty">No round-ups yet. They're created from expense transactions once round-ups are enabled.</p>
     {% endif %}
   </section>
 </div>
 
-<section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
-  <h2 class="font-semibold text-lg mb-2">Investment-eligible surplus</h2>
-  <p class="text-xs text-slate-400 mb-4">A transparent estimate, not a guarantee — never assumes money left over is automatically safe to invest.</p>
-  <div class="grid sm:grid-cols-5 gap-3 mb-4 text-sm">
-    <div class="bg-slate-50 rounded-lg p-3"><p class="text-xs text-slate-400">Cash balance</p><p class="font-bold">${{ surplus.cash_balance }}</p></div>
-    <div class="bg-slate-50 rounded-lg p-3"><p class="text-xs text-slate-400">− Cash reserve</p><p class="font-bold">${{ surplus.minimum_cash_reserve }}</p></div>
-    <div class="bg-slate-50 rounded-lg p-3"><p class="text-xs text-slate-400">− Goal allocations</p><p class="font-bold">${{ surplus.goal_allocations }}</p></div>
-    <div class="bg-slate-50 rounded-lg p-3"><p class="text-xs text-slate-400">− Bills buffer (1mo)</p><p class="font-bold">${{ surplus.upcoming_bills_buffer }}</p></div>
-    <div class="bg-mint-500/10 rounded-lg p-3"><p class="text-xs text-slate-500">= Investable surplus</p><p class="font-bold text-mint-600">${{ surplus.investable_surplus }}</p></div>
-  </div>
-  <details class="text-xs text-slate-500 mb-4">
-    <summary class="cursor-pointer font-medium text-slate-600">How this is calculated</summary>
-    <ul class="list-disc ml-5 mt-2 space-y-1">{% for n in surplus.notes %}<li>{{ n }}</li>{% endfor %}</ul>
-  </details>
-  <form method="post" action="{% url 'investing:propose_surplus' %}" class="flex gap-3 items-end flex-wrap">
-    {% csrf_token %}
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Amount to propose investing ($)</label>
-      <input type="number" step="0.01" min="0" name="amount" value="{{ surplus.investable_surplus }}">
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Into Savings Pool</label>
-      <select name="pool">
-        <option value="">General / unassigned</option>
-        {% for pool in investable_pools %}<option value="{{ pool.pk }}">{{ pool.name }}</option>{% endfor %}
-      </select>
-    </div>
-    <button type="submit" class="border border-brand-300 text-brand-700 font-medium px-4 py-2 rounded-lg hover:bg-brand-50 focus-ring">Propose (requires approval below)</button>
-  </form>
-  {% if not investable_pools %}
-  <p class="text-xs text-slate-400 mt-2">No investable Savings Pools yet — <a href="{% url 'savings:goal_add' %}" class="underline">create one</a> and check "Make this an investable Savings Pool" to target round-ups and proposals at it specifically.</p>
-  {% endif %}
-
-  {% if pending_orders %}
-  <div class="mt-5">
-    <h3 class="text-sm font-semibold mb-2">Pending your approval</h3>
-    <ul class="space-y-2">
-      {% for o in pending_orders %}
-      <li class="flex justify-between items-center text-sm border border-sunset-200 bg-sunset-500/5 rounded-lg px-3 py-2">
-        <span>Proposed {{ o.get_order_type_display|lower }} of ${{ o.amount }} into {% if o.pool %}"{{ o.pool.name }}"{% else %}general bucket{% endif %} ({{ o.created_at|date:"M j, Y" }})</span>
-        <span class="flex gap-2">
-          <form method="post" action="{% url 'investing:approve_order' o.pk %}">{% csrf_token %}<button class="bg-mint-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-mint-600 focus-ring">Approve</button></form>
-          <form method="post" action="{% url 'investing:reject_order' o.pk %}">{% csrf_token %}<button class="border border-coral-300 text-coral-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-coral-50 focus-ring">Reject</button></form>
-        </span>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-  {% endif %}
-</section>
-
 {% if pool_summaries %}
-<section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
-  <h2 class="font-semibold text-lg mb-4">Your investable Savings Pools</h2>
-  <div class="grid sm:grid-cols-2 gap-4">
+<section class="card padded" style="margin-top:18px;">
+  <div class="section-title">Your investable savings pools</div>
+  <div class="goals-grid" style="margin-top:16px;">
     {% for row in pool_summaries %}
-    <a href="{% url 'savings:goal_detail' row.pool.pk %}" class="block border border-slate-200 rounded-xl p-4 hover:border-brand-300">
-      <p class="font-semibold flex items-center gap-2 mb-2"><span class="w-2.5 h-2.5 rounded-full" style="background:{{ row.pool.color }}"></span>{{ row.pool.name }}</p>
+    <a class="card goal-card" href="{% url 'savings:goal_detail' row.pool.pk %}">
+      <div class="recommend-title">{{ row.pool.name }}</div>
       {% if row.snapshot %}
-      <div class="text-sm flex justify-between"><span class="text-slate-500">Invested</span><span class="font-semibold">${{ row.snapshot.net_contributions }}</span></div>
-      <div class="text-sm flex justify-between"><span class="text-slate-500">Market value</span><span class="font-semibold">${{ row.snapshot.market_value }}</span></div>
+      <div class="goal-footer"><span>Invested {{ row.snapshot.net_contributions|money }}</span><strong>{{ row.snapshot.market_value|money }}</strong></div>
       {% else %}
-      <p class="text-xs text-slate-400">No investments yet.</p>
+      <p class="muted">No investments yet.</p>
       {% endif %}
     </a>
     {% endfor %}
   </div>
 </section>
 {% endif %}
+{% endif %}
+{% endblock %}
 
-<section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
-  <h2 class="font-semibold text-lg mb-4">Simulated order history</h2>
-  {% if orders %}
-  <table class="w-full text-sm">
-    <thead class="text-slate-400 text-left"><tr><th class="py-1">Date</th><th>Type</th><th>Pool</th><th>Amount</th><th>Status</th></tr></thead>
-    <tbody class="divide-y divide-slate-100">
-      {% for o in orders %}
-      <tr><td class="py-2">{{ o.created_at|date:"M j, Y" }}</td><td>{{ o.get_order_type_display }}</td><td>{{ o.pool.name|default:"General" }}</td><td>${{ o.amount }}</td><td>{{ o.get_status_display }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="text-sm text-slate-400 italic">No simulated orders yet.</p>
-  {% endif %}
-</section>
+{% block extra_js %}
+<script>
+(function () {
+  const years = document.getElementById("calc-years");
+  const startEl = document.getElementById("calc-start");
+  const monthlyEl = document.getElementById("calc-monthly");
+  const rateEl = document.getElementById("calc-rate");
+  if (!years || !startEl || !monthlyEl || !rateEl) return;
+  function project() {
+    const n = Number(years.value);
+    const start = Number(startEl.value || "0");
+    const monthly = Number(monthlyEl.value || "0");
+    const rate = Number(rateEl.value || "0") / 100;
+    const monthlyRate = rate / 12;
+    const growth = start * Math.pow(1 + rate, n);
+    const contrib = monthlyRate === 0 ? monthly * n * 12 : monthly * ((Math.pow(1 + monthlyRate, n * 12) - 1) / monthlyRate);
+    const value = Math.round(growth + contrib);
+    const label = document.getElementById("calc-years-label");
+    const out = document.getElementById("calc-projection");
+    const horizon = document.getElementById("calc-horizon");
+    if (label) label.textContent = n + " years";
+    if (horizon) horizon.textContent = "Estimated value in " + n + " years";
+    if (out) out.textContent = "$" + value.toLocaleString();
+  }
+  [years, startEl, monthlyEl, rateEl].forEach(function (el) { el.addEventListener("input", project); });
+  project();
+})();
+</script>
 {% endblock %}

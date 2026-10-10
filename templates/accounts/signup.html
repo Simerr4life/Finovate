@@ -1,25 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Sign up — Finovate{% endblock %}
 {% block content %}
-<div class="max-w-md mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-  <h1 class="text-2xl font-bold mb-1">Create your account</h1>
-  <p class="text-sm text-slate-500 mb-6">
-    <strong>Demo authentication:</strong> this uses Django's standard local account
-    system for development. It is not connected to a production identity
-    provider yet — see Settings for future options.
-  </p>
-  <form method="post" class="space-y-4" novalidate>
+<section class="card auth-card">
+  <div class="eyebrow">FINOVATE</div>
+  <div class="page-title">Create your account</div>
+  <p class="page-subtitle">This uses Django's local account system for this prototype. It is not a production identity provider.</p>
+  <form method="post" novalidate>
     {% csrf_token %}
     {% for field in form %}
-    <div>
-      <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
-      {{ field }}
-      {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
-      {% for error in field.errors %}<p class="text-xs text-coral-600 mt-1">{{ error }}</p>{% endfor %}
-    </div>
+    <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
     {% endfor %}
-    <button type="submit" class="w-full bg-brand-600 text-white font-medium py-2.5 rounded-lg hover:bg-brand-700 focus-ring">Create account</button>
+    <button type="submit" class="button" style="width:100%;margin-top:18px;">Create account</button>
   </form>
-  <p class="text-sm text-slate-500 mt-4">Already have an account? <a class="text-brand-700 font-medium" href="{% url 'accounts:login' %}">Log in</a></p>
-</div>
+  <p class="muted">Already have an account? <a class="text-link" href="{% url 'accounts:login' %}">Log in</a></p>
+</section>
 {% endblock %}

@@ -1,171 +1,149 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — Finovate{% endblock %}
+{% load finovate %}
+{% block title %}Overview — Finovate{% endblock %}
+{% block crumb %}Overview{% endblock %}
 {% block content %}
-<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+<div class="overview-heading">
   <div>
-    <h1 class="text-2xl font-bold">Your dashboard</h1>
-    <p class="text-sm text-slate-500">As of {{ today }}. {% if has_demo_data %}Includes clearly-labeled demo/sample data.{% endif %}</p>
+    <div class="page-title">{{ greeting }}, {{ user_display_name }}.</div>
+    <div class="page-subtitle">{{ today|date:"l, F j" }} · Here is how your recorded money is doing.{% if has_demo_data %} Includes labeled demo data.{% endif %}</div>
   </div>
-  <div class="flex gap-2">
-    <a href="{% url 'budgets:transaction_add' %}" class="bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-700 focus-ring">+ Transaction</a>
-    <a href="{% url 'savings:goal_add' %}" class="bg-mint-500 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-mint-600 focus-ring">+ Goal</a>
-    <a href="{% url 'budgets:index' %}" class="border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 focus-ring">Edit budgets</a>
-  </div>
+  {% if banks_connected %}
+  <span class="pill good"><span class="status-dot"></span> All accounts synced</span>
+  {% else %}
+  <span class="pill">No bank connected</span>
+  {% endif %}
 </div>
 
-<!-- Balance breakdown: cash, round-ups pending, and invested value are
-     always shown separately, never combined into one number. -->
-<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Cash balance</p>
-    <p class="text-2xl font-bold text-mint-600">${{ cash_balance|floatformat:2 }}</p>
-    <p class="text-xs text-slate-400 mt-1">Income minus expenses, all time</p>
-  </div>
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Total income</p>
-    <p class="text-2xl font-bold text-slate-700">${{ income_total|floatformat:2 }}</p>
-  </div>
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Total expenses</p>
-    <p class="text-2xl font-bold text-slate-700">${{ expense_total|floatformat:2 }}</p>
-  </div>
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Round-ups pending <span class="font-normal">(simulated)</span></p>
-    <p class="text-2xl font-bold text-sunset-600">${{ pending_roundups_total|floatformat:2 }}</p>
-    <p class="text-xs text-slate-400 mt-1">Not yet swept — separate from cash</p>
-  </div>
+<div class="summary-grid">
+  <section class="card summary-card">
+    <div class="label">Total cash</div>
+    <div class="money">{{ cash_balance|money }}</div>
+    <div class="summary-detail">Income minus expenses, all time</div>
+  </section>
+  <section class="card summary-card">
+    <div class="label">Monthly income</div>
+    <div class="money">{{ month_income|money }}</div>
+    <div class="summary-detail">{% if income_vs_plan != None %}{{ income_vs_plan }}% of planned monthly income{% else %}No income plan entered yet{% endif %}</div>
+  </section>
+  <section class="card summary-card">
+    <div class="label">Monthly spending</div>
+    <div class="money">{{ month_expense|money }}</div>
+    <div class="summary-detail {% if budget_remaining > 0 %}good{% endif %}">
+      {% if budget_progress %}{{ budget_remaining|money }} still inside active limits{% else %}No active budget limits{% endif %}
+    </div>
+  </section>
+  <section class="card summary-card">
+    <div class="label">Potential savings</div>
+    <div class="money">{{ surplus.investable_surplus|money }}</div>
+    <div class="summary-detail">Estimated after reserves</div>
+  </section>
 </div>
 
-{% if latest_snapshot %}
-<div class="bg-white rounded-2xl border border-slate-200 p-5 mb-8">
-  <p class="text-xs font-semibold text-slate-400 uppercase mb-2">Simulated investment portfolio — as of {{ latest_snapshot.as_of }}</p>
-  <div class="flex gap-8 flex-wrap">
-    <div><span class="text-slate-500 text-sm">Net contributions</span><p class="font-bold text-lg">${{ latest_snapshot.net_contributions|floatformat:2 }}</p></div>
-    <div><span class="text-slate-500 text-sm">Market value</span><p class="font-bold text-lg">${{ latest_snapshot.market_value|floatformat:2 }}</p></div>
-    <div><span class="text-slate-500 text-sm">Gain/loss (simulated)</span><p class="font-bold text-lg {% if latest_snapshot.gain_loss < 0 %}text-coral-600{% else %}text-mint-600{% endif %}">${{ latest_snapshot.gain_loss|floatformat:2 }}</p></div>
-  </div>
-  <p class="text-xs text-slate-400 mt-2">This is simulated performance, not a real brokerage balance. Contributions (deposits) are always shown separately from market performance.</p>
-</div>
-{% endif %}
-
-<div class="grid lg:grid-cols-3 gap-6">
-  <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5">
-    <h2 class="font-semibold mb-4">Spending by category</h2>
-    {% if category_spending %}
-    <canvas id="categoryChart" height="220" role="img" aria-label="Bar chart of spending by category"></canvas>
+<div class="dashboard-grid">
+  <section class="card balance-card">
+    <div class="card-header">
+      <div>
+        <div class="section-title">Cash &amp; savings</div>
+        <div class="card-metric">{{ cash_balance|money }}</div>
+      </div>
+      <div class="range-tabs" role="tablist" aria-label="Chart range">
+        {% for r in ranges %}
+        <a href="?range={{ r }}" class="{% if range_key == r %}active{% endif %}">{{ r }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% if chart %}
+    <div class="legend"><span><i class="legend-line current-line"></i>Recorded cash balance</span></div>
+    <div class="chart-wrap">
+      <div class="chart-y">{% for label in chart.y_labels %}<span>{{ label }}</span>{% endfor %}</div>
+      <svg class="line-chart" viewBox="0 0 800 260" preserveAspectRatio="none" role="img" aria-label="Cash balance from recorded transactions">
+        <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2f7d62" stop-opacity=".18" /><stop offset="100%" stop-color="#2f7d62" stop-opacity="0" /></linearGradient></defs>
+        <path class="gridline" d="M0 30H800M0 95H800M0 160H800M0 225H800" />
+        <path class="area" d="{{ chart.area }}" />
+        <path class="current" d="{{ chart.current }}" />
+        <circle cx="{{ chart.point_x }}" cy="{{ chart.point_y }}" r="6" class="chart-point" />
+      </svg>
+      <div class="chart-x">{% for label in chart.x_labels %}<span>{{ label }}</span>{% endfor %}</div>
+    </div>
     {% else %}
-    <p class="text-sm text-slate-400 italic py-10 text-center">No categorized expenses yet. Add a transaction to see this chart.</p>
+    <p class="empty">Not enough transaction history to chart a balance yet.</p>
     {% endif %}
-  </div>
-
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <h2 class="font-semibold mb-4">Budget progress</h2>
-    {% if budget_progress %}
-    <ul class="space-y-3">
-      {% for b in budget_progress %}
-      <li>
-        <div class="flex justify-between text-sm mb-1">
-          <span class="font-medium">{{ b.category_name }}</span>
-          <span class="text-slate-500">${{ b.spent_amount }} / ${{ b.limit_amount }}</span>
-        </div>
-        <div class="h-2 rounded-full bg-slate-100 overflow-hidden" role="progressbar" aria-valuenow="{{ b.percent_used }}" aria-valuemin="0" aria-valuemax="100">
-          <div class="h-full {% if b.is_over %}bg-coral-500{% elif b.is_warning %}bg-sunset-500{% else %}bg-mint-500{% endif %}" style="width: {{ b.percent_used }}%"></div>
-        </div>
-        <p class="text-xs mt-1 {% if b.is_over %}text-coral-600 font-semibold{% elif b.is_warning %}text-sunset-600 font-semibold{% else %}text-slate-400{% endif %}">
-          {% if b.is_over %}Over budget{% elif b.is_warning %}Approaching limit{% else %}On track{% endif %} — ${{ b.remaining_amount }} remaining (not necessarily available cash)
-        </p>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="text-sm text-slate-400 italic">No active budget period yet. <a href="{% url 'budgets:index' %}" class="text-brand-700 underline">Set one up</a>.</p>
+    {% if latest_snapshot %}
+    <p class="muted">Simulated portfolio value {{ latest_snapshot.market_value|money }} is kept separate from this cash figure.</p>
     {% endif %}
-  </div>
-</div>
+  </section>
 
-<div class="grid lg:grid-cols-2 gap-6 mt-6">
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <h2 class="font-semibold mb-4">Recent activity</h2>
+  <section class="card opportunity-card">
+    <div class="opportunity-icon">{% include "partials/icon.html" with name="trend" %}</div>
+    <div class="eyebrow">SAVINGS OPPORTUNITY</div>
+    <div class="opportunity-title">Your money could be working harder.</div>
+    <div class="opportunity-copy">Based on recorded cash, savings goals, recurring bills, and your cash reserve. This is an estimate.</div>
+    <div class="breakdown">
+      <div><span>Cash balance</span><strong>{{ surplus.cash_balance|money }}</strong></div>
+      <div><span>Upcoming bills buffer</span><strong>-{{ surplus.upcoming_bills_buffer|money }}</strong></div>
+      <div><span>Goal allocations</span><strong>-{{ surplus.goal_allocations|money }}</strong></div>
+      <div><span>Minimum reserve</span><strong>-{{ surplus.minimum_cash_reserve|money }}</strong></div>
+      <div class="total"><span>Available to consider</span><strong>{{ surplus.investable_surplus|money }}</strong></div>
+    </div>
+    <button type="button" class="button" data-open-review {% if surplus.investable_surplus <= 0 %}disabled{% endif %}>Review savings plan {% include "partials/icon.html" with name="arrow" size=17 %}</button>
+    <small class="estimate-note">Estimate only. No funds will move without your approval.</small>
+  </section>
+
+  <section class="card recent-card">
+    <div class="card-header">
+      <div>
+        <div class="section-title">Recent transactions</div>
+        <div class="muted">Your latest recorded activity</div>
+      </div>
+      <a class="text-link" href="{% url 'budgets:transaction_list' %}">View all {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+    </div>
     {% if recent_transactions %}
-    <ul class="divide-y divide-slate-100">
+    <div class="transaction-list">
       {% for t in recent_transactions %}
-      <li class="py-2 flex justify-between items-center text-sm">
-       <div>
-    <p class="font-medium">
-        {% if t.description %}
-            {{ t.description }}
-        {% elif t.category %}
-            {{ t.category.name }}
-        {% else %}
-            Transaction
-        {% endif %}
-    </p>
-    <p class="text-xs text-slate-400">
-        {{ t.occurred_on }} ·
-        {% if t.is_demo %}
-            demo
-        {% else %}
-            {{ t.get_source_display }}
-        {% endif %}
-    </p>
-</div>
-        <span class="font-semibold {% if t.kind == 'income' %}text-mint-600{% else %}text-slate-700{% endif %}">
-          {% if t.kind == 'income' %}+{% else %}-{% endif %}${{ t.amount }}
-        </span>
-      </li>
+      <a class="transaction-row" href="{% url 'budgets:transaction_edit' t.pk %}">
+        <span class="merchant-mark">{% if t.description %}{{ t.description|merchant_mark }}{% elif t.category %}{{ t.category.name|merchant_mark }}{% else %}TX{% endif %}</span>
+        <span class="transaction-name"><strong>{% if t.description %}{{ t.description }}{% elif t.category %}{{ t.category.name }}{% else %}Transaction{% endif %}</strong><small>{{ t.occurred_on|date:"M j" }} · {% if t.category %}{{ t.category.name }}{% else %}Uncategorized{% endif %}{% if t.is_demo %} · demo{% endif %}</small></span>
+        <span class="amount {% if t.kind == 'income' %}positive{% endif %}">{% if t.kind == 'income' %}+{% else %}-{% endif %}{{ t.amount|money }}</span>
+        {% include "partials/icon.html" with name="chevron" size=16 %}
+      </a>
       {% endfor %}
-    </ul>
+    </div>
     {% else %}
-    <p class="text-sm text-slate-400 italic py-6 text-center">No transactions yet. <a href="{% url 'budgets:transaction_add' %}" class="text-brand-700 underline">Add your first one</a>.</p>
+    <p class="empty">No transactions yet. <a class="text-link" href="{% url 'budgets:transaction_add' %}">Add your first one</a></p>
     {% endif %}
-  </div>
+  </section>
 
-  <div class="bg-white rounded-2xl border border-slate-200 p-5">
-    <h2 class="font-semibold mb-4">Savings goals</h2>
+  <section class="card insights-card">
+    <div class="card-header">
+      <div>
+        <div class="section-title">Today's insights</div>
+        <div class="muted">From your own records</div>
+      </div>
+    </div>
+    {% if budget_progress %}
+      {% for b in budget_progress|slice:":2" %}
+      <div class="insight">
+        <span class="insight-icon">{% include "partials/icon.html" with name="card" size=18 %}</span>
+        <div><strong>{{ b.category_name }}</strong><span>{{ b.spent_amount|money }} of {{ b.limit_amount|money }}{% if b.is_over %} · over budget{% elif b.is_warning %} · approaching the limit{% else %} · on track{% endif %}</span></div>
+      </div>
+      {% endfor %}
+    {% endif %}
+    {% if recurring_count %}
+    <div class="insight">
+      <span class="insight-icon">{% include "partials/icon.html" with name="card" size=18 %}</span>
+      <div><strong>{{ recurring_total|money }} in recurring expenses</strong><span>{{ recurring_count }} active recurring expense{{ recurring_count|pluralize }} on file.</span></div>
+    </div>
+    {% endif %}
     {% if goals %}
-    <ul class="space-y-4">
-      {% for g in goals %}
-      <li>
-        <div class="flex justify-between text-sm mb-1">
-          <span class="font-medium">{{ g.name }}</span>
-          <span class="text-slate-500">${{ g.current_amount }} / ${{ g.target_amount }}</span>
-        </div>
-        <div class="h-2 rounded-full bg-slate-100 overflow-hidden" role="progressbar" aria-valuenow="{{ g.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
-          <div class="h-full bg-brand-500" style="width: {{ g.progress_percent }}%"></div>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="text-sm text-slate-400 italic py-6 text-center">No savings goals yet. <a href="{% url 'savings:goal_add' %}" class="text-brand-700 underline">Create one</a>.</p>
+    <div class="insight">
+      <span class="insight-icon">{% include "partials/icon.html" with name="target" size=18 %}</span>
+      <div><strong>{{ goals.0.remaining_amount|money }} to {{ goals.0.name }}</strong><span>{{ goals.0.progress_percent }}% of the target is recorded as cash toward this goal.</span></div>
+    </div>
     {% endif %}
-  </div>
+    {% if not budget_progress and not recurring_count and not goals and not has_transactions %}
+    <p class="empty">Add transactions, budgets, or goals to see insights from your records.</p>
+    {% endif %}
+  </section>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-{% if category_spending %}
-{{ category_spending|json_script:"category-spending-data" }}
-<script>
-  const categoryData = JSON.parse(document.getElementById('category-spending-data').textContent);
-  const ctx = document.getElementById('categoryChart');
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: categoryData.map(c => c.category__name || 'Uncategorized'),
-      datasets: [{
-        label: 'Spent',
-        data: categoryData.map(c => c.total),
-        backgroundColor: categoryData.map(c => c.category__color),
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v } } }
-    }
-  });
-</script>
-{% endif %}
 {% endblock %}

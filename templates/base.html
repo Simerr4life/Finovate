@@ -1,96 +1,128 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Finovate{% endblock %}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
-              400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
-              800: '#3730a3', 900: '#312e81',
-            },
-            mint: { 500: '#10b981', 600: '#059669' },
-            sunset: { 500: '#f59e0b', 600: '#d97706' },
-            coral: { 500: '#f43f5e', 600: '#e11d48' },
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; }
-    .focus-ring:focus { outline: 3px solid #818cf8; outline-offset: 2px; }
-    input[type=text], input[type=email], input[type=password], input[type=number],
-    input[type=date], select, textarea {
-      width: 100%; border: 1px solid #cbd5e1; border-radius: 0.5rem;
-      padding: 0.5rem 0.75rem; font-size: 0.9rem; background: white;
-    }
-    input:focus, select:focus, textarea:focus {
-      outline: 3px solid #818cf8; outline-offset: 1px; border-color: #818cf8;
-    }
-    input[type=checkbox] { width: 1.1rem; height: 1.1rem; accent-color: #4f46e5; }
-  </style>
+  <link rel="stylesheet" href="{% static 'css/finovate.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
-<body class="h-full bg-slate-50 text-slate-900 antialiased">
-  <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:px-3 focus:py-2 focus:rounded focus:shadow">Skip to content</a>
+<body class="{% if not user.is_authenticated %}guest{% endif %}">
+  <a href="#main-content" class="skip-link">Skip to content</a>
 
   {% if FINOVATE_DEMO_MODE %}
-  <div class="bg-sunset-500 text-white text-sm text-center py-1.5 px-4 font-medium" role="status">
-    Demo mode — sample/demo data and local demo authentication only. No bank, brokerage, or messaging provider is connected.
+  <div class="demo-banner" role="status">
+    Demo mode — sample or locally entered data and local demo authentication only. No bank, brokerage, or messaging provider is connected.
   </div>
   {% endif %}
 
-  <header class="bg-white border-b border-slate-200">
-    <nav class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between" aria-label="Main navigation">
-      <a href="{% url 'landing' %}" class="flex items-center gap-2 font-bold text-xl text-brand-700">
-        <span aria-hidden="true">🌱</span> Finovate
-      </a>
-      {% if user.is_authenticated %}
-      <ul class="hidden md:flex items-center gap-5 text-sm font-medium text-slate-600">
-        <li><a class="hover:text-brand-700 focus-ring rounded" href="{% url 'dashboard' %}">Dashboard</a></li>
-        <li><a class="hover:text-brand-700 focus-ring rounded" href="{% url 'budgets:index' %}">Budgeting</a></li>
-        <li><a class="hover:text-brand-700 focus-ring rounded" href="{% url 'savings:index' %}">Savings</a></li>
-        <li><a class="hover:text-brand-700 focus-ring rounded" href="{% url 'investing:index' %}">Investing</a></li>
-        <li><a class="hover:text-brand-700 focus-ring rounded" href="{% url 'transactions:statement_list' %}">Statements</a></li>
-        <li><a class="hover:text-brand-700 focus-ring rounded" href="{% url 'accounts:settings' %}">Settings</a></li>
-      </ul>
-      <form method="post" action="{% url 'accounts:logout' %}">
-        {% csrf_token %}
-        <button type="submit" class="text-sm font-medium text-slate-600 hover:text-brand-700 focus-ring rounded">Log out</button>
-      </form>
-      {% else %}
-      <div class="flex items-center gap-3 text-sm font-medium">
-        <a class="text-slate-600 hover:text-brand-700 focus-ring rounded" href="{% url 'accounts:login' %}">Log in</a>
-        <a class="bg-brand-600 text-white px-4 py-2 rounded-lg hover:bg-brand-700 focus-ring" href="{% url 'accounts:signup' %}">Get started</a>
-      </div>
-      {% endif %}
-    </nav>
+  <header class="auth-top guest-only">
+    <a class="brand" href="{% url 'landing' %}" style="color: var(--navy);">
+      <div class="brand-mark">F</div>
+      <span>finovate</span>
+    </a>
+    <div class="button-row">
+      <a class="button ghost" href="{% url 'accounts:login' %}">Log in</a>
+      <a class="button" href="{% url 'accounts:signup' %}">Get started</a>
+    </div>
   </header>
 
-  <main id="main-content" class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-    {% if messages %}
-    <div class="mb-6 space-y-2" role="status">
-      {% for message in messages %}
-      <div class="rounded-lg px-4 py-3 text-sm font-medium {% if message.tags == 'error' %}bg-coral-500/10 text-coral-600{% else %}bg-mint-500/10 text-mint-600{% endif %}">
-        {{ message }}
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="{% url 'dashboard' %}">
+        <div class="brand-mark">F</div>
+        <span>finovate</span>
+      </a>
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="nav-item {% if nav_active == 'overview' %}active{% endif %}" href="{% url 'dashboard' %}">{% include "partials/icon.html" with name="grid" %} <span>Overview</span></a>
+        <a class="nav-item {% if nav_active == 'transactions' %}active{% endif %}" href="{% url 'budgets:transaction_list' %}">{% include "partials/icon.html" with name="card" %} <span>Transactions</span></a>
+        <a class="nav-item {% if nav_active == 'savings' %}active{% endif %}" href="{% url 'savings:index' %}">{% include "partials/icon.html" with name="vault" %} <span>Savings</span></a>
+        <a class="nav-item {% if nav_active == 'investments' %}active{% endif %}" href="{% url 'investing:index' %}">{% include "partials/icon.html" with name="trend" %} <span>Investments</span></a>
+        <a class="nav-item {% if nav_active == 'goals' %}active{% endif %}" href="{% url 'savings:goals' %}">{% include "partials/icon.html" with name="target" %} <span>Financial Goals</span></a>
+        <a class="nav-item {% if nav_active == 'insights' %}active{% endif %}" href="{% url 'insights' %}">{% include "partials/icon.html" with name="chart" %} <span>Insights</span></a>
+        <a class="nav-item {% if nav_active == 'settings' %}active{% endif %}" href="{% url 'accounts:settings' %}">{% include "partials/icon.html" with name="settings" %} <span>Settings</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="connection">
+          <span class="status-dot {% if not banks_connected %}off{% endif %}"></span>
+          <div>
+            {% if banks_connected %}
+            <strong>Accounts connected</strong>
+            <span>Connection status from Settings</span>
+            {% else %}
+            <strong>No bank connected</strong>
+            <span>Using locally entered data only</span>
+            {% endif %}
+          </div>
+        </div>
+        <a class="profile" href="{% url 'accounts:settings' %}">
+          <span class="avatar">{{ user_initials }}</span>
+          <span>
+            <strong>{{ user_display_name }}</strong>
+            <small>{{ user.email|default:user.username }}</small>
+          </span>
+          {% include "partials/icon.html" with name="chevron" size=16 %}
+        </a>
       </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
+    </aside>
 
-  <footer class="max-w-6xl mx-auto px-4 sm:px-6 py-8 text-xs text-slate-400 border-t border-slate-200 mt-8">
-    Finovate is a local prototype. Budgeting suggestions are estimates, not financial advice. Investing data is simulated — no brokerage is connected and no real trades occur.
-  </footer>
+    <header class="mobile-header">
+      <a class="brand" href="{% url 'dashboard' %}">
+        <div class="brand-mark">F</div>
+        <span>finovate</span>
+      </a>
+      <button class="icon-button" type="button" data-menu-toggle aria-label="Open menu">{% include "partials/icon.html" with name="menu" %}</button>
+    </header>
+    <div class="mobile-menu hidden" data-mobile-menu>
+      <a class="{% if nav_active == 'overview' %}active{% endif %}" href="{% url 'dashboard' %}">{% include "partials/icon.html" with name="grid" %} Overview</a>
+      <a class="{% if nav_active == 'transactions' %}active{% endif %}" href="{% url 'budgets:transaction_list' %}">{% include "partials/icon.html" with name="card" %} Transactions</a>
+      <a class="{% if nav_active == 'savings' %}active{% endif %}" href="{% url 'savings:index' %}">{% include "partials/icon.html" with name="vault" %} Savings</a>
+      <a class="{% if nav_active == 'investments' %}active{% endif %}" href="{% url 'investing:index' %}">{% include "partials/icon.html" with name="trend" %} Investments</a>
+      <a class="{% if nav_active == 'goals' %}active{% endif %}" href="{% url 'savings:goals' %}">{% include "partials/icon.html" with name="target" %} Financial Goals</a>
+      <a class="{% if nav_active == 'insights' %}active{% endif %}" href="{% url 'insights' %}">{% include "partials/icon.html" with name="chart" %} Insights</a>
+      <a class="{% if nav_active == 'settings' %}active{% endif %}" href="{% url 'accounts:settings' %}">{% include "partials/icon.html" with name="settings" %} Settings</a>
+    </div>
+
+    <main class="main" id="main-content">
+      <div class="desktop-topbar">
+        <div class="breadcrumbs">{% block breadcrumbs %}{% if nav_active == 'overview' %}Your financial home{% else %}Home / {% block crumb %}{% endblock %}{% endif %}{% endblock %}</div>
+        <div class="top-actions">
+          <a class="icon-button" href="{% url 'accounts:settings' %}" aria-label="Notifications">
+            {% include "partials/icon.html" with name="bell" %}
+            {% if unread_notifications %}<i class="notification-dot"></i>{% endif %}
+          </a>
+          <span class="avatar small">{{ user_initials }}</span>
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="button ghost">Log out</button>
+          </form>
+        </div>
+      </div>
+      <div class="content">
+        {% if messages %}
+        <div class="messages" role="status">
+          {% for message in messages %}
+          <div class="message {% if message.tags == 'error' %}error{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </div>
+      <p class="page-footer">Finovate is a local prototype. Budgeting suggestions are estimates, not financial advice. Investing data is simulated — no brokerage is connected and no real trades occur.</p>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Mobile navigation">
+      <a class="{% if nav_active == 'overview' %}active{% endif %}" href="{% url 'dashboard' %}">{% include "partials/icon.html" with name="grid" %}<span>Overview</span></a>
+      <a class="{% if nav_active == 'transactions' %}active{% endif %}" href="{% url 'budgets:transaction_list' %}">{% include "partials/icon.html" with name="card" %}<span>Transactions</span></a>
+      <a class="{% if nav_active == 'savings' %}active{% endif %}" href="{% url 'savings:index' %}">{% include "partials/icon.html" with name="vault" %}<span>Savings</span></a>
+      <a class="{% if nav_active == 'investments' %}active{% endif %}" href="{% url 'investing:index' %}">{% include "partials/icon.html" with name="trend" %}<span>Investments</span></a>
+      <button type="button" data-menu-toggle>{% include "partials/icon.html" with name="menu" %}<span>More</span></button>
+    </nav>
+  </div>
+
+  {% include "partials/review_modal.html" %}
+  <script src="{% static 'js/finovate.js' %}?v=2"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>

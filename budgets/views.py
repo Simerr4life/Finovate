@@ -1,8 +1,12 @@
+import csv
 from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from savings.models import Goal
 from transactions.models import Category, Transaction
@@ -56,10 +60,77 @@ def index(request):
     return render(request, "budgets/index.html", context)
 
 
+def _filtered_transactions(request):
+    transactions = Transaction.objects.filter(user=request.user).select_related("category", "account")
+    query = (request.GET.get("q") or "").strip()
+    category_id = request.GET.get("category") or ""
+    month = request.GET.get("month") or ""
+    if query:
+        transactions = transactions.filter(
+            Q(description__icontains=query) | Q(category__name__icontains=query)
+        )
+    if category_id.isdigit():
+        transactions = transactions.filter(category_id=int(category_id))
+    if len(month) == 7 and month[4] == "-":
+        year, mon = month.split("-")
+        if year.isdigit() and mon.isdigit():
+            transactions = transactions.filter(occurred_on__year=int(year), occurred_on__month=int(mon))
+    return transactions, query, category_id, month
+
+
 @login_required
 def transaction_list(request):
-    transactions = Transaction.objects.filter(user=request.user).select_related("category")
-    return render(request, "budgets/transaction_list.html", {"transactions": transactions})
+    transactions, query, category_id, month = _filtered_transactions(request)
+    today = timezone.now().date()
+    month_begin = today.replace(day=1)
+    month_txns = Transaction.objects.filter(user=request.user, occurred_on__gte=month_begin, occurred_on__lte=today)
+    spent = month_txns.filter(kind=Transaction.Kind.EXPENSE).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    income = month_txns.filter(kind=Transaction.Kind.INCOME).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    income_count = month_txns.filter(kind=Transaction.Kind.INCOME).count()
+    recurring = RecurringExpense.objects.filter(user=request.user, is_active=True)
+    recurring_total = Decimal("0")
+    from budgets.services import monthly_equivalent
+
+    for exp in recurring:
+        recurring_total += monthly_equivalent(exp.amount, exp.cadence)
+    return render(
+        request,
+        "budgets/transaction_list.html",
+        {
+            "transactions": transactions,
+            "query": query,
+            "category_id": category_id,
+            "month": month,
+            "categories": Category.objects.filter(user=request.user),
+            "month_spent": spent,
+            "month_income": income,
+            "income_count": income_count,
+            "recurring_total": recurring_total,
+            "recurring_count": recurring.count(),
+        },
+    )
+
+
+@login_required
+def transaction_export(request):
+    transactions, _, _, _ = _filtered_transactions(request)
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="finovate-transactions.csv"'
+    writer = csv.writer(response)
+    writer.writerow(["date", "description", "category", "kind", "amount", "source", "demo"])
+    for txn in transactions:
+        writer.writerow(
+            [
+                txn.occurred_on.isoformat(),
+                txn.description,
+                txn.category.name if txn.category_id else "",
+                txn.kind,
+                txn.amount,
+                txn.source,
+                "yes" if txn.is_demo else "no",
+            ]
+        )
+    return response
 
 
 @login_required
