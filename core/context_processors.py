@@ -17,6 +17,7 @@ NAV_MAP = {
     "transactions:statement_list": "transactions",
     "transactions:statement_detail": "transactions",
     "savings:index": "savings",
+    "savings:pools": "pools",
     "savings:goals": "goals",
     "savings:goal_add": "goals",
     "savings:goal_edit": "goals",

@@ -1,17 +1,18 @@
 {% extends "base.html" %}
-{% block title %}{% if mode == "add" %}New goal{% else %}Edit goal{% endif %} — Finovate{% endblock %}
+{% block title %}{% if mode == "add" %}{% if return_to_pools %}New pool{% else %}New goal{% endif %}{% elif return_to_pools %}Edit pool{% else %}Edit goal{% endif %} — Finovate{% endblock %}
 {% block crumb %}Financial Goals{% endblock %}
 {% block content %}
 <section class="card form-card">
-  <div class="page-title">{% if mode == "add" %}Create a financial goal{% else %}Edit goal{% endif %}</div>
+  <div class="page-title">{% if mode == "add" %}{% if return_to_pools %}Create a savings pool{% else %}Create a financial goal{% endif %}{% elif return_to_pools %}Edit savings pool{% else %}Edit goal{% endif %}</div>
   <form method="post" novalidate>
     {% csrf_token %}
+    {% if return_to_pools %}<input type="hidden" name="from" value="pools">{% endif %}
     {% for field in form %}
     <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
     {% endfor %}
     <div class="modal-actions">
-      <a class="button ghost" href="{% url 'savings:goals' %}">Cancel</a>
-      <button type="submit" class="button">Save goal</button>
+      <a class="button ghost" href="{% if return_to_pools %}{% url 'savings:pools' %}{% else %}{% url 'savings:goals' %}{% endif %}">Cancel</a>
+      <button type="submit" class="button">{% if mode == "add" and return_to_pools %}Create pool{% elif return_to_pools %}Save pool{% else %}Save goal{% endif %}</button>
     </div>
   </form>
 </section>
