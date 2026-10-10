@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Statement — {{ account.institution_name }} — Finovate{% endblock %}
+{% block content %}
+
+<div class="bg-coral-600 text-white text-center text-sm font-bold py-2 rounded-t-xl">
+  FICTIONAL SAMPLE — NOT A REAL BANK STATEMENT
+</div>
+
+<div class="bg-white border border-coral-200 rounded-b-xl p-6 mb-6">
+  <div class="flex justify-between items-start flex-wrap gap-4 mb-4">
+    <div>
+      <h1 class="text-2xl font-bold">{{ account.institution_name }}</h1>
+      <p class="text-sm text-slate-500">{{ account.location }}</p>
+    </div>
+    <span class="text-xs bg-sunset-500/10 text-sunset-600 px-3 py-1.5 rounded-full font-semibold self-start">DEMO ACCOUNT · FICTIONAL DATA</span>
+  </div>
+  <div class="grid sm:grid-cols-4 gap-4 text-sm border-t border-slate-100 pt-4">
+    <div><p class="text-slate-400">Account holder</p><p class="font-semibold">{{ account.account_holder_name }}</p></div>
+    <div><p class="text-slate-400">Account</p><p class="font-semibold">{{ account.account_type }} {{ account.masked_number }}</p></div>
+    <div><p class="text-slate-400">Statement period</p><p class="font-semibold">{{ account.statement_start_date }} – {{ account.statement_end_date }}</p></div>
+    <div><p class="text-slate-400">Opening balance</p><p class="font-semibold">${{ report.opening_balance }}</p></div>
+  </div>
+  <p class="text-xs text-slate-400 mt-4 italic">
+    This entire account, its holder, and every transaction below are fictional and created solely to demonstrate
+    Finovate's import/categorization/budgeting features. No real bank or person is represented.
+  </p>
+</div>
+
+<!-- Reconciliation -->
+<section class="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+  <h2 class="font-semibold text-lg mb-4">Reconciliation</h2>
+  <div class="grid sm:grid-cols-3 gap-4 text-sm">
+    <div class="rounded-lg p-3 {% if report.deposits_match %}bg-mint-500/10{% else %}bg-coral-500/10{% endif %}">
+      <p class="text-slate-500">Total deposits</p>
+      <p class="font-bold">${{ report.computed_total_deposits }}</p>
+      {% if report.stated_total_deposits %}<p class="text-xs text-slate-400">Statement claimed: ${{ report.stated_total_deposits }} — {% if report.deposits_match %}matches ✓{% else %}does not match ✗{% endif %}</p>{% endif %}
+    </div>
+    <div class="rounded-lg p-3 {% if report.withdrawals_match %}bg-mint-500/10{% else %}bg-coral-500/10{% endif %}">
+      <p class="text-slate-500">Total withdrawals</p>
+      <p class="font-bold">${{ report.computed_total_withdrawals }}</p>
+      {% if report.stated_total_withdrawals %}<p class="text-xs text-slate-400">Statement claimed: ${{ report.stated_total_withdrawals }} — {% if report.withdrawals_match %}matches ✓{% else %}does not match ✗{% endif %}</p>{% endif %}
+    </div>
+    <div class="rounded-lg p-3 {% if report.ending_balance_match %}bg-mint-500/10{% else %}bg-coral-500/10{% endif %}">
+      <p class="text-slate-500">Ending balance</p>
+      <p class="font-bold">${{ report.computed_ending_balance }}</p>
+      {% if report.stated_ending_balance %}<p class="text-xs text-slate-400">Statement claimed: ${{ report.stated_ending_balance }} — {% if report.ending_balance_match %}matches ✓{% else %}does not match ✗{% endif %}</p>{% endif %}
+    </div>
+  </div>
+  <p class="text-xs text-slate-400 mt-3">
+    Verified using the accounting identity: ending balance = opening balance + deposits − withdrawals, computed from
+    the transaction ledger below — never just copied from the source statement's stated totals.
+  </p>
+</section>
+
+{% if summary %}
+<!-- Category breakdown -->
+<section class="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+  <h2 class="font-semibold text-lg mb-4">Monthly category breakdown</h2>
+  <div class="grid sm:grid-cols-3 gap-4 mb-4 text-sm">
+    <div class="bg-mint-500/10 rounded-lg p-3"><p class="text-slate-500">Earned income</p><p class="font-bold text-mint-600">${{ summary.earned_income }}</p></div>
+    <div class="bg-brand-500/10 rounded-lg p-3"><p class="text-slate-500">Transfers / reimbursements / gifts received</p><p class="font-bold text-brand-700">${{ summary.transfer_income }}</p><p class="text-xs text-slate-400">Not counted as earned income</p></div>
+    <div class="bg-slate-100 rounded-lg p-3"><p class="text-slate-500">Net cash flow</p><p class="font-bold {% if summary.net_cash_flow < 0 %}text-coral-600{% endif %}">${{ summary.net_cash_flow }}</p></div>
+  </div>
+  <table class="w-full text-sm">
+    <thead class="text-slate-400 text-left"><tr><th class="py-1">Category</th><th class="text-right">Spent</th></tr></thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for row in summary.expense_by_category %}
+      <tr><td class="py-2 flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background:{{ row.color }}"></span>{{ row.category_name }}</td><td class="text-right font-semibold">${{ row.total }}</td></tr>
+      {% endfor %}
+      <tr class="font-bold"><td class="py-2">Total expenses</td><td class="text-right">${{ summary.total_expenses }}</td></tr>
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<!-- Ledger -->
+<section class="bg-white rounded-2xl border border-slate-200 p-6">
+  <h2 class="font-semibold text-lg mb-4">Transaction ledger</h2>
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="text-slate-400 text-left">
+      <tr><th class="py-2">Date</th><th>Description</th><th>Category</th><th class="text-right">Money in</th><th class="text-right">Money out</th><th class="text-right">Balance</th></tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      <tr class="text-slate-400">
+        <td class="py-2">{{ account.statement_start_date }}</td>
+        <td colspan="4">Opening balance</td>
+        <td class="text-right font-semibold">${{ report.opening_balance }}</td>
+      </tr>
+      {% for row in ledger_rows %}
+      <tr>
+        <td class="py-2">{{ row.transaction.occurred_on }}</td>
+        <td>{{ row.transaction.description }}</td>
+        <td>{{ row.transaction.category.name|default:"Uncategorized" }}</td>
+        <td class="text-right text-mint-600">{% if row.transaction.kind == "income" %}${{ row.transaction.amount }}{% endif %}</td>
+        <td class="text-right text-slate-700">{% if row.transaction.kind == "expense" %}${{ row.transaction.amount }}{% endif %}</td>
+        <td class="text-right font-semibold">${{ row.balance_after }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<div class="bg-coral-600 text-white text-center text-sm font-bold py-2 rounded-xl mt-6">
+  FICTIONAL SAMPLE — NOT A REAL BANK STATEMENT
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ goal.name }} — Finovate{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+  <h1 class="text-2xl font-bold flex items-center gap-2">
+    <span class="w-4 h-4 rounded-full" style="background:{{ goal.color }}"></span>
+    {{ goal.name }}
+    {% if goal.is_investable %}<span class="text-xs bg-mint-500/10 text-mint-600 font-semibold px-2 py-1 rounded-full align-middle">Investable Savings Pool</span>{% endif %}
+  </h1>
+  <div class="flex gap-2">
+    <a href="{% url 'savings:goal_edit' goal.pk %}" class="border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 focus-ring">Edit</a>
+    <a href="{% url 'savings:goal_delete' goal.pk %}" class="border border-coral-300 text-coral-600 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-coral-50 focus-ring">Delete</a>
+  </div>
+</div>
+
+{% if goal.is_investable %}
+<div class="bg-brand-500/5 border border-brand-200 rounded-xl p-4 mb-6 text-sm">
+  <p class="font-semibold text-brand-700 mb-1">This pool can receive simulated investments</p>
+  {% if invested_snapshot %}
+  <div class="flex gap-6 flex-wrap">
+    <span>Net contributions invested: <strong>${{ invested_snapshot.net_contributions }}</strong></span>
+    <span>Simulated market value: <strong>${{ invested_snapshot.market_value }}</strong></span>
+    <span class="{% if invested_snapshot.gain_loss < 0 %}text-coral-600{% else %}text-mint-600{% endif %}">Gain/loss: <strong>${{ invested_snapshot.gain_loss }}</strong></span>
+  </div>
+  {% else %}
+  <p class="text-slate-500">No simulated investments into this pool yet. Manage round-up targeting and proposed investments on the <a href="{% url 'investing:index' %}" class="underline font-medium">Investing page</a>.</p>
+  {% endif %}
+  <p class="text-xs text-slate-400 mt-2">Invested amounts above are tracked completely separately from this pool's cash balance below — never combined into one number.</p>
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-3 gap-6 mb-8">
+  <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6">
+    <div class="h-3 rounded-full bg-slate-100 overflow-hidden mb-3">
+      <div class="h-full bg-brand-500" style="width: {{ goal.progress_percent }}%"></div>
+    </div>
+    <div class="grid sm:grid-cols-3 gap-4 text-sm">
+      <div><p class="text-slate-400">Current (cash)</p><p class="font-bold text-lg">${{ goal.current_amount }}</p></div>
+      <div><p class="text-slate-400">Target</p><p class="font-bold text-lg">${{ goal.target_amount }}</p></div>
+      <div><p class="text-slate-400">Remaining</p><p class="font-bold text-lg">${{ goal.remaining_amount }}</p></div>
+    </div>
+    <p class="text-xs text-slate-400 mt-4">
+      {% if estimated_completion %}Estimated completion: <strong>{{ estimated_completion }}</strong> based on your recent contribution pace. This is an estimate, not a guarantee.
+      {% elif goal.achieved_at %}🎉 Achieved on {{ goal.achieved_at|date }}.
+      {% else %}Not enough recent activity yet to estimate a completion date.{% endif %}
+    </p>
+    <div class="flex gap-2 mt-4 text-xs" aria-label="Milestones">
+      {% for pct in milestone_percents %}
+      <span class="px-2 py-1 rounded-full {% if goal.progress_percent >= pct %}bg-mint-500/20 text-mint-600 font-semibold{% else %}bg-slate-100 text-slate-400{% endif %}">
+        {{ pct }}%
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 p-6">
+    <h2 class="font-semibold mb-4">Add a contribution</h2>
+    <form method="post" class="space-y-3" novalidate>
+      {% csrf_token %}
+      {% for field in form %}
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">{{ field.label }}</label>
+        {{ field }}
+      </div>
+      {% endfor %}
+      <button type="submit" class="w-full bg-mint-500 text-white font-semibold py-2 rounded-lg hover:bg-mint-600 focus-ring">Record</button>
+    </form>
+  </div>
+</div>
+
+<div class="bg-white rounded-2xl border border-slate-200 p-6">
+  <h2 class="font-semibold mb-4">Activity history</h2>
+  {% if contributions %}
+  <ul class="divide-y divide-slate-100 text-sm">
+    {% for c in contributions %}
+    <li class="py-2 flex justify-between">
+      <span>{{ c.get_kind_display }}{% if c.note %} — {{ c.note }}{% endif %}</span>
+      <span class="flex items-center gap-3">
+        <span class="text-xs text-slate-400">{{ c.created_at|date:"M j, Y" }}</span>
+        <span class="font-semibold {% if c.kind == 'withdrawal' %}text-coral-600{% else %}text-mint-600{% endif %}">
+          {% if c.kind == 'withdrawal' %}-{% else %}+{% endif %}${{ c.amount }}
+        </span>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-slate-400 italic">No activity yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

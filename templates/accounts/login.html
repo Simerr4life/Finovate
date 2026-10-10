@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Log in — Finovate{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+  <h1 class="text-2xl font-bold mb-1">Log in</h1>
+  <p class="text-sm text-slate-500 mb-6">Demo mode: local account login for development only.</p>
+  <form method="post" class="space-y-4" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+    <div>
+      <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}<p class="text-xs text-coral-600 mt-1">{{ error }}</p>{% endfor %}
+    </div>
+    {% endfor %}
+    {% for error in form.non_field_errors %}<p class="text-xs text-coral-600">{{ error }}</p>{% endfor %}
+    <button type="submit" class="w-full bg-brand-600 text-white font-medium py-2.5 rounded-lg hover:bg-brand-700 focus-ring">Log in</button>
+  </form>
+  <p class="text-sm text-slate-500 mt-4">New here? <a class="text-brand-700 font-medium" href="{% url 'accounts:signup' %}">Create an account</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Finovate{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+  <div>
+    <h1 class="text-2xl font-bold">Your dashboard</h1>
+    <p class="text-sm text-slate-500">As of {{ today }}. {% if has_demo_data %}Includes clearly-labeled demo/sample data.{% endif %}</p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{% url 'budgets:transaction_add' %}" class="bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-700 focus-ring">+ Transaction</a>
+    <a href="{% url 'savings:goal_add' %}" class="bg-mint-500 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-mint-600 focus-ring">+ Goal</a>
+    <a href="{% url 'budgets:index' %}" class="border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 focus-ring">Edit budgets</a>
+  </div>
+</div>
+
+<!-- Balance breakdown: cash, round-ups pending, and invested value are
+     always shown separately, never combined into one number. -->
+<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Cash balance</p>
+    <p class="text-2xl font-bold text-mint-600">${{ cash_balance|floatformat:2 }}</p>
+    <p class="text-xs text-slate-400 mt-1">Income minus expenses, all time</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Total income</p>
+    <p class="text-2xl font-bold text-slate-700">${{ income_total|floatformat:2 }}</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Total expenses</p>
+    <p class="text-2xl font-bold text-slate-700">${{ expense_total|floatformat:2 }}</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Round-ups pending <span class="font-normal">(simulated)</span></p>
+    <p class="text-2xl font-bold text-sunset-600">${{ pending_roundups_total|floatformat:2 }}</p>
+    <p class="text-xs text-slate-400 mt-1">Not yet swept — separate from cash</p>
+  </div>
+</div>
+
+{% if latest_snapshot %}
+<div class="bg-white rounded-2xl border border-slate-200 p-5 mb-8">
+  <p class="text-xs font-semibold text-slate-400 uppercase mb-2">Simulated investment portfolio — as of {{ latest_snapshot.as_of }}</p>
+  <div class="flex gap-8 flex-wrap">
+    <div><span class="text-slate-500 text-sm">Net contributions</span><p class="font-bold text-lg">${{ latest_snapshot.net_contributions|floatformat:2 }}</p></div>
+    <div><span class="text-slate-500 text-sm">Market value</span><p class="font-bold text-lg">${{ latest_snapshot.market_value|floatformat:2 }}</p></div>
+    <div><span class="text-slate-500 text-sm">Gain/loss (simulated)</span><p class="font-bold text-lg {% if latest_snapshot.gain_loss < 0 %}text-coral-600{% else %}text-mint-600{% endif %}">${{ latest_snapshot.gain_loss|floatformat:2 }}</p></div>
+  </div>
+  <p class="text-xs text-slate-400 mt-2">This is simulated performance, not a real brokerage balance. Contributions (deposits) are always shown separately from market performance.</p>
+</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5">
+    <h2 class="font-semibold mb-4">Spending by category</h2>
+    {% if category_spending %}
+    <canvas id="categoryChart" height="220" role="img" aria-label="Bar chart of spending by category"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 italic py-10 text-center">No categorized expenses yet. Add a transaction to see this chart.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <h2 class="font-semibold mb-4">Budget progress</h2>
+    {% if budget_progress %}
+    <ul class="space-y-3">
+      {% for b in budget_progress %}
+      <li>
+        <div class="flex justify-between text-sm mb-1">
+          <span class="font-medium">{{ b.category_name }}</span>
+          <span class="text-slate-500">${{ b.spent_amount }} / ${{ b.limit_amount }}</span>
+        </div>
+        <div class="h-2 rounded-full bg-slate-100 overflow-hidden" role="progressbar" aria-valuenow="{{ b.percent_used }}" aria-valuemin="0" aria-valuemax="100">
+          <div class="h-full {% if b.is_over %}bg-coral-500{% elif b.is_warning %}bg-sunset-500{% else %}bg-mint-500{% endif %}" style="width: {{ b.percent_used }}%"></div>
+        </div>
+        <p class="text-xs mt-1 {% if b.is_over %}text-coral-600 font-semibold{% elif b.is_warning %}text-sunset-600 font-semibold{% else %}text-slate-400{% endif %}">
+          {% if b.is_over %}Over budget{% elif b.is_warning %}Approaching limit{% else %}On track{% endif %} — ${{ b.remaining_amount }} remaining (not necessarily available cash)
+        </p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400 italic">No active budget period yet. <a href="{% url 'budgets:index' %}" class="text-brand-700 underline">Set one up</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6 mt-6">
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <h2 class="font-semibold mb-4">Recent activity</h2>
+    {% if recent_transactions %}
+    <ul class="divide-y divide-slate-100">
+      {% for t in recent_transactions %}
+      <li class="py-2 flex justify-between items-center text-sm">
+       <div>
+    <p class="font-medium">
+        {% if t.description %}
+            {{ t.description }}
+        {% elif t.category %}
+            {{ t.category.name }}
+        {% else %}
+            Transaction
+        {% endif %}
+    </p>
+    <p class="text-xs text-slate-400">
+        {{ t.occurred_on }} ·
+        {% if t.is_demo %}
+            demo
+        {% else %}
+            {{ t.get_source_display }}
+        {% endif %}
+    </p>
+</div>
+        <span class="font-semibold {% if t.kind == 'income' %}text-mint-600{% else %}text-slate-700{% endif %}">
+          {% if t.kind == 'income' %}+{% else %}-{% endif %}${{ t.amount }}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400 italic py-6 text-center">No transactions yet. <a href="{% url 'budgets:transaction_add' %}" class="text-brand-700 underline">Add your first one</a>.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <h2 class="font-semibold mb-4">Savings goals</h2>
+    {% if goals %}
+    <ul class="space-y-4">
+      {% for g in goals %}
+      <li>
+        <div class="flex justify-between text-sm mb-1">
+          <span class="font-medium">{{ g.name }}</span>
+          <span class="text-slate-500">${{ g.current_amount }} / ${{ g.target_amount }}</span>
+        </div>
+        <div class="h-2 rounded-full bg-slate-100 overflow-hidden" role="progressbar" aria-valuenow="{{ g.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+          <div class="h-full bg-brand-500" style="width: {{ g.progress_percent }}%"></div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400 italic py-6 text-center">No savings goals yet. <a href="{% url 'savings:goal_add' %}" class="text-brand-700 underline">Create one</a>.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if category_spending %}
+{{ category_spending|json_script:"category-spending-data" }}
+<script>
+  const categoryData = JSON.parse(document.getElementById('category-spending-data').textContent);
+  const ctx = document.getElementById('categoryChart');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: categoryData.map(c => c.category__name || 'Uncategorized'),
+      datasets: [{
+        label: 'Spent',
+        data: categoryData.map(c => c.total),
+        backgroundColor: categoryData.map(c => c.category__color),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { callback: (v) => '$' + v } } }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

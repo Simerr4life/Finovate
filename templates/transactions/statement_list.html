@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Statements — Finovate{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Statements</h1>
+{% if accounts %}
+<ul class="space-y-3">
+  {% for acc in accounts %}
+  <li class="bg-white rounded-2xl border border-slate-200 p-5 flex justify-between items-center">
+    <div>
+      <p class="font-semibold">{{ acc.institution_name }} <span class="text-slate-400">{{ acc.masked_number }}</span></p>
+      <p class="text-xs text-slate-400">{{ acc.account_type }} · {{ acc.statement_start_date }} – {{ acc.statement_end_date }}
+        {% if acc.is_demo %}<span class="ml-2 text-xs bg-sunset-500/10 text-sunset-600 px-2 py-0.5 rounded-full font-semibold">DEMO ACCOUNT · FICTIONAL DATA</span>{% endif %}
+      </p>
+    </div>
+    <a href="{% url 'transactions:statement_detail' acc.pk %}" class="text-brand-700 font-medium hover:underline">View statement →</a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-sm text-slate-400 italic py-10 text-center">No statement-style accounts yet.</p>
+{% endif %}
+{% endblock %}

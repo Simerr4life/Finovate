@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Hypothetical market scenario — Finovate{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-2">
+  <h1 class="text-2xl font-bold">Hypothetical market scenario</h1>
+  <a href="{% url 'investing:market_data' %}" class="text-sm font-medium text-brand-700 hover:underline">View verified market data →</a>
+</div>
+<div class="bg-coral-500/10 border border-coral-500/30 rounded-xl p-4 text-sm text-coral-700 mb-6">
+  <strong>No real purchase happened on any date shown here.</strong> This is entirely separate from the September
+  bank statement activity. The "verified" calculator below uses real, source-cited historical prices (see Market
+  Data), but applying them to a hypothetical investment is still illustrative, not a record of an actual trade.
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6 mb-6">
+  <section class="bg-white rounded-2xl border border-slate-200 p-6">
+    <h2 class="font-semibold text-lg mb-1">Verified prices</h2>
+    <p class="text-xs text-slate-400 mb-4">Prices come from the Market Data page's source-cited rows.</p>
+    <form method="post" class="space-y-4" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="verified">
+      {% for field in verified_form %}
+      <div>
+        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+        {% for error in field.errors %}<p class="text-xs text-coral-600 mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      {% endfor %}
+      {% for error in verified_form.non_field_errors %}<p class="text-xs text-coral-600">{{ error }}</p>{% endfor %}
+      <button type="submit" class="bg-mint-500 text-white font-medium px-5 py-2 rounded-lg hover:bg-mint-600 focus-ring">Calculate with verified prices</button>
+    </form>
+  </section>
+
+  <section class="bg-white rounded-2xl border border-slate-200 p-6">
+    <h2 class="font-semibold text-lg mb-1">Custom (manual) prices</h2>
+    <p class="text-xs text-slate-400 mb-4">For a symbol/date Finovate has no verified data for. You supply the prices — unverified.</p>
+    <form method="post" class="space-y-4" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="manual">
+      {% for field in form %}
+      <div>
+        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+        {{ field }}
+        {% for error in field.errors %}<p class="text-xs text-coral-600 mt-1">{{ error }}</p>{% endfor %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="border border-brand-300 text-brand-700 font-medium px-5 py-2 rounded-lg hover:bg-brand-50 focus-ring">Calculate with custom prices</button>
+    </form>
+  </section>
+</div>
+
+{% if scenario %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6">
+  <h2 class="font-semibold text-lg mb-1">Result</h2>
+  <p class="text-xs font-semibold mb-3 {% if 'unverified' in scenario_source %}text-sunset-600{% else %}text-mint-600{% endif %}">
+    Price source: {{ scenario_source }}
+  </p>
+  <div class="grid sm:grid-cols-2 gap-4 text-sm max-w-xl">
+    <div class="flex justify-between"><span class="text-slate-500">Symbol</span><span class="font-semibold">{{ scenario.symbol }}</span></div>
+    <div class="flex justify-between"><span class="text-slate-500">Hypothetical shares bought</span><span class="font-semibold">{{ scenario.shares }}</span></div>
+    <div class="flex justify-between"><span class="text-slate-500">Invested on {{ scenario.invest_date }}</span><span class="font-semibold">${{ scenario.amount_invested }} @ ${{ scenario.invest_price }}/sh</span></div>
+    <div class="flex justify-between"><span class="text-slate-500">Value on {{ scenario.valuation_date }}</span><span class="font-semibold">${{ scenario.value_at_valuation_date }} @ ${{ scenario.valuation_price }}/sh</span></div>
+    <div class="flex justify-between col-span-2"><span class="text-slate-500">Hypothetical gain/loss</span><span class="font-semibold {% if scenario.gain_loss < 0 %}text-coral-600{% else %}text-mint-600{% endif %}">${{ scenario.gain_loss }} ({{ scenario.gain_loss_percent }}%)</span></div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

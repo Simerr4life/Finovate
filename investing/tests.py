@@ -1,0 +1,320 @@
+from decimal import Decimal
+
+from django.contrib.auth.models import User
+from django.test import TestCase
+
+from budgets.models import RecurringExpense
+from savings.models import Goal
+from transactions.models import Transaction
+
+from .forms import VerifiedScenarioForm
+from .models import MarketPrice, PortfolioSnapshot, RoundUpLedgerEntry, RoundUpSettings, SimulatedOrder
+from .services import (
+    approve_order,
+    compute_hypothetical_scenario,
+    compute_investable_surplus,
+    create_roundup_for_transaction,
+    investable_pools,
+    pool_investment_summaries,
+    propose_surplus_investment,
+    reject_order,
+    sweep_pending_roundups,
+)
+
+
+class RoundUpCreationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="x")
+        RoundUpSettings.objects.create(user=self.user, enabled=True, round_to=Decimal("1.00"))
+
+    def _expense(self, amount=Decimal("4.35")):
+        return Transaction.objects.create(
+            user=self.user, kind=Transaction.Kind.EXPENSE, amount=amount, occurred_on="2026-01-01"
+        )
+
+    def test_creates_pending_entry_for_eligible_expense(self):
+        txn = self._expense()
+        entry = create_roundup_for_transaction(txn)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.round_up_amount, Decimal("0.65"))
+        self.assertEqual(entry.status, RoundUpLedgerEntry.Status.PENDING)
+
+    def test_calling_twice_for_same_transaction_does_not_duplicate(self):
+        txn = self._expense()
+        first = create_roundup_for_transaction(txn)
+        second = create_roundup_for_transaction(txn)
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(RoundUpLedgerEntry.objects.filter(source_transaction=txn).count(), 1)
+
+    def test_income_transactions_are_not_eligible(self):
+        txn = Transaction.objects.create(
+            user=self.user, kind=Transaction.Kind.INCOME, amount=Decimal("100.00"), occurred_on="2026-01-01"
+        )
+        self.assertIsNone(create_roundup_for_transaction(txn))
+
+    def test_disabled_settings_skip_roundup(self):
+        self.user.roundup_settings.enabled = False
+        self.user.roundup_settings.save()
+        txn = self._expense()
+        self.assertIsNone(create_roundup_for_transaction(txn))
+
+    def test_reversed_transaction_is_not_eligible(self):
+        original = self._expense()
+        refund = Transaction.objects.create(
+            user=self.user, kind=Transaction.Kind.EXPENSE, amount=Decimal("4.35"),
+            occurred_on="2026-01-02", reverses=original,
+        )
+        self.assertIsNone(create_roundup_for_transaction(refund))
+
+
+class SweepTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="x")
+        RoundUpSettings.objects.create(
+            user=self.user, enabled=True, round_to=Decimal("1.00"),
+            minimum_cash_reserve=Decimal("0.00"),
+        )
+        Transaction.objects.create(user=self.user, kind=Transaction.Kind.INCOME, amount=Decimal("1000.00"), occurred_on="2026-01-01")
+        for amount in (Decimal("4.35"), Decimal("2.50")):
+            txn = Transaction.objects.create(user=self.user, kind=Transaction.Kind.EXPENSE, amount=amount, occurred_on="2026-01-02")
+            create_roundup_for_transaction(txn)
+
+    def test_sweep_moves_pending_to_swept(self):
+        result = sweep_pending_roundups(self.user)
+        self.assertEqual(result["entries_swept"], 2)
+        self.assertEqual(RoundUpLedgerEntry.objects.filter(status=RoundUpLedgerEntry.Status.PENDING).count(), 0)
+
+    def test_sweep_respects_cash_reserve(self):
+        rs = self.user.roundup_settings
+        rs.minimum_cash_reserve = Decimal("100000.00")  # reserve far exceeds cash balance
+        rs.save()
+        result = sweep_pending_roundups(self.user)
+        self.assertEqual(result["entries_swept"], 0)
+        self.assertEqual(RoundUpLedgerEntry.objects.filter(status=RoundUpLedgerEntry.Status.PENDING).count(), 2)
+
+    def test_sweep_respects_contribution_cap(self):
+        rs = self.user.roundup_settings
+        rs.contribution_cap_per_period = Decimal("0.40")
+        rs.save()
+        result = sweep_pending_roundups(self.user)
+        # Pending entries are 0.65 and 0.50 — both exceed a 0.40 cap, so nothing fits.
+        self.assertEqual(result["entries_swept"], 0)
+
+    def test_sweep_when_paused_does_nothing(self):
+        rs = self.user.roundup_settings
+        rs.is_paused = True
+        rs.save()
+        result = sweep_pending_roundups(self.user)
+        self.assertEqual(result["entries_swept"], 0)
+
+
+class InvestableSurplusTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="x")
+        RoundUpSettings.objects.create(user=self.user, minimum_cash_reserve=Decimal("200.00"))
+        Transaction.objects.create(user=self.user, kind=Transaction.Kind.INCOME, amount=Decimal("1000.00"), occurred_on="2026-01-01")
+
+    def test_surplus_is_cash_minus_reserve_when_nothing_else_reserved(self):
+        surplus = compute_investable_surplus(self.user)
+        self.assertEqual(surplus.cash_balance, Decimal("1000.00"))
+        self.assertEqual(surplus.investable_surplus, Decimal("800.00"))
+
+    def test_goal_allocations_reduce_surplus(self):
+        Goal.objects.create(user=self.user, name="Trip", target_amount=Decimal("500"), current_amount=Decimal("300.00"))
+        surplus = compute_investable_surplus(self.user)
+        self.assertEqual(surplus.goal_allocations, Decimal("300.00"))
+        self.assertEqual(surplus.investable_surplus, Decimal("500.00"))  # 1000 - 200 reserve - 300 goal
+
+    def test_recurring_bills_buffer_reduces_surplus(self):
+        RecurringExpense.objects.create(user=self.user, name="Rent", amount=Decimal("400.00"), cadence="monthly")
+        surplus = compute_investable_surplus(self.user)
+        self.assertEqual(surplus.upcoming_bills_buffer, Decimal("400.00"))
+        self.assertEqual(surplus.investable_surplus, Decimal("400.00"))  # 1000 - 200 - 400
+
+    def test_surplus_never_goes_negative(self):
+        RoundUpSettings.objects.filter(user=self.user).update(minimum_cash_reserve=Decimal("5000.00"))
+        surplus = compute_investable_surplus(self.user)
+        self.assertEqual(surplus.investable_surplus, Decimal("0.00"))
+
+    def test_achieved_goals_do_not_reserve_funds(self):
+        from django.utils import timezone
+
+        Goal.objects.create(
+            user=self.user, name="Done", target_amount=Decimal("100"), current_amount=Decimal("100"),
+            achieved_at=timezone.now(),
+        )
+        surplus = compute_investable_surplus(self.user)
+        self.assertEqual(surplus.goal_allocations, Decimal("0.00"))
+
+
+class ProposeApproveRejectTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="x")
+
+    def test_proposed_order_starts_pending_and_does_not_touch_snapshot(self):
+        order = propose_surplus_investment(self.user, Decimal("50.00"))
+        self.assertEqual(order.status, SimulatedOrder.Status.PENDING)
+        self.assertFalse(PortfolioSnapshot.objects.filter(user=self.user).exists())
+
+    def test_approving_fills_order_and_updates_snapshot(self):
+        order = propose_surplus_investment(self.user, Decimal("50.00"))
+        approve_order(order)
+        order.refresh_from_db()
+        self.assertEqual(order.status, SimulatedOrder.Status.FILLED)
+        snapshot = PortfolioSnapshot.objects.get(user=self.user)
+        self.assertEqual(snapshot.net_contributions, Decimal("50.00"))
+        self.assertEqual(snapshot.market_value, Decimal("50.00"))
+
+    def test_rejecting_leaves_snapshot_untouched(self):
+        order = propose_surplus_investment(self.user, Decimal("50.00"))
+        reject_order(order)
+        order.refresh_from_db()
+        self.assertEqual(order.status, SimulatedOrder.Status.REJECTED)
+        self.assertFalse(PortfolioSnapshot.objects.filter(user=self.user).exists())
+
+
+class HypotheticalScenarioTests(TestCase):
+    def test_basic_gain_calculation(self):
+        scenario = compute_hypothetical_scenario(
+            symbol="VTI", invest_date="2026-09-30", invest_price=Decimal("250.00"),
+            valuation_date="2026-10-06", valuation_price=Decimal("260.00"),
+            amount_invested=Decimal("100.00"),
+        )
+        self.assertEqual(scenario.shares, Decimal("0.400000"))
+        self.assertEqual(scenario.value_at_valuation_date, Decimal("104.00"))
+        self.assertEqual(scenario.gain_loss, Decimal("4.00"))
+
+    def test_loss_scenario(self):
+        scenario = compute_hypothetical_scenario(
+            symbol="VTI", invest_date="2026-09-30", invest_price=Decimal("100.00"),
+            valuation_date="2026-10-06", valuation_price=Decimal("90.00"),
+            amount_invested=Decimal("100.00"),
+        )
+        self.assertEqual(scenario.gain_loss, Decimal("-10.00"))
+        self.assertEqual(scenario.gain_loss_percent, Decimal("-10.00"))
+
+    def test_zero_or_negative_price_is_rejected(self):
+        with self.assertRaises(ValueError):
+            compute_hypothetical_scenario(
+                symbol="VTI", invest_date="2026-09-30", invest_price=Decimal("0"),
+                valuation_date="2026-10-06", valuation_price=Decimal("90.00"),
+                amount_invested=Decimal("100.00"),
+            )
+
+
+class SavingsPoolTargetingTests(TestCase):
+    """'Invest round-ups and surplus into a named Savings Pool'."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="x")
+        self.pool = Goal.objects.create(
+            user=self.user, name="Retirement nest egg", target_amount=Decimal("5000"), is_investable=True
+        )
+        RoundUpSettings.objects.create(user=self.user, enabled=True, round_to=Decimal("1.00"), target_pool=self.pool)
+        Transaction.objects.create(user=self.user, kind=Transaction.Kind.INCOME, amount=Decimal("1000.00"), occurred_on="2026-01-01")
+        txn = Transaction.objects.create(user=self.user, kind=Transaction.Kind.EXPENSE, amount=Decimal("4.35"), occurred_on="2026-01-02")
+        create_roundup_for_transaction(txn)
+
+    def test_sweep_attributes_order_and_snapshot_to_the_target_pool(self):
+        result = sweep_pending_roundups(self.user)
+        self.assertEqual(result["pool"], self.pool)
+        order = result["order"]
+        self.assertEqual(order.pool, self.pool)
+        snapshot = PortfolioSnapshot.objects.get(user=self.user, pool=self.pool)
+        self.assertEqual(snapshot.net_contributions, Decimal("0.65"))
+
+    def test_sweep_ignores_a_pool_that_is_not_investable(self):
+        self.pool.is_investable = False
+        self.pool.save()
+        result = sweep_pending_roundups(self.user)
+        self.assertIsNone(result["pool"])
+        self.assertTrue(PortfolioSnapshot.objects.filter(user=self.user, pool__isnull=True).exists())
+
+    def test_general_bucket_snapshot_stays_separate_from_pool_snapshot(self):
+        sweep_pending_roundups(self.user)  # goes to self.pool
+        propose_surplus_investment(self.user, Decimal("10.00"), pool=None)
+        general_order = SimulatedOrder.objects.get(pool__isnull=True)
+        approve_order(general_order)
+        general_snapshot = PortfolioSnapshot.objects.get(user=self.user, pool__isnull=True)
+        pool_snapshot = PortfolioSnapshot.objects.get(user=self.user, pool=self.pool)
+        self.assertEqual(general_snapshot.net_contributions, Decimal("10.00"))
+        self.assertEqual(pool_snapshot.net_contributions, Decimal("0.65"))
+
+    def test_propose_into_non_investable_pool_raises(self):
+        other = Goal.objects.create(user=self.user, name="Not investable", target_amount=Decimal("100"))
+        with self.assertRaises(ValueError):
+            propose_surplus_investment(self.user, Decimal("10.00"), pool=other)
+
+    def test_investable_pools_excludes_non_investable_goals(self):
+        Goal.objects.create(user=self.user, name="Just a goal", target_amount=Decimal("100"))
+        pools = list(investable_pools(self.user))
+        self.assertEqual(pools, [self.pool])
+
+    def test_pool_investment_summaries_reflects_invested_amount(self):
+        sweep_pending_roundups(self.user)
+        summaries = pool_investment_summaries(self.user)
+        self.assertEqual(len(summaries), 1)
+        self.assertEqual(summaries[0]["snapshot"].net_contributions, Decimal("0.65"))
+
+    def test_pool_cash_balance_is_never_mixed_with_invested_amount(self):
+        from savings.services import apply_contribution
+
+        apply_contribution(self.pool, kind="contribution", amount=Decimal("200.00"))
+        sweep_pending_roundups(self.user)
+        self.pool.refresh_from_db()
+        snapshot = PortfolioSnapshot.objects.get(user=self.user, pool=self.pool)
+        self.assertEqual(self.pool.current_amount, Decimal("200.00"))
+        self.assertEqual(snapshot.net_contributions, Decimal("0.65"))
+
+
+class MarketDataSeedTests(TestCase):
+    def test_seed_command_is_idempotent(self):
+        from django.core.management import call_command
+
+        call_command("seed_market_data")
+        first_count = MarketPrice.objects.count()
+        call_command("seed_market_data")
+        self.assertEqual(MarketPrice.objects.count(), first_count)
+        self.assertEqual(first_count, 18)
+
+    def test_verified_rows_are_never_fabricated_outside_the_given_set(self):
+        from django.core.management import call_command
+
+        call_command("seed_market_data")
+        self.assertTrue(MarketPrice.objects.filter(symbol="AAPL", date="2026-09-16", close=Decimal("332.41")).exists())
+        self.assertFalse(MarketPrice.objects.filter(symbol="AAPL", date="2026-09-17").exists())
+
+    def test_reset_clears_rows_before_reseeding(self):
+        from django.core.management import call_command
+
+        call_command("seed_market_data")
+        call_command("seed_market_data", reset=True)
+        self.assertEqual(MarketPrice.objects.count(), 18)
+
+
+class VerifiedScenarioFormTests(TestCase):
+    def setUp(self):
+        from django.core.management import call_command
+
+        call_command("seed_market_data")
+        self.sep15 = MarketPrice.objects.get(symbol="AAPL", date="2026-09-15")
+        self.sep16 = MarketPrice.objects.get(symbol="AAPL", date="2026-09-16")
+        self.nvda = MarketPrice.objects.get(symbol="NVDA", date="2026-09-25")
+
+    def test_same_symbol_before_after_is_valid(self):
+        form = VerifiedScenarioForm(data={
+            "invest_row": self.sep15.pk, "valuation_row": self.sep16.pk, "amount_invested": "100",
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_mismatched_symbols_is_invalid(self):
+        form = VerifiedScenarioForm(data={
+            "invest_row": self.sep15.pk, "valuation_row": self.nvda.pk, "amount_invested": "100",
+        })
+        self.assertFalse(form.is_valid())
+
+    def test_valuation_before_investment_is_invalid(self):
+        form = VerifiedScenarioForm(data={
+            "invest_row": self.sep16.pk, "valuation_row": self.sep15.pk, "amount_invested": "100",
+        })
+        self.assertFalse(form.is_valid())

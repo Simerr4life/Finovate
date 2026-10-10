@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Transactions — Finovate{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+  <h1 class="text-2xl font-bold">Transactions</h1>
+  <div class="flex gap-2">
+    <a href="{% url 'budgets:index' %}" class="border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 focus-ring">← Budgeting</a>
+    <a href="{% url 'budgets:transaction_add' %}" class="bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-700 focus-ring">+ Add transaction</a>
+  </div>
+</div>
+
+{% if transactions %}
+<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 text-slate-500 text-left">
+      <tr>
+        <th class="px-4 py-3">Date</th>
+        <th class="px-4 py-3">Description</th>
+        <th class="px-4 py-3">Category</th>
+        <th class="px-4 py-3">Source</th>
+        <th class="px-4 py-3 text-right">Amount</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for t in transactions %}
+      <tr>
+        <td class="px-4 py-3">{{ t.occurred_on }}</td>
+        <td class="px-4 py-3">{{ t.description|default:"—" }}</td>
+        <td class="px-4 py-3">{{ t.category.name|default:"Uncategorized" }}</td>
+        <td class="px-4 py-3">{% if t.is_demo %}<span class="text-xs bg-slate-100 px-2 py-0.5 rounded-full">demo</span>{% else %}{{ t.get_source_display }}{% endif %}</td>
+        <td class="px-4 py-3 text-right font-semibold {% if t.kind == 'income' %}text-mint-600{% endif %}">
+          {% if t.kind == 'income' %}+{% else %}-{% endif %}${{ t.amount }}
+        </td>
+        <td class="px-4 py-3 text-right whitespace-nowrap">
+          <a href="{% url 'budgets:transaction_edit' t.pk %}" class="text-brand-700 hover:underline mr-3">Edit</a>
+          <a href="{% url 'budgets:transaction_delete' t.pk %}" class="text-coral-600 hover:underline">Delete</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-sm text-slate-400 italic py-10 text-center">No transactions yet.</p>
+{% endif %}
+{% endblock %}

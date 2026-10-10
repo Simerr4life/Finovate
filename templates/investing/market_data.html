@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Market data (verified) — Finovate{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-2">September 2026 market data</h1>
+<div class="bg-mint-500/10 border border-mint-500/30 rounded-xl p-4 text-sm text-mint-700 mb-6">
+  <strong>Source-verified only.</strong> Every row below cites a source (Yahoo Finance, StockAnalysis, or FRED/S&P
+  Dow Jones Indices). This is a deliberately partial dataset — of the five indexes and five stocks originally
+  requested, only S&amp;P 500 and four stocks (NVDA, GOOGL, MSFT, AAPL) had verifiable rows, and only for the
+  specific dates shown. No row here is estimated or fabricated; gaps are simply not included.
+</div>
+
+{% for symbol, prices in by_symbol.items %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+  <h2 class="font-semibold text-lg mb-4">{{ symbol }} <span class="text-xs text-slate-400 font-normal">({{ prices.0.get_asset_type_display }})</span></h2>
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="text-slate-400 text-left">
+      <tr><th class="py-1">Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th><th>Daily %</th><th>Source</th></tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for p in prices %}
+      <tr>
+        <td class="py-2">{{ p.date }}</td>
+        <td>{% if p.open %}{{ p.open }}{% else %}—{% endif %}</td>
+        <td>{% if p.high %}{{ p.high }}{% else %}—{% endif %}</td>
+        <td>{% if p.low %}{{ p.low }}{% else %}—{% endif %}</td>
+        <td class="font-semibold">{{ p.close }}</td>
+        <td>{% if p.volume %}{{ p.volume }}{% else %}—{% endif %}</td>
+        <td>{% if p.daily_change_percent %}{{ p.daily_change_percent }}%{% else %}not shown in source{% endif %}</td>
+        <td class="text-xs text-slate-400">{{ p.source_note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% empty %}
+<p class="text-sm text-slate-400 italic py-10 text-center">No market data seeded yet. Run <code>python manage.py seed_market_data</code>.</p>
+{% endfor %}
+
+<a href="{% url 'investing:historical_demo' %}" class="text-brand-700 font-medium hover:underline">Use this data in the hypothetical scenario calculator →</a>
+{% endblock %}
