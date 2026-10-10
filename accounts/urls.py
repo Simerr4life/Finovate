@@ -12,7 +12,9 @@ urlpatterns = [
         auth_views.LoginView.as_view(template_name="accounts/login.html"),
         name="login",
     ),
-    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("logout/", views.auth0_logout, name="logout"),
     path("onboarding/", views.onboarding, name="onboarding"),
     path("settings/", views.settings_view, name="settings"),
+    path("auth0/login/", views.auth0_login, name="auth0_login"),
+    path("auth0/callback/", views.auth0_callback, name="auth0_callback"),
 ]

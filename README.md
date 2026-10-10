@@ -52,6 +52,28 @@ required to get started. `FINOVATE_DEMO_MODE=true` (the default) shows the
 demo-mode banner and is independent of whether you're logged in as the
 seeded demo user or your own account.
 
+### Optional: Auth0 login and Supabase/Postgres database
+
+Both are off by default — the app runs fully on local demo auth + SQLite
+with no configuration. To turn either on, add to `.env`:
+
+```bash
+# Auth0 — enables the "Log in with Auth0" button. Create a "Regular Web
+# Application" in your Auth0 tenant; set its Allowed Callback URL to
+# <your-url>/accounts/auth0/callback/ and Allowed Logout URL to <your-url>/.
+AUTH0_DOMAIN=your-tenant.us.auth0.com
+AUTH0_CLIENT_ID=...
+AUTH0_CLIENT_SECRET=...
+
+# Supabase/Postgres — switches off SQLite. Use the pooled connection
+# string from Project Settings -> Database in your Supabase project.
+DATABASE_URL=postgresql://...
+```
+
+See [docs/architecture-auth0-supabase.md](docs/architecture-auth0-supabase.md)
+for how identity mapping and database connectivity work, and exactly
+what's unverified until you've configured real credentials.
+
 ## Testing
 
 ```bash

@@ -55,6 +55,28 @@ class Profile(TimeStampedModel):
     notify_budget_warnings = models.BooleanField(default=True)
     notify_goal_milestones = models.BooleanField(default=True)
     onboarding_completed = models.BooleanField(default=False)
+    photon_chat_id = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text=(
+            "The iMessage chat/sender id this account is reachable at, once a "
+            "Photon Spectrum line exists. Used to route an inbound webhook "
+            "message to the right Finovate user. Empty until you set it."
+        ),
+    )
+    auth0_sub = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=(
+            "Auth0's stable 'sub' claim for this user, if they've ever logged "
+            "in via Auth0. Null for local demo-only accounts. Never used to "
+            "merge accounts by email — only this exact identifier maps to a "
+            "Finovate user."
+        ),
+    )
 
     def __str__(self) -> str:
         return f"Profile<{self.user_id}>"

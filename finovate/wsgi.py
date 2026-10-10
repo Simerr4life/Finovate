@@ -14,3 +14,11 @@ from django.core.wsgi import get_wsgi_application
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'finovate.settings')
 
 application = get_wsgi_application()
+
+if os.environ.get("VERCEL"):
+    from django.contrib.auth.models import User
+    from django.core.management import call_command
+
+    call_command("migrate", interactive=False, verbosity=0)
+    if not User.objects.filter(username="demo").exists():
+        call_command("seed_demo", verbosity=0)

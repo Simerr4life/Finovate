@@ -1,5 +1,6 @@
 from django.conf import settings
 
+from accounts.auth0 import auth0_configured
 from accounts.models import ConnectedAccountPlaceholder
 from core.display import display_name, user_initials
 from investing.services import compute_investable_surplus
@@ -54,4 +55,5 @@ def app_context(request):
         "banks_connected": banks_connected,
         "unread_notifications": unread_notifications,
         "surplus": surplus,
+        "AUTH0_ENABLED": auth0_configured(),
     }

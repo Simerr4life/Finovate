@@ -6,26 +6,60 @@ would plug in, what it would require, and what stays simulated until
 then. It is intentionally not a how-to for signing up with any provider —
 that's a decision for whoever owns credentials and legal/consent review.
 
-## 1. Identity provider (e.g. Auth0)
+## 1. Identity provider — Auth0 (now implemented)
 
-- **Where it plugs in:** `accounts/views.py` (`signup`, and Django's
-  built-in `LoginView`/`LogoutView` wired in `accounts/urls.py`).
-  Today these use Django's local session auth — clearly labeled "demo
-  authentication" on the signup/login templates.
-- **Interface needed:** an OAuth2/OIDC flow. Concretely: a callback view
-  that exchanges an authorization code for tokens, a way to map the
-  provider's user ID to Django's `User` model (e.g. a `SocialAccount`-style
-  table, not yet built), and a decision on whether Django sessions remain
-  the source of truth post-login or whether to move to a different
-  session strategy.
-- **Config that would eventually be required:** `AUTH0_DOMAIN`,
-  `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` — placeholders already exist in
-  `.env.example` and `finovate/settings.py`, read by nothing yet.
-- **Security/consent considerations:** redirect URI allowlisting, token
-  storage (never log tokens), session fixation on login, and a plan for
-  existing demo-mode users if/when real auth is turned on.
-- **Stays simulated until configured:** who's allowed to log in and how.
-  Local signup/login keeps working either way; this would be additive.
+**Update:** built. Full writeup in
+[docs/architecture-auth0-supabase.md](architecture-auth0-supabase.md).
+
+- **Where it plugs in:** `accounts/auth0.py` (OIDC client, built only
+  when configured), `accounts/views.py::auth0_login` /
+  `auth0_callback` / `auth0_logout`, wired in `accounts/urls.py`. Django
+  sessions remain the single source of truth post-login — Auth0 is a way
+  to *establish* that session (via `django.contrib.auth.login()`), not a
+  parallel auth system. Existing `@login_required` views and local
+  signup/login are completely unchanged.
+- **Token validation:** handled by `authlib`'s OIDC client
+  (`authorize_access_token()`), which verifies signature (via Auth0's
+  JWKS), issuer, audience, and expiration as part of the standard flow —
+  not hand-rolled.
+- **Identity mapping:** `Profile.auth0_sub` stores the `sub` claim,
+  unique. Never matched/merged by email — two Auth0 accounts sharing an
+  email become two separate Finovate users (tested).
+- **Config required to activate:** set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
+  `AUTH0_CLIENT_SECRET` in `.env`. In your Auth0 tenant, create a
+  "Regular Web Application" with Allowed Callback URL
+  `<your-url>/accounts/auth0/callback/` and Allowed Logout URL
+  `<your-url>/`. Until these are set, the "Log in with Auth0" button
+  doesn't render and local login/signup is the only path (tested).
+- **Tests:** `accounts/tests.py` — unconfigured fallback, successful
+  login creates exactly one mapped user, repeat login doesn't duplicate,
+  shared-email accounts aren't merged, failed token exchange creates no
+  user, missing `sub` claim creates no user, federated logout redirect.
+
+## 1b. Database — Supabase/hosted Postgres (now implemented)
+
+**Update:** built. Full writeup in
+[docs/architecture-auth0-supabase.md](architecture-auth0-supabase.md).
+
+- **Where it plugs in:** `finovate/settings.py::_postgres_config_from_url`.
+  Setting `DATABASE_URL` or `SUPABASE_DB_URL` switches `DATABASES` from
+  local SQLite to Postgres; nothing else changes, since Django's existing
+  migrations create the same schema on either engine.
+- **Config required to activate:** a connection string from your
+  Supabase project (Project Settings → Database → Connection string,
+  pooled URI recommended) in `DATABASE_URL` or `SUPABASE_DB_URL`.
+- **Not implemented, and why:** Supabase Row Level Security and a
+  client-side Supabase SDK. Both assume a browser talking to Supabase
+  directly; this app is server-rendered Django with one trusted backend
+  credential, so authorization is enforced in Python (already tested
+  via per-user ownership checks) rather than in Postgres policies. See
+  the architecture doc for an optional, non-required RLS script if that
+  assumption ever changes.
+- **Tests:** `accounts/tests.py::PostgresUrlParsingTests` — connection
+  string parsing including percent-encoded passwords (a real bug caught
+  and fixed while building this: `urlparse` does not decode the
+  userinfo portion, so a password containing `@` or `:` would otherwise
+  reach psycopg still percent-encoded).
 
 ## 2. Bank transaction and balance provider
 
@@ -78,37 +112,44 @@ that's a decision for whoever owns credentials and legal/consent review.
   trades occur") must remain accurate and should be removed only in the
   same change that wires up a real provider.
 
-## 4. Messaging/companion channel (Photon was mentioned; unconfirmed)
+## 4. Messaging/companion channel — Photon/Spectrum (iMessage)
 
-- **Where it plugs in:** nothing today. The product spec asks for a
-  provider-neutral adapter *only if it helps the architecture*; building
-  one before knowing the provider's actual API would be guessing, so it
-  hasn't been built. The services layer (`budgets/services.py`,
-  `savings/services.py`, `investing/services.py`) is already
-  request/template-free, which is what would let a future messaging
-  handler call the same functions the website calls.
-- **Interface it would need:** a thin handler that parses an inbound
-  message, maps it to one of the documented intents below, calls the
-  relevant service function, and formats a reply — without duplicating
-  budget/goal/round-up logic.
-- **Documented intents for later implementation** (not built):
-  - "What's my budget status?" → `budgets.services.compute_budget_progress`
-    for the active period.
-  - "I got paid $X" → record an income transaction, but only after an
-    explicit confirmation step (never silently trust a free-text amount).
-  - "Move my vacation goal target to $X" → update `savings.models.Goal`,
-    again behind confirmation.
-  - "How's my portfolio doing?" → read the latest `PortfolioSnapshot`,
-    stating the period and separating contributions from performance.
-  - "Pause round-ups" → toggle `RoundUpSettings.is_paused`, which already
-    exists and is exercised by the Investing page today.
-  - Any money-movement or order-placing intent **must** require explicit
-    confirmation before calling a mutating service function — same rule
-    as the website.
-- **Config:** `MESSAGING_PROVIDER_API_KEY` placeholder exists, intentionally
-  unused.
-- **Stays simulated/absent until configured:** the entire channel. No
-  iMessage/Photon integration exists in this codebase.
+**Update:** the owner explicitly asked to move forward with this (overriding
+the original "don't build this yet" scope), installed `@photon-ai/cli`,
+and will handle their own Photon login/project/line setup. The intent
+logic and a local test channel are now built; the real Photon transport
+is not, because its documented integration path is a Node.js SDK rather
+than a REST webhook Django can receive directly. Full writeup:
+[docs/messaging-assistant.md](messaging-assistant.md).
+
+- **What's built:** `assistant/` app — `intents.py` (keyword/regex
+  parsing, no LLM), `services.py::handle_incoming_message` (dispatches to
+  the exact same `budgets.services` / `savings.services` /
+  `investing.services` functions the website uses, with a
+  `PendingConfirmation` gate in front of every state-changing intent),
+  and `python manage.py chat_demo` for testing it today without Photon.
+- **What's unverified:** `/assistant/photon-webhook/` is built against a
+  `NativeWebhookPayload` shape (`guid`/`text`/`sender`/`chatId`) mentioned
+  in Photon's published docs as an "optional self-hosted webhook," but no
+  example JSON or auth header was published alongside it, and the
+  *primary* documented integration path is a Node SDK
+  (`startGatewayListener()`/`postMessage()`), not a webhook at all. This
+  may need a small Node.js sidecar once tested against a real line — see
+  the doc above for exactly what to check first.
+- **Interface:** a thin handler parses an inbound message, maps it to one
+  of a fixed set of intents, calls the relevant service function, and
+  formats a reply — no duplicated budget/goal/round-up logic.
+- **Supported intents today:** budget status, portfolio performance
+  summary, market status (honest "no live feed" reply), report income
+  (confirm), set risk comfort (confirm), change a goal's target (confirm,
+  with ambiguous-name clarification), pause round-ups (immediate — safe
+  direction), resume round-ups (confirm — risk direction).
+- **Config:** `PHOTON_WEBHOOK_SECRET` placeholder added for an
+  X-Photon-Webhook-Secret header check; exact header name Photon actually
+  uses is unverified. `MESSAGING_PROVIDER_API_KEY` remains unused.
+- **Still absent:** the real Photon/Spectrum wiring (account, project,
+  iMessage line) — that's the owner's own setup, done through the
+  `photon` CLI directly, not through this codebase.
 
 ## 5. Domain/hosting (GoDaddy was mentioned)
 

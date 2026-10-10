@@ -8,6 +8,7 @@ can be promoted to real settings later without code changes.
 
 import os
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from dotenv import load_dotenv
 
@@ -32,13 +33,28 @@ SECRET_KEY = os.environ.get(
     "django-insecure-demo-key-do-not-use-in-production",
 )
 
-DEBUG = env_bool("FINOVATE_DEBUG", True)
+ON_VERCEL = bool(os.environ.get("VERCEL"))
 
+DEBUG = env_bool("FINOVATE_DEBUG", not ON_VERCEL)
+
+_default_hosts = (
+    ".vercel.app,finovate.biz,www.finovate.biz" if ON_VERCEL else "localhost,127.0.0.1"
+)
 ALLOWED_HOSTS = [
     h.strip()
-    for h in os.environ.get("FINOVATE_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    for h in os.environ.get("FINOVATE_ALLOWED_HOSTS", _default_hosts).split(",")
     if h.strip()
 ]
+
+if ON_VERCEL:
+    CSRF_TRUSTED_ORIGINS = [
+        "https://finovate.biz",
+        "https://www.finovate.biz",
+        "https://*.vercel.app",
+    ]
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # Demo mode is the default local experience: no external providers are
 # configured, auth is a clearly-labeled local demo flow, and seed data is
@@ -59,6 +75,7 @@ INSTALLED_APPS = [
     "budgets",
     "savings",
     "investing",
+    "assistant",
 ]
 
 MIDDLEWARE = [
@@ -91,15 +108,45 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "finovate.wsgi.application"
 
-# Database: SQLite is used for local development per project constraints.
-# Access goes through Django's ORM/migrations so swapping to Postgres later
-# only requires changing this DATABASES block and the ENGINE driver.
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.environ.get("FINOVATE_DB_PATH", str(BASE_DIR / "db.sqlite3")),
+# Database. SQLite is the local/demo default -- unchanged unless a real
+# Postgres connection string is provided. DATABASE_URL (generic) or
+# SUPABASE_DB_URL (Supabase's own name for the same thing) switches to
+# Postgres; nothing else about the ORM/migrations/models changes, since
+# Django's migrations create the same schema on either engine. See
+# docs/architecture-auth0-supabase.md for the full rationale.
+def _postgres_config_from_url(url: str) -> dict:
+    # urlparse does NOT percent-decode the userinfo portion -- a password
+    # containing "@" or ":" would arrive still percent-encoded (e.g.
+    # "p%40ss") without this, which psycopg would then treat as a
+    # literal wrong password rather than "p@ss".
+    parsed = urlparse(url)
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": parsed.path.lstrip("/"),
+        "USER": unquote(parsed.username) if parsed.username else "",
+        "PASSWORD": unquote(parsed.password) if parsed.password else "",
+        "HOST": parsed.hostname or "",
+        "PORT": parsed.port or "",
+        # Supabase's pooled connection endpoints are reached over TLS;
+        # sslmode=require is safe to always set for a hosted Postgres URL.
+        "OPTIONS": {"sslmode": "require"},
     }
-}
+
+
+_pg_url = os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_DB_URL")
+if _pg_url:
+    DATABASES = {"default": _postgres_config_from_url(_pg_url)}
+else:
+    # Vercel functions can write only to /tmp, and that disk is local to
+    # one instance -- demo data is recreated on cold start there, not
+    # persisted. Local dev uses a real file next to the project.
+    _default_db = "/tmp/finovate.sqlite3" if ON_VERCEL else str(BASE_DIR / "db.sqlite3")
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.environ.get("FINOVATE_DB_PATH", _default_db),
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -119,6 +166,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -159,3 +207,10 @@ AUTH0_CLIENT_SECRET = os.environ.get("AUTH0_CLIENT_SECRET", "")
 BANK_PROVIDER_API_KEY = os.environ.get("BANK_PROVIDER_API_KEY", "")
 BROKERAGE_PROVIDER_API_KEY = os.environ.get("BROKERAGE_PROVIDER_API_KEY", "")
 MESSAGING_PROVIDER_API_KEY = os.environ.get("MESSAGING_PROVIDER_API_KEY", "")
+
+# Shared secret expected on the Photon Spectrum (iMessage) self-hosted
+# webhook, if/when that mode is enabled on the Photon side. Empty by
+# default -- unset means the webhook endpoint accepts any caller, which
+# is only acceptable for local demo use. The exact header name Photon
+# actually sends is unverified; see docs/messaging-assistant.md.
+PHOTON_WEBHOOK_SECRET = os.environ.get("PHOTON_WEBHOOK_SECRET", "")
