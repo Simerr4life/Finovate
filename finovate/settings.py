@@ -59,11 +59,9 @@ if ON_VERCEL:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
-# Demo mode is the default local experience: no external providers are
-# configured, auth is a clearly-labeled local demo flow, and seed data is
-# available. This flag is read by templates/views to show "Demo Mode"
-# banners and gate destructive demo-data actions.
-FINOVATE_DEMO_MODE = env_bool("FINOVATE_DEMO_MODE", True)
+# Kept so existing environment files still parse. The product UI no longer
+# shows a demo-mode banner from this flag.
+FINOVATE_DEMO_MODE = env_bool("FINOVATE_DEMO_MODE", False)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -79,6 +77,7 @@ INSTALLED_APPS = [
     "savings",
     "investing",
     "assistant",
+    "imports",
 ]
 
 MIDDLEWARE = [
@@ -218,3 +217,8 @@ MESSAGING_PROVIDER_API_KEY = os.environ.get("MESSAGING_PROVIDER_API_KEY", "")
 # is only acceptable for local demo use. The exact header name Photon
 # actually sends is unverified; see docs/messaging-assistant.md.
 PHOTON_WEBHOOK_SECRET = os.environ.get("PHOTON_WEBHOOK_SECRET", "")
+# Spectrum Cloud webhook signing secret (Stable docs). PHOTON_WEBHOOK_SECRET
+# remains as a fallback name for existing environments.
+IMESSAGE_WEBHOOK_SECRET = os.environ.get("IMESSAGE_WEBHOOK_SECRET", "")
+IMESSAGE_PROJECT_ID = os.environ.get("IMESSAGE_PROJECT_ID", "")
+IMESSAGE_PROJECT_SECRET = os.environ.get("IMESSAGE_PROJECT_SECRET", "")

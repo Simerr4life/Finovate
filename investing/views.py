@@ -3,15 +3,29 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.text import slugify
+from django.views.decorators.http import require_POST
 
 from accounts.models import NotificationEvent
 
 from .forms import HypotheticalScenarioForm, RoundUpSettingsForm, VerifiedScenarioForm
-from .models import MarketPrice, PortfolioSnapshot, RoundUpLedgerEntry, SimulatedOrder
+from .models import (
+    DemoInvestmentSuggestion,
+    MarketPrice,
+    PortfolioSnapshot,
+    RoundUpLedgerEntry,
+    SimulatedOrder,
+)
 from .services import (
+    accept_demo_investment_suggestion,
+    available_demo_investment_budget,
     approve_order,
     compute_hypothetical_scenario,
     compute_investable_surplus,
+    create_demo_market_order,
+    decline_demo_investment_suggestion,
+    generate_demo_investment_suggestions,
     get_or_create_settings,
     investable_pools,
     pool_investment_summaries,
@@ -63,12 +77,25 @@ def index(request):
     surplus = compute_investable_surplus(request.user)
     pools = investable_pools(request.user)
     pool_summaries = pool_investment_summaries(request.user)
+    demo_suggestions = DemoInvestmentSuggestion.objects.filter(
+        user=request.user, status=DemoInvestmentSuggestion.Status.PENDING
+    ).select_related("simulated_order")[:3]
+    has_demo_market_data = MarketPrice.objects.filter(
+        asset_type=MarketPrice.AssetType.STOCK,
+        is_verified=True,
+        is_demo_sample=True,
+    ).exists()
     market_rows = []
-    for row in MarketPrice.objects.all().order_by("symbol", "-date"):
+    for row in MarketPrice.objects.filter(
+        is_verified=True,
+        is_demo_sample=True,
+    ).order_by("symbol", "-date"):
         if not any(existing["symbol"] == row.symbol for existing in market_rows):
             market_rows.append(
                 {
                     "symbol": row.symbol,
+                    "asset_name": row.asset_name or row.symbol,
+                    "asset_type": row.get_asset_type_display(),
                     "date": row.date,
                     "close": row.close,
                     "source_note": row.source_note,
@@ -89,9 +116,101 @@ def index(request):
         "investable_pools": pools,
         "pool_summaries": pool_summaries,
         "market_rows": market_rows,
+        "demo_suggestions": demo_suggestions,
+        "reviewed_demo_suggestions": DemoInvestmentSuggestion.objects.filter(
+            user=request.user
+        ).exclude(status=DemoInvestmentSuggestion.Status.PENDING).select_related(
+            "simulated_order"
+        )[:5],
+        "has_demo_market_data": has_demo_market_data,
         "tab": request.GET.get("tab", "portfolio"),
     }
     return render(request, "investing/index.html", context)
+
+
+@login_required
+@require_POST
+def generate_demo_suggestions_view(request):
+    if not MarketPrice.objects.filter(
+        asset_type=MarketPrice.AssetType.STOCK,
+        is_verified=True,
+        is_demo_sample=True,
+    ).exists():
+        messages.info(
+            request,
+            "Load the supplied sample prices first with "
+            "`python manage.py seed_excel_demo_market`.",
+        )
+    else:
+        suggestions = generate_demo_investment_suggestions(request.user)
+        pending_count = sum(
+            suggestion.status == DemoInvestmentSuggestion.Status.PENDING
+            for suggestion in suggestions
+        )
+        if pending_count:
+            messages.success(
+                request,
+                f"{pending_count} demo recommendation(s) are ready for your review. "
+                "Nothing has been invested.",
+            )
+        elif not available_demo_investment_budget(request.user):
+            messages.info(
+                request,
+                "No recommendations generated because your current estimated "
+                "investable surplus is $0.00.",
+            )
+        elif suggestions:
+            messages.info(
+                request,
+                "You have already reviewed recommendations for this sample-data snapshot.",
+            )
+        else:
+            messages.info(
+                request,
+                "The supplied sample does not contain enough dated stock prices "
+                "to generate demo recommendations.",
+            )
+    return redirect("investing:index")
+
+
+@login_required
+@require_POST
+def accept_demo_suggestion_view(request, pk):
+    suggestion = get_object_or_404(
+        DemoInvestmentSuggestion,
+        pk=pk,
+        user=request.user,
+        status=DemoInvestmentSuggestion.Status.PENDING,
+    )
+    pool = None
+    pool_id = request.POST.get("pool")
+    if pool_id:
+        pool = get_object_or_404(investable_pools(request.user), pk=pool_id)
+    try:
+        order = accept_demo_investment_suggestion(request.user, suggestion, pool)
+    except ValueError as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(
+            request,
+            f"Accepted {order.symbol} as a simulated pending order. "
+            "Review and approve it below to record it in your demo portfolio.",
+        )
+    return redirect("investing:index")
+
+
+@login_required
+@require_POST
+def decline_demo_suggestion_view(request, pk):
+    suggestion = get_object_or_404(
+        DemoInvestmentSuggestion,
+        pk=pk,
+        user=request.user,
+        status=DemoInvestmentSuggestion.Status.PENDING,
+    )
+    decline_demo_investment_suggestion(request.user, suggestion)
+    messages.info(request, "Demo recommendation declined. No order was created.")
+    return redirect("investing:index")
 
 
 @login_required
@@ -188,11 +307,97 @@ def historical_demo(request):
 
 @login_required
 def market_data(request):
-    rows = MarketPrice.objects.all()
-    by_symbol = {}
+    rows = MarketPrice.objects.filter(
+        is_verified=True,
+        is_demo_sample=True,
+    ).order_by("symbol", "date")
+    grouped_rows = {}
     for row in rows:
-        by_symbol.setdefault(row.symbol, []).append(row)
-    return render(request, "investing/market_data.html", {"by_symbol": by_symbol})
+        grouped_rows.setdefault(row.symbol, []).append(row)
+
+    stock_assets = []
+    index_assets = []
+    for symbol, history in grouped_rows.items():
+        first_price, latest_price = history[0], history[-1]
+        period_change = Decimal("0.00")
+        if first_price.close:
+            period_change = (
+                (latest_price.close - first_price.close)
+                / first_price.close
+                * Decimal("100")
+            ).quantize(Decimal("0.01"))
+        asset = {
+            "symbol": symbol,
+            "name": latest_price.asset_name or symbol,
+            "asset_type": latest_price.asset_type,
+            "asset_type_label": latest_price.get_asset_type_display(),
+            "latest": latest_price,
+            "history": list(reversed(history)),
+            "period_change": period_change,
+            "anchor": slugify(symbol),
+            "chart_id": f"market-series-{slugify(symbol)}",
+            "first_date": history[0].date,
+            "chart_data": [
+                {"date": price.date.isoformat(), "close": str(price.close)}
+                for price in history
+            ],
+        }
+        if latest_price.asset_type == MarketPrice.AssetType.STOCK:
+            stock_assets.append(asset)
+        else:
+            index_assets.append(asset)
+
+    return render(
+        request,
+        "investing/market_data.html",
+        {
+            "stock_assets": stock_assets,
+            "index_assets": index_assets,
+            "demo_budget": available_demo_investment_budget(request.user),
+            "investable_pools": investable_pools(request.user),
+        },
+    )
+
+
+@login_required
+@require_POST
+def buy_demo_market_asset(request):
+    symbol = request.POST.get("symbol", "").strip()
+    try:
+        amount = Decimal(request.POST.get("amount", ""))
+    except (InvalidOperation, TypeError, ValueError):
+        messages.error(request, "Enter a valid amount to simulate.")
+        return redirect("investing:market_data")
+
+    if not amount.is_finite() or amount <= 0:
+        messages.error(request, "Enter an amount greater than $0.00 with up to two decimal places.")
+        return redirect("investing:market_data")
+    try:
+        rounded_amount = amount.quantize(Decimal("0.01"))
+    except InvalidOperation:
+        rounded_amount = None
+    if rounded_amount is None or amount != rounded_amount or amount > Decimal("9999999999.99"):
+        messages.error(request, "Enter an amount greater than $0.00 with up to two decimal places.")
+        return redirect("investing:market_data")
+
+    pool = None
+    pool_id = request.POST.get("pool", "").strip()
+    if pool_id:
+        pool = get_object_or_404(investable_pools(request.user), pk=pool_id)
+
+    try:
+        order = create_demo_market_order(request.user, symbol, amount, pool)
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("investing:market_data")
+
+    target = f'"{pool.name}"' if pool else "the general bucket"
+    messages.success(
+        request,
+        f"Created a simulated {order.symbol} buy order for ${order.amount} in {target}. "
+        "Review and approve it on Investments to add it to your demo portfolio.",
+    )
+    return redirect(f"{reverse('investing:market_data')}#asset-{slugify(symbol)}")
 
 
 @login_required

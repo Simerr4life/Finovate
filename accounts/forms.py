@@ -37,7 +37,11 @@ class OnboardingForm(forms.ModelForm):
 
 
 class ProfileSettingsForm(OnboardingForm):
-    """Same fields as onboarding, reused on the Settings page."""
+    """Same fields as onboarding, plus notification choices used only in Settings."""
 
     class Meta(OnboardingForm.Meta):
-        pass
+        fields = OnboardingForm.Meta.fields + ["notify_simulated_orders"]
+        labels = {
+            **OnboardingForm.Meta.labels,
+            "notify_simulated_orders": "Record simulated investment proposals",
+        }

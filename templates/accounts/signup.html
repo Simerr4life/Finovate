@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Sign up — Finovate{% endblock %}
+{% block title %}Finovate | Sign up{% endblock %}
 {% block content %}
 <section class="card auth-card">
-  <div class="eyebrow">FINOVATE</div>
+  {% include "partials/brand_logo.html" with large=True %}
   <div class="page-title">Create your account</div>
-  <p class="page-subtitle">This uses Django's local account system for this prototype. It is not a production identity provider.</p>
+  <p class="page-subtitle">Auth0 is the account provider when it is configured. A local account remains available for this server.</p>
   {% if AUTH0_ENABLED %}
   <a class="button" style="width:100%;display:block;text-align:center;margin-bottom:14px;" href="{% url 'accounts:auth0_login' %}?screen_hint=signup">Sign up with Auth0</a>
   <p class="muted" style="text-align:center;margin:10px 0;">or create a local account</p>

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load finovate %}
-{% block title %}Overview — Finovate{% endblock %}
+{% block title %}Finovate | Dashboard{% endblock %}
 {% block crumb %}Overview{% endblock %}
 {% block content %}
 <div class="overview-heading">
   <div>
     <div class="page-title">{{ greeting }}, {{ user_display_name }}.</div>
-    <div class="page-subtitle">{{ today|date:"l, F j" }} · Here is how your recorded money is doing.{% if has_demo_data %} Includes labeled demo data.{% endif %}</div>
+    <div class="page-subtitle">{{ today|date:"l, F j" }} · Here is how your recorded money is doing.</div>
   </div>
   {% if banks_connected %}
   <span class="pill good"><span class="status-dot"></span> All accounts synced</span>
@@ -103,7 +103,7 @@
       {% for t in recent_transactions %}
       <a class="transaction-row" href="{% url 'budgets:transaction_edit' t.pk %}">
         <span class="merchant-mark">{% if t.description %}{{ t.description|merchant_mark }}{% elif t.category %}{{ t.category.name|merchant_mark }}{% else %}TX{% endif %}</span>
-        <span class="transaction-name"><strong>{% if t.description %}{{ t.description }}{% elif t.category %}{{ t.category.name }}{% else %}Transaction{% endif %}</strong><small>{{ t.occurred_on|date:"M j" }} · {% if t.category %}{{ t.category.name }}{% else %}Uncategorized{% endif %}{% if t.is_demo %} · demo{% endif %}</small></span>
+        <span class="transaction-name"><strong>{% if t.description %}{{ t.description }}{% elif t.category %}{{ t.category.name }}{% else %}Transaction{% endif %}</strong><small>{{ t.occurred_on|date:"M j" }} · {% if t.category %}{{ t.category.name }}{% else %}Uncategorized{% endif %}</small></span>
         <span class="amount {% if t.kind == 'income' %}positive{% endif %}">{% if t.kind == 'income' %}+{% else %}-{% endif %}{{ t.amount|money }}</span>
         {% include "partials/icon.html" with name="chevron" size=16 %}
       </a>

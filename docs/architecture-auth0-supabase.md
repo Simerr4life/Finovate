@@ -163,6 +163,31 @@ That `current_setting('app.current_user_id')` would need the backend to
 `SET` it per connection/request — not implemented, since nothing
 currently needs it.
 
+## Phone-number login
+
+Phone login is **not enabled**. The Auth0 application named Finovate
+(`regular_web`, tenant `finovate`) allows `authorization_code`,
+`implicit`, `refresh_token`, and `client_credentials`. It does not allow
+the passwordless OTP grant, and this codebase does not collect a phone
+number or one-time SMS code.
+
+To turn phone login on later, in the Auth0 dashboard:
+
+1. Create a Passwordless SMS connection and attach an SMS provider
+   (Auth0's trial SMS or your own Twilio account). A paid Auth0 feature
+   or an external SMS account may be required.
+2. Enable that connection for the Finovate application.
+3. Add the passwordless OTP grant if the SDK flow requires it.
+4. Keep the callback at `<APP_BASE_URL>/callback` and logout return at
+   `<APP_BASE_URL>/`. Today those URLs are only registered for
+   `http://localhost:5000`. Add `http://127.0.0.1:8000` and the production
+   `https://finovate.biz` origins before using those hosts.
+5. Map the user by the Auth0 `sub` claim, the same way interactive login
+   already does. Do not merge accounts by phone number.
+
+Until that connection exists, the login page keeps local password login
+and the optional Auth0 button. There is no phone form.
+
 ## What this integration does NOT do
 
 - It does not add a second login system. Supabase Auth is not used.

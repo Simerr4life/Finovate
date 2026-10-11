@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load finovate %}
-{% block title %}Investments — Finovate{% endblock %}
+{% block title %}Finovate | Investments{% endblock %}
 {% block crumb %}Investments{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -21,26 +21,26 @@
 {% if tab == 'explore' %}
 <section class="card">
   <div class="filter-row">
-    <p class="muted">Verified prices already stored in Finovate. Rows are omitted when a date was not verified.</p>
-    <a class="button secondary" href="{% url 'investing:market_data' %}">Market data</a>
+  <p class="muted">Browse the included September 2026 stock and index sample, see each recorded price day, and try a simulated buy.</p>
+  <a class="button secondary" href="{% url 'investing:market_data' %}">Browse sample data &amp; invest</a>
   </div>
   {% if market_rows %}
   <div class="etf-list">
     {% for row in market_rows %}
-    <a class="etf-row" href="{% url 'investing:market_data' %}">
+  <a class="etf-row" href="{% url 'investing:market_data' %}#asset-{{ row.symbol|slugify }}">
       <span class="ticker">{{ row.symbol }}</span>
-      <span><strong>{{ row.symbol }}</strong><small>{{ row.source_note }}</small></span>
+    <span><strong>{{ row.asset_name }}</strong><small>{{ row.asset_type }} · {{ row.source_note }}</small></span>
       <span><small>Latest close</small><strong>{{ row.close }}</strong></span>
       <span><small>As of</small><strong>{{ row.date }}</strong></span>
-      <span class="pill">Verified price</span>
+    <span class="pill">Demo sample</span>
       {% include "partials/icon.html" with name="chevron" size=16 %}
     </a>
     {% endfor %}
   </div>
   {% else %}
-  <p class="empty">No verified market prices are loaded. Seed market data before this list can show symbols.</p>
+<p class="empty">Sample market prices will appear after the database migrations are applied.</p>
   {% endif %}
-  <div class="estimate-note">Closes are source-cited prices, not a projection of your portfolio.</div>
+<div class="estimate-note">These are historical sample closes, not live prices or a projection of your portfolio.</div>
 </section>
 
 {% elif tab == 'calculator' %}
@@ -64,6 +64,87 @@
 </div>
 
 {% else %}
+<section class="demo-ai-panel">
+  <div class="demo-ai-header">
+    <div class="demo-ai-mark">{% include "partials/icon.html" with name="trend" size=23 %}</div>
+    <div class="demo-ai-title">
+      <span class="eyebrow">FINOVATE DEMO AI</span>
+      <h2>Sample-data investment ideas</h2>
+      <p>Transparent rules rank the supplied historical stock data by sample-period return minus observed volatility.</p>
+    </div>
+    <span class="demo-only-pill">SIMULATED ONLY</span>
+  </div>
+  <div class="demo-ai-disclaimer">
+    These are educational, rule-based suggestions, not predictions or financial advice. Accepting one creates a simulated pending order; it does not contact a brokerage or move money.
+  </div>
+  {% if not has_demo_market_data %}
+  <div class="demo-ai-empty">
+    <strong>Sample market data is not loaded yet.</strong>
+    <span>Run <code>python manage.py seed_excel_demo_market</code> to load the included September 2026 dataset.</span>
+  </div>
+  {% elif demo_suggestions %}
+  <div class="demo-ai-suggestions">
+    {% for idea in demo_suggestions %}
+    <article class="demo-ai-idea">
+      <div class="demo-ai-idea-top">
+        <span class="ticker">{{ idea.symbol }}</span>
+        <span class="demo-score">Demo score <strong>{{ idea.score }}</strong></span>
+      </div>
+      <div class="demo-ai-metrics">
+        <div><span>Sample-period move</span><strong>{% if idea.historical_return_percent > 0 %}+{% endif %}{{ idea.historical_return_percent }}%</strong></div>
+        <div><span>Observed volatility</span><strong>{{ idea.volatility_percent }}%</strong></div>
+        <div><span>Suggested amount</span><strong>{{ idea.amount|money }}</strong></div>
+      </div>
+      <p class="demo-ai-explanation">{{ idea.explanation }}</p>
+      <div class="demo-execution-note">Simulated reference close: ${{ idea.demo_execution_price }} · {{ idea.data_date }}</div>
+      <div class="demo-ai-actions">
+        <form method="post" action="{% url 'investing:accept_demo_suggestion' idea.pk %}">
+          {% csrf_token %}
+          <label class="field-label">Attribute this demo order to
+            <select name="pool">
+              <option value="">General / unassigned</option>
+              {% for pool in investable_pools %}<option value="{{ pool.pk }}">{{ pool.name }}</option>{% endfor %}
+            </select>
+          </label>
+          <button class="button" type="submit">Accept demo idea</button>
+        </form>
+        <form method="post" action="{% url 'investing:decline_demo_suggestion' idea.pk %}">
+          {% csrf_token %}
+          <button class="button secondary" type="submit">Decline</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="demo-ai-empty">
+    {% if surplus.investable_surplus <= 0 %}
+    <strong>No demo recommendations yet - your estimated investable surplus is $0.00.</strong>
+    <span>Suggestions are limited to your estimated surplus after reserves, savings goals, and recurring bills.</span>
+    {% else %}
+    <strong>Ready to explore a demo recommendation?</strong>
+    <span>Suggestions use only the included sample prices and are limited to $75 total per review.</span>
+    <form method="post" action="{% url 'investing:generate_demo_suggestions' %}">
+      {% csrf_token %}
+      <button class="button" type="submit">Generate demo ideas</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if reviewed_demo_suggestions %}
+  <details class="demo-ai-history">
+    <summary>Recently reviewed demo ideas</summary>
+    {% for idea in reviewed_demo_suggestions %}
+    <div class="demo-ai-history-row">
+      <strong>{{ idea.symbol }}</strong>
+      <span>{{ idea.get_status_display }}{% if idea.simulated_order %} · simulated order {{ idea.simulated_order.get_status_display }}{% endif %}</span>
+      <span>{{ idea.amount|money }}</span>
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+</section>
+
 <div class="summary-grid compact">
   <section class="card summary-card">
     <div class="label">Simulated portfolio value</div>
@@ -96,7 +177,7 @@
       {% for o in orders %}
       <div class="transaction-row" style="cursor:default;">
         <span class="merchant-mark">{{ o.get_order_type_display|merchant_mark }}</span>
-        <span class="transaction-name"><strong>{{ o.get_order_type_display }} · {{ o.pool.name|default:"General" }}</strong><small>{{ o.created_at|date:"M j, Y" }} · {{ o.get_status_display }}</small></span>
+        <span class="transaction-name"><strong>{{ o.get_order_type_display }}{% if o.demo_execution_price %} {{ o.symbol }}{% endif %} · {{ o.pool.name|default:"General" }}</strong><small>{{ o.created_at|date:"M j, Y" }} · {{ o.get_status_display }}{% if o.demo_shares %} · {{ o.demo_shares }} simulated shares @ ${{ o.demo_execution_price }} · sample price {{ o.demo_data_date }}{% endif %}</small></span>
         <span class="amount">{{ o.amount|money }}</span>
       </div>
       {% endfor %}
@@ -134,7 +215,7 @@
   <div class="section-title">Pending your approval</div>
   {% for o in pending_orders %}
   <div class="list-row" style="margin-top:12px;">
-    <span>Proposed {{ o.get_order_type_display|lower }} of {{ o.amount|money }} into {% if o.pool %}{{ o.pool.name }}{% else %}the general bucket{% endif %}</span>
+    <span>Proposed {{ o.get_order_type_display|lower }}{% if o.demo_execution_price %} {{ o.symbol }}{% endif %} of {{ o.amount|money }} into {% if o.pool %}{{ o.pool.name }}{% else %}the general bucket{% endif %}{% if o.demo_shares %}<small class="muted"> · {{ o.demo_shares }} simulated shares @ ${{ o.demo_execution_price }} · sample price {{ o.demo_data_date }}</small>{% endif %}</span>
     <span class="button-row">
       <form method="post" action="{% url 'investing:approve_order' o.pk %}">{% csrf_token %}<button class="button" type="submit">Approve</button></form>
       <form method="post" action="{% url 'investing:reject_order' o.pk %}">{% csrf_token %}<button class="button secondary" type="submit">Reject</button></form>

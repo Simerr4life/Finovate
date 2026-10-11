@@ -14,7 +14,10 @@ urlpatterns = [
     ),
     path("logout/", views.auth0_logout, name="logout"),
     path("onboarding/", views.onboarding, name="onboarding"),
+    path("onboarding/preferences/", views.onboarding_preferences, name="onboarding_preferences"),
     path("settings/", views.settings_view, name="settings"),
+    path("settings/messaging/link/", views.messaging_link_issue, name="messaging_link"),
+    path("settings/messaging/unlink/", views.messaging_unlink, name="messaging_unlink"),
     path("auth0/login/", views.auth0_login, name="auth0_login"),
     path("auth0/callback/", views.auth0_callback, name="auth0_callback"),
 ]

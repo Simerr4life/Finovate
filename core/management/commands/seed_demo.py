@@ -7,12 +7,16 @@ distinguishable from data a real user enters, and --reset only ever
 touches that demo user's own rows.
 """
 
+import os
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
+
+PUBLISHED_LOCAL_PASSWORD = "demo-pass-1234"
 
 from budgets.models import Budget, BudgetPeriod, IncomeSource, RecurringExpense
 from investing.models import RoundUpSettings
@@ -34,12 +38,23 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         username = options["username"]
         password = options["password"]
+        if (
+            not settings.DEBUG
+            and password == PUBLISHED_LOCAL_PASSWORD
+            and not os.environ.get("DEMO_ACCOUNT_PASSWORD")
+        ):
+            raise CommandError(
+                "Refusing the published local demo password while DEBUG is false. "
+                "Set DEMO_ACCOUNT_PASSWORD or pass --password."
+            )
+        if password == PUBLISHED_LOCAL_PASSWORD and os.environ.get("DEMO_ACCOUNT_PASSWORD"):
+            password = os.environ["DEMO_ACCOUNT_PASSWORD"]
 
         user, created = User.objects.get_or_create(username=username, defaults={"email": f"{username}@example.com"})
         if created:
             user.set_password(password)
             user.save()
-            self.stdout.write(self.style.SUCCESS(f"Created demo user '{username}' / password '{password}'"))
+            self.stdout.write(self.style.SUCCESS(f"Created user '{username}'. The password is not written to the log."))
         elif options["reset"]:
             user.categories.all().delete()
             user.transactions.all().delete()

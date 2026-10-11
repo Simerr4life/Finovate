@@ -2,17 +2,12 @@
 {% block title %}Statement — {{ account.institution_name }} — Finovate{% endblock %}
 {% block content %}
 
-<div class="bg-coral-600 text-white text-center text-sm font-bold py-2 rounded-t-xl">
-  FICTIONAL SAMPLE — NOT A REAL BANK STATEMENT
-</div>
-
-<div class="bg-white border border-coral-200 rounded-b-xl p-6 mb-6">
+<div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
   <div class="flex justify-between items-start flex-wrap gap-4 mb-4">
     <div>
       <h1 class="text-2xl font-bold">{{ account.institution_name }}</h1>
       <p class="text-sm text-slate-500">{{ account.location }}</p>
     </div>
-    <span class="text-xs bg-sunset-500/10 text-sunset-600 px-3 py-1.5 rounded-full font-semibold self-start">DEMO ACCOUNT · FICTIONAL DATA</span>
   </div>
   <div class="grid sm:grid-cols-4 gap-4 text-sm border-t border-slate-100 pt-4">
     <div><p class="text-slate-400">Account holder</p><p class="font-semibold">{{ account.account_holder_name }}</p></div>
@@ -102,7 +97,4 @@
   </div>
 </section>
 
-<div class="bg-coral-600 text-white text-center text-sm font-bold py-2 rounded-xl mt-6">
-  FICTIONAL SAMPLE — NOT A REAL BANK STATEMENT
-</div>
 {% endblock %}

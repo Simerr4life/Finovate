@@ -163,12 +163,60 @@ class SimulatedOrder(TimeStampedModel):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     filled_at = models.DateTimeField(null=True, blank=True)
+    demo_execution_price = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    demo_shares = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    demo_data_date = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
         return f"{self.order_type} {self.amount} {self.symbol} ({self.status})"
+
+
+class DemoInvestmentSuggestion(TimeStampedModel):
+    """A rule-based recommendation generated only from bundled demo prices."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Awaiting your decision"
+        ACCEPTED = "accepted", "Accepted (simulated order)"
+        DECLINED = "declined", "Declined"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="demo_investment_suggestions",
+    )
+    symbol = models.CharField(max_length=20)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    data_date = models.DateField()
+    demo_execution_price = models.DecimalField(max_digits=14, decimal_places=4)
+    historical_return_percent = models.DecimalField(max_digits=9, decimal_places=2)
+    volatility_percent = models.DecimalField(max_digits=9, decimal_places=2)
+    score = models.DecimalField(max_digits=9, decimal_places=2)
+    explanation = models.CharField(max_length=300)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PENDING
+    )
+    simulated_order = models.OneToOneField(
+        SimulatedOrder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="demo_suggestion",
+    )
+
+    class Meta:
+        ordering = ["-score", "symbol"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "symbol", "data_date"],
+                name="unique_demo_suggestion_user_symbol_date",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Demo suggestion {self.symbol} for {self.user}"
 
 
 class MarketPrice(TimeStampedModel):
@@ -185,6 +233,7 @@ class MarketPrice(TimeStampedModel):
         STOCK = "stock", "Stock"
 
     symbol = models.CharField(max_length=20)
+    asset_name = models.CharField(max_length=80, blank=True, default="")
     asset_type = models.CharField(max_length=10, choices=AssetType.choices)
     date = models.DateField()
     open = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
@@ -196,6 +245,10 @@ class MarketPrice(TimeStampedModel):
     source_note = models.CharField(max_length=120, help_text='e.g. "Yahoo Finance historical data"')
     is_verified = models.BooleanField(
         default=True, help_text="Always true today: unverified rows are never inserted, only omitted."
+    )
+    is_demo_sample = models.BooleanField(
+        default=False,
+        help_text="This row came from the bundled Excel-backed demo dataset.",
     )
 
     class Meta:

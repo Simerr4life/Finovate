@@ -1,0 +1,100 @@
+{% load finovate %}
+<article class="market-asset-card" id="asset-{{ asset.anchor }}" data-series-id="{{ asset.chart_id }}">
+  <header class="market-asset-heading">
+    <div>
+      <span class="market-type-chip">{{ asset.asset_type_label }} · demo sample</span>
+      <h3>{{ asset.name }}</h3>
+      <span class="market-symbol">{{ asset.symbol }}</span>
+    </div>
+    <div class="market-current-price">
+      <small>Latest sample close · {{ asset.latest.date }}</small>
+      <strong>${{ asset.latest.close }}</strong>
+    </div>
+  </header>
+
+  <div class="market-asset-stats">
+    <div><small>Recorded sample days</small><strong>{{ asset.history|length }}</strong></div>
+    <div>
+      <small>Change across shown dates</small>
+      <strong class="{% if asset.period_change > 0 %}positive{% elif asset.period_change < 0 %}negative{% endif %}">
+        {% if asset.period_change > 0 %}+{% endif %}{{ asset.period_change }}%
+      </strong>
+    </div>
+    <div><small>Latest daily move</small><strong>{% if asset.latest.daily_change_percent != None %}{{ asset.latest.daily_change_percent }}%{% else %}Not supplied{% endif %}</strong></div>
+  </div>
+
+  <div class="market-view-controls" role="group" aria-label="Choose {{ asset.name }} data view">
+    <button class="market-view-button active" type="button" data-market-view="chart" aria-pressed="false">Graph</button>
+    <button class="market-view-button" type="button" data-market-view="table" aria-pressed="true">Price table</button>
+  </div>
+  <section class="market-chart-panel" data-market-chart hidden aria-label="{{ asset.name }} sample price graph">
+    <div class="market-chart-reading" aria-live="polite">
+      <span data-chart-date>{{ asset.latest.date }}</span>
+      <strong data-chart-price>${{ asset.latest.close }}</strong>
+      <span data-chart-change>Sample price</span>
+    </div>
+    <div class="market-chart-scroll">
+      <svg class="market-price-chart" viewBox="0 0 720 260" role="img" aria-label="Interactive historical sample closing prices for {{ asset.name }}">
+        <title>{{ asset.name }} sample closing prices. Move over the graph or use the slider below to inspect each date.</title>
+      </svg>
+    </div>
+    <label class="market-chart-slider-label">
+      <span>Move through sample dates</span>
+      <input type="range" min="0" max="{{ asset.history|length|add:'-1' }}" value="{{ asset.history|length|add:'-1' }}" step="1" data-chart-slider aria-label="Choose a sample date for {{ asset.name }}">
+    </label>
+    <div class="market-chart-range"><span>{{ asset.first_date }}</span><span>{{ asset.latest.date }}</span></div>
+    <div class="market-chart-legend" aria-label="Graph colors">
+      <span><i class="up"></i> Up from prior sample date</span>
+      <span><i class="down"></i> Down from prior sample date</span>
+    </div>
+    <p class="market-chart-help">Hover over the graph or drag the slider to see the sample close for each recorded date.</p>
+  </section>
+
+  <details class="market-history" data-market-table>
+    <summary>View all {{ asset.history|length }} sample price days</summary>
+    <div class="market-history-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th><th>Daily move</th><th>Source</th></tr>
+        </thead>
+        <tbody>
+          {% for price in asset.history %}
+          <tr>
+            <td>{{ price.date }}</td>
+            <td>{% if price.open != None %}${{ price.open }}{% else %}-{% endif %}</td>
+            <td>{% if price.high != None %}${{ price.high }}{% else %}-{% endif %}</td>
+            <td>{% if price.low != None %}${{ price.low }}{% else %}-{% endif %}</td>
+            <td class="num">${{ price.close }}</td>
+            <td>{% if price.volume != None %}{{ price.volume }}{% else %}-{% endif %}</td>
+            <td>{% if price.daily_change_percent != None %}{{ price.daily_change_percent }}%{% else %}-{% endif %}</td>
+            <td>{{ price.source_note }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {{ asset.chart_data|json_script:asset.chart_id }}
+
+  <form class="market-buy-form" method="post" action="{% url 'investing:buy_demo_market_asset' %}">
+    {% csrf_token %}
+    <input type="hidden" name="symbol" value="{{ asset.symbol }}">
+    <div class="market-buy-heading">
+      <strong>Try a simulated buy</strong>
+      <span>Available demo budget: {{ demo_budget|money }}</span>
+    </div>
+    <div class="market-buy-fields">
+      <label class="field-label">Amount
+        <input type="number" name="amount" min="0.01" max="{{ demo_budget }}" step="0.01" placeholder="e.g. 25.00" required {% if demo_budget <= 0 %}disabled{% endif %}>
+      </label>
+      <label class="field-label">Add to savings pool
+        <select name="pool" {% if demo_budget <= 0 %}disabled{% endif %}>
+          <option value="">General / unassigned</option>
+          {% for pool in investable_pools %}<option value="{{ pool.pk }}">{{ pool.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <button class="button" type="submit" {% if demo_budget <= 0 %}disabled{% endif %}>Create demo order</button>
+    </div>
+    <p class="market-buy-note">Uses the latest sample close to estimate fractional shares. The order stays pending until you approve it on Investments. No real trade or money movement occurs.</p>
+  </form>
+</article>

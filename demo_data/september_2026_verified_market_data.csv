@@ -1,0 +1,110 @@
+date,asset,ticker,open,high,low,close,volume,daily_change_percent,source_note
+2026-09-01,Apple,AAPL,316.98,327.3,314.73,325.13,53167388,2.61,FinanceCharts excerpt / uploaded report
+2026-09-02,Apple,AAPL,326.87,328.4,323.53,324.96,33776370,-0.05,FinanceCharts excerpt / uploaded report
+2026-09-03,Amazon,AMZN,256.2,259.5,256,258.9,26891531,1.54,FinanceCharts excerpt
+2026-09-03,Apple,AAPL,324.87,330.81,324.11,328.21,37225838,1,FinanceCharts excerpt / uploaded report
+2026-09-03,Microsoft,MSFT,501.66,515.65,500.8,510.12,24125893,2.68,FinanceCharts excerpt
+2026-09-03,NVIDIA,NVDA,226.02,230.4,224.75,228.45,134681610,1.8,FinanceCharts / StockAnalysis excerpts
+2026-09-04,Amazon,AMZN,259.07,261.12,255.29,258.51,30749912,-0.15,FinanceCharts excerpt
+2026-09-04,Apple,AAPL,328.31,328.93,317.86,319.97,39606884,-2.51,FinanceCharts excerpt / uploaded report
+2026-09-04,Microsoft,MSFT,510,511,499.36,499.7,18101758,-2.04,FinanceCharts excerpt
+2026-09-04,NVIDIA,NVDA,231.09,234.76,229.63,230.36,135352420,0.84,FinanceCharts / StockAnalysis excerpts
+2026-09-08,Amazon,AMZN,256.68,257.99,254.75,256.97,29397994,-0.6,FinanceCharts excerpt
+2026-09-08,Apple,AAPL,317.1,320.7,314.9,316.22,35477090,-1.17,FinanceCharts excerpt / uploaded report
+2026-09-08,Microsoft,MSFT,493.01,495.19,490.15,493.95,18882338,-1.15,FinanceCharts excerpt
+2026-09-08,NVIDIA,NVDA,233.11,233.71,224.85,225.73,122965555,-2.01,FinanceCharts / StockAnalysis excerpts
+2026-09-09,Amazon,AMZN,253.12,254.69,250.65,252.4,33055487,-1.78,FinanceCharts excerpt
+2026-09-09,Apple,AAPL,315.49,319.15,309.9,315.34,65639962,-0.28,FinanceCharts excerpt / uploaded report
+2026-09-09,Microsoft,MSFT,493.07,494.39,489.8,491.65,12889572,-0.47,FinanceCharts excerpt
+2026-09-09,NVIDIA,NVDA,225.28,226.18,223.46,223.67,82955478,-0.91,FinanceCharts / StockAnalysis excerpts
+2026-09-10,Amazon,AMZN,250.11,253.15,249.58,251.89,25484814,-0.2,FinanceCharts excerpt
+2026-09-10,Apple,AAPL,316.67,326.74,316.51,326.57,70011913,3.56,FinanceCharts excerpt / uploaded report
+2026-09-10,Microsoft,MSFT,488.32,494.52,486,492.44,16038805,0.16,FinanceCharts excerpt
+2026-09-10,NVIDIA,NVDA,220.53,220.99,217.2,218.36,105768001,-2.37,FinanceCharts / StockAnalysis excerpts
+2026-09-11,Amazon,AMZN,254.09,257.59,253.14,256.78,26724121,1.94,FinanceCharts excerpt
+2026-09-11,Apple,AAPL,327.45,336.22,326.3,332.27,50716865,1.75,FinanceCharts excerpt / uploaded report
+2026-09-11,Microsoft,MSFT,495.65,498.97,492.58,495.63,14518435,0.65,FinanceCharts excerpt
+2026-09-11,NVIDIA,NVDA,221.24,222,218.15,218.29,89060140,-0.03,FinanceCharts / StockAnalysis excerpts
+2026-09-11,S&P 500,^GSPC,7636.75,7677.02,7636.75,7656.98,4722480000,,Yahoo Finance historical data
+2026-09-14,Amazon,AMZN,253.15,255.95,250.74,253.54,34352766,-1.26,FinanceCharts excerpt
+2026-09-14,Apple,AAPL,334.79,335.5,331.34,333.08,39269147,0.24,FinanceCharts excerpt / uploaded report
+2026-09-14,Microsoft,MSFT,497.06,509.95,495.34,505.41,23091435,1.97,FinanceCharts excerpt
+2026-09-14,NVIDIA,NVDA,211.24,212.77,208.93,210.96,132267244,-3.36,FinanceCharts / StockAnalysis excerpts
+2026-09-14,S&P 500,^GSPC,7611.44,7647.99,7592.28,7619.98,4963750000,,Yahoo Finance historical data
+2026-09-15,Amazon,AMZN,252.24,253.27,247.22,248.42,36275442,-2.02,FinanceCharts excerpt
+2026-09-15,Apple,AAPL,330.13,331.78,328.35,331.34,31748183,-0.52,FinanceCharts excerpt / uploaded report
+2026-09-15,Microsoft,MSFT,500.06,505.9,495.54,497.12,17794612,-1.64,FinanceCharts excerpt
+2026-09-15,NVIDIA,NVDA,213.38,213.94,211.16,212.17,88059700,0.57,FinanceCharts / StockAnalysis excerpts
+2026-09-15,S&P 500,^GSPC,7612.3,7617.26,7572.69,7585.73,5154930000,,Yahoo Finance historical data
+2026-09-16,Amazon,AMZN,248.1,249.26,244.3,245.96,33488488,-0.99,FinanceCharts excerpt
+2026-09-16,Apple,AAPL,332.53,335.48,330.7,332.41,35981000,0.32,FinanceCharts excerpt / uploaded report
+2026-09-16,Microsoft,MSFT,493.03,495.97,487.23,490.3,16670285,-1.37,FinanceCharts excerpt
+2026-09-16,NASDAQ Composite,^IXIC,26108.46,26225.09,25802.96,25978.43,9968640000,,Yahoo Finance excerpt
+2026-09-16,NVIDIA,NVDA,214.14,216.76,212.5,213.9,96563600,0.82,FinanceCharts / StockAnalysis excerpts
+2026-09-16,S&P 500,^GSPC,7601.25,7626.79,7507.77,7551.81,5307920000,,Yahoo Finance historical data
+2026-09-17,Amazon,AMZN,251.06,252.73,249.24,251.19,30438790,2.13,FinanceCharts excerpt
+2026-09-17,Apple,AAPL,334.77,338.34,330.18,337,36700225,1.38,FinanceCharts excerpt / uploaded report
+2026-09-17,Microsoft,MSFT,497.8,501.47,493.17,497.75,17841640,1.52,FinanceCharts excerpt
+2026-09-17,NASDAQ Composite,^IXIC,26377.86,26460.64,26289.94,26418.3,9884890000,,Yahoo Finance excerpt
+2026-09-17,NVIDIA,NVDA,218.38,219.91,217.15,219.34,94191300,2.54,FinanceCharts / StockAnalysis excerpts
+2026-09-17,S&P 500,^GSPC,7631.44,7646.86,7611.81,7637.76,5058210000,,Yahoo Finance historical data
+2026-09-18,Amazon,AMZN,252.92,255.43,251.88,253.71,52274713,1,FinanceCharts excerpt
+2026-09-18,Apple,AAPL,337.9,338.49,332.53,336.13,86588203,-0.26,FinanceCharts excerpt / uploaded report
+2026-09-18,Microsoft,MSFT,497.96,498.65,491.1,493.78,39622288,-0.8,FinanceCharts excerpt
+2026-09-18,NASDAQ Composite,^IXIC,26522.09,26544.93,26333.98,26522.54,13286960000,,Yahoo Finance excerpt
+2026-09-18,NVIDIA,NVDA,219.35,222.73,218.03,222.27,190287428,1.34,FinanceCharts / StockAnalysis excerpts
+2026-09-18,S&P 500,^GSPC,7657.17,7657.17,7610.52,7650.5,8858350000,,Yahoo Finance historical data
+2026-09-21,Amazon,AMZN,256.4,259.49,253.6,258.45,42979407,1.87,FinanceCharts excerpt
+2026-09-21,Apple,AAPL,335.28,339.64,333.05,338.98,34999229,0.85,FinanceCharts excerpt / uploaded report
+2026-09-21,Microsoft,MSFT,494.94,501.87,491.33,501.61,27959944,1.59,FinanceCharts excerpt
+2026-09-21,NASDAQ Composite,^IXIC,26723.19,27183.93,26707.42,27122.09,8813260000,,Yahoo Finance excerpt
+2026-09-21,NVIDIA,NVDA,222.94,228.5,221.56,227.38,109806100,2.3,FinanceCharts / StockAnalysis excerpts
+2026-09-21,S&P 500,^GSPC,7692.83,7779.22,7691.19,7764.7,4828050000,,Yahoo Finance historical data
+2026-09-22,Amazon,AMZN,255.11,259,253.78,254.98,41982569,-1.34,FinanceCharts excerpt
+2026-09-22,Apple,AAPL,340.13,345.34,338.75,339.75,40711786,0.23,FinanceCharts excerpt / uploaded report
+2026-09-22,Dow Jones Industrial Average,^DJI,52301.92,52319.01,51726.08,51863.69,444770000,,Yahoo Finance / StatMuse excerpt
+2026-09-22,Microsoft,MSFT,507.32,508.5,493.65,498,21652838,-0.72,FinanceCharts excerpt
+2026-09-22,NASDAQ Composite,^IXIC,27161.2,27288.79,27161.2,27244.28,9334690000,,Yahoo Finance excerpt
+2026-09-22,NVIDIA,NVDA,226.85,229.98,226.5,228.87,95746700,0.66,FinanceCharts / StockAnalysis excerpts
+2026-09-22,S&P 500,^GSPC,7770.81,7782.19,7756.26,7764.64,5286270000,,Yahoo Finance historical data
+2026-09-23,Amazon,AMZN,253,253.99,247.76,249.27,44209157,-2.24,FinanceCharts excerpt
+2026-09-23,Apple,AAPL,341.07,341.8,335.5,337.02,31658823,-0.8,FinanceCharts excerpt / uploaded report
+2026-09-23,Dow Jones Industrial Average,^DJI,51771.41,51846.81,51477.53,51511.59,428070000,,Yahoo Finance / StatMuse excerpt
+2026-09-23,Microsoft,MSFT,500.75,509.44,495.88,500.59,19445555,0.52,FinanceCharts excerpt
+2026-09-23,NASDAQ Composite,^IXIC,27213.52,27217.33,26873.54,26936.04,8491740000,,Yahoo Finance excerpt
+2026-09-23,NVIDIA,NVDA,228.03,228.95,224.02,225.51,89547290,-1.47,FinanceCharts / StockAnalysis excerpts
+2026-09-23,S&P 500,^GSPC,7761.94,7761.94,7694.89,7706.03,5110910000,,Yahoo Finance historical data
+2026-09-24,Amazon,AMZN,246.02,250.43,245.6,249.38,33040052,0.04,FinanceCharts excerpt
+2026-09-24,Apple,AAPL,336.72,338.91,334.3,335.92,24733098,-0.33,FinanceCharts excerpt / uploaded report
+2026-09-24,Dow Jones Industrial Average,^DJI,51415.75,51485.97,51124.02,51349.98,390410000,,Yahoo Finance / StatMuse excerpt
+2026-09-24,Microsoft,MSFT,495.07,498.9,491.22,497.93,16657643,-0.53,FinanceCharts excerpt
+2026-09-24,NASDAQ Composite,^IXIC,26734.51,26971.04,26706.14,26939.37,8078820000,,Yahoo Finance excerpt
+2026-09-24,NVIDIA,NVDA,222.08,224.94,221.09,224.58,77469856,-0.41,FinanceCharts / StockAnalysis excerpts
+2026-09-24,S&P 500,^GSPC,7666.99,7719.01,7662.57,7704.13,5316390000,,Yahoo Finance historical data
+2026-09-25,Amazon,AMZN,248.56,250.88,247.18,249.67,34263902,0.12,FinanceCharts excerpt
+2026-09-25,Apple,AAPL,336.04,341.67,334.53,341.07,29405971,1.53,FinanceCharts excerpt / uploaded report
+2026-09-25,Dow Jones Industrial Average,^DJI,51359.7,51874.94,51339.24,51828.62,387540000,,Yahoo Finance / StatMuse excerpt
+2026-09-25,Microsoft,MSFT,499.04,519.4,497.25,516.17,38193112,3.66,FinanceCharts excerpt
+2026-09-25,NASDAQ Composite,^IXIC,26970.95,27122.76,26876.27,27068.72,7275260000,,Yahoo Finance excerpt
+2026-09-25,NVIDIA,NVDA,225.13,226.94,223.13,225.07,89947712,0.22,FinanceCharts / StockAnalysis excerpts
+2026-09-25,S&P 500,^GSPC,7709.86,7752.07,7693.08,7743.41,4499180000,,Yahoo Finance historical data
+2026-09-28,Amazon,AMZN,246.62,247.77,244.72,246.15,32596709,-1.41,FinanceCharts excerpt
+2026-09-28,Dow Jones Industrial Average,^DJI,51648.48,51780.5,51409.65,51481.51,455450000,,Yahoo Finance / StatMuse excerpt
+2026-09-28,Microsoft,MSFT,505.47,513.33,502.22,509.22,19626939,-1.35,FinanceCharts excerpt
+2026-09-28,NASDAQ Composite,^IXIC,26935.76,26990.02,26709.69,26820.38,7030730000,,Yahoo Finance excerpt
+2026-09-28,NVIDIA,NVDA,229.75,233.21,228.04,228.86,142344321,1.68,FinanceCharts / StockAnalysis excerpts
+2026-09-28,S&P 500,^GSPC,7721.7,7724.15,7666.6,7683.69,5129710000,,Yahoo Finance historical data
+2026-09-29,Alphabet,GOOGL,341.95,342.84,338.02,340.92,21066900,-0.53,StockAnalysis excerpt in uploaded report
+2026-09-29,Amazon,AMZN,246.71,248.84,245.14,246.67,33730401,0.21,FinanceCharts excerpt
+2026-09-29,Dow Jones Industrial Average,^DJI,51416.96,51505.19,51129.18,51349.92,386240000,,Yahoo Finance / StatMuse excerpt
+2026-09-29,Microsoft,MSFT,508.31,513.64,502.4,508.96,21341832,-0.05,FinanceCharts excerpt
+2026-09-29,NASDAQ Composite,^IXIC,26908.76,26919.72,26717.95,26797.54,7097250000,,Yahoo Finance excerpt
+2026-09-29,NVIDIA,NVDA,230.97,232.82,227.03,227.21,101494933,-0.72,FinanceCharts / StockAnalysis excerpts
+2026-09-29,S&P 500,^GSPC,7699.6,7699.6,7653.55,7670.84,5023590000,,Yahoo Finance historical data
+2026-09-30,Alphabet,GOOGL,344.15,352.6,340.99,344.08,37373739,0.93,StockAnalysis excerpt in uploaded report
+2026-09-30,Amazon,AMZN,246.79,252.44,246.08,249.15,41913110,1.01,FinanceCharts excerpt
+2026-09-30,Dow Jones Industrial Average,^DJI,51424.84,51473.93,50906.05,50906.05,487860000,,Yahoo Finance / StatMuse excerpt
+2026-09-30,Microsoft,MSFT,511.61,519.83,510.31,512.9,27223264,0.77,FinanceCharts excerpt
+2026-09-30,NASDAQ Composite,^IXIC,26892.8,27108.2,26861.06,26861.06,8300260000,,Yahoo Finance excerpt
+2026-09-30,NVIDIA,NVDA,229.27,232.37,228.17,228.38,121732188,0.51,FinanceCharts / StockAnalysis excerpts
+2026-09-30,S&P 500,^GSPC,7688.99,7722.88,7651.54,7651.54,4276550000,,Yahoo Finance historical data

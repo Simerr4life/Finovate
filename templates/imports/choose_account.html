@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Import — choose account — Finovate{% endblock %}
+{% block crumb %}Import a statement{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 max-w-xl">
+  <h1 class="text-xl font-bold mb-2">Which account is this?</h1>
+  <p class="text-sm text-slate-500 mb-4">
+    Pick the account this statement belongs to, or create a new one. Only the last few digits of
+    the account number are ever stored.
+  </p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <label class="field-label" for="{{ form.existing_account.id_for_label }}">{{ form.existing_account.label }}{{ form.existing_account }}</label>
+    {% if form.existing_account.errors %}<p class="text-sm text-coral-600">{{ form.existing_account.errors.0 }}</p>{% endif %}
+
+    <p class="text-xs text-slate-400 mt-4 mb-1 uppercase tracking-wide">Or create a new account</p>
+    {% for field in form %}
+      {% if field.name != "existing_account" %}
+      <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}</label>
+      {% if field.errors %}<p class="text-sm text-coral-600">{{ field.errors.0 }}</p>{% endif %}
+      {% endif %}
+    {% endfor %}
+
+    <button type="submit" class="button" style="width:100%;margin-top:18px;">Continue</button>
+  </form>
+</section>
+{% endblock %}

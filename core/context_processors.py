@@ -1,5 +1,3 @@
-from django.conf import settings
-
 from accounts.auth0 import auth0_configured
 from accounts.models import ConnectedAccountPlaceholder
 from core.display import display_name, user_initials
@@ -16,6 +14,12 @@ NAV_MAP = {
     "budgets:transaction_delete": "transactions",
     "transactions:statement_list": "transactions",
     "transactions:statement_detail": "transactions",
+    "imports:history": "transactions",
+    "imports:upload": "transactions",
+    "imports:choose_account": "transactions",
+    "imports:map_columns": "transactions",
+    "imports:preview": "transactions",
+    "imports:batch_detail": "transactions",
     "savings:index": "savings",
     "savings:pools": "pools",
     "savings:goals": "goals",
@@ -49,7 +53,6 @@ def app_context(request):
         unread_notifications = request.user.notification_events.filter(read_at__isnull=True).count()
         surplus = compute_investable_surplus(request.user)
     return {
-        "FINOVATE_DEMO_MODE": settings.FINOVATE_DEMO_MODE,
         "nav_active": nav_active,
         "user_display_name": user_label,
         "user_initials": initials,
