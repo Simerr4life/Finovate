@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load finovate %}
+{% load static finovate %}
 {% block title %}Explore sample market — Finovate{% endblock %}
 {% block crumb %}Explore sample market{% endblock %}
 {% block content %}
@@ -60,3 +60,4 @@
 
 <div class="disclosure market-data-footnote">The change shown for each asset compares only its earliest and latest dates included in this sample. Missing dates are not estimated or filled in.</div>
 {% endblock %}
+{% block extra_js %}<script src="{% static 'js/market-charts.js' %}?v=1" defer></script>{% endblock %}

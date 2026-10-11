@@ -1,5 +1,5 @@
 {% load finovate %}
-<article class="market-asset-card" id="asset-{{ asset.anchor }}">
+<article class="market-asset-card" id="asset-{{ asset.anchor }}" data-series-id="{{ asset.chart_id }}">
   <header class="market-asset-heading">
     <div>
       <span class="market-type-chip">{{ asset.asset_type_label }} · demo sample</span>
@@ -23,7 +23,34 @@
     <div><small>Latest daily move</small><strong>{% if asset.latest.daily_change_percent != None %}{{ asset.latest.daily_change_percent }}%{% else %}Not supplied{% endif %}</strong></div>
   </div>
 
-  <details class="market-history">
+  <div class="market-view-controls" role="group" aria-label="Choose {{ asset.name }} data view">
+    <button class="market-view-button active" type="button" data-market-view="chart" aria-pressed="false">Graph</button>
+    <button class="market-view-button" type="button" data-market-view="table" aria-pressed="true">Price table</button>
+  </div>
+  <section class="market-chart-panel" data-market-chart hidden aria-label="{{ asset.name }} sample price graph">
+    <div class="market-chart-reading" aria-live="polite">
+      <span data-chart-date>{{ asset.latest.date }}</span>
+      <strong data-chart-price>${{ asset.latest.close }}</strong>
+      <span data-chart-change>Sample price</span>
+    </div>
+    <div class="market-chart-scroll">
+      <svg class="market-price-chart" viewBox="0 0 720 260" role="img" aria-label="Interactive historical sample closing prices for {{ asset.name }}">
+        <title>{{ asset.name }} sample closing prices. Move over the graph or use the slider below to inspect each date.</title>
+      </svg>
+    </div>
+    <label class="market-chart-slider-label">
+      <span>Move through sample dates</span>
+      <input type="range" min="0" max="{{ asset.history|length|add:'-1' }}" value="{{ asset.history|length|add:'-1' }}" step="1" data-chart-slider aria-label="Choose a sample date for {{ asset.name }}">
+    </label>
+    <div class="market-chart-range"><span>{{ asset.first_date }}</span><span>{{ asset.latest.date }}</span></div>
+    <div class="market-chart-legend" aria-label="Graph colors">
+      <span><i class="up"></i> Up from prior sample date</span>
+      <span><i class="down"></i> Down from prior sample date</span>
+    </div>
+    <p class="market-chart-help">Hover over the graph or drag the slider to see the sample close for each recorded date.</p>
+  </section>
+
+  <details class="market-history" data-market-table>
     <summary>View all {{ asset.history|length }} sample price days</summary>
     <div class="market-history-scroll">
       <table class="data-table">
@@ -47,6 +74,7 @@
       </table>
     </div>
   </details>
+  {{ asset.chart_data|json_script:asset.chart_id }}
 
   <form class="market-buy-form" method="post" action="{% url 'investing:buy_demo_market_asset' %}">
     {% csrf_token %}

@@ -335,6 +335,12 @@ def market_data(request):
             "history": list(reversed(history)),
             "period_change": period_change,
             "anchor": slugify(symbol),
+            "chart_id": f"market-series-{slugify(symbol)}",
+            "first_date": history[0].date,
+            "chart_data": [
+                {"date": price.date.isoformat(), "close": str(price.close)}
+                for price in history
+            ],
         }
         if latest_price.asset_type == MarketPrice.AssetType.STOCK:
             stock_assets.append(asset)

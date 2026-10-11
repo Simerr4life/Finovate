@@ -607,6 +607,30 @@ body.guest .content { max-width: 1120px; padding-top: 48px; }
 .market-no-data { padding: 26px; }
 .market-no-data h2 { margin-top: 0; }
 .market-data-footnote { margin-top: 20px; }
+.market-view-controls { display: none; gap: 6px; margin-top: 14px; padding: 4px; width: fit-content; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+body.has-market-chart-js .market-view-controls { display: flex; }
+.market-view-button { padding: 7px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.market-view-button.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px #102a2018; }
+.market-view-button:focus-visible, .market-chart-slider-label input:focus-visible { outline: 3px solid #72ad91; outline-offset: 2px; }
+.market-history[hidden] { display: none; }
+.market-chart-panel { padding: 12px 0 4px; }
+.market-chart-reading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; min-height: 28px; }
+.market-chart-reading > span:first-child { color: var(--muted); font-size: 11px; }
+.market-chart-reading > strong { font: 700 17px "Manrope", sans-serif; }
+.market-chart-reading > span:last-child { color: var(--muted); font-size: 11px; }
+.market-chart-reading .market-chart-up { color: var(--green); }
+.market-chart-reading .market-chart-down { color: var(--danger); }
+.market-chart-scroll { margin: 8px 0 2px; overflow-x: auto; }
+.market-price-chart { display: block; width: 100%; min-width: 540px; height: auto; overflow: visible; }
+.market-chart-slider-label { display: grid; gap: 7px; color: var(--ink); font-size: 11px; font-weight: 600; }
+.market-chart-slider-label input { width: 100%; min-height: 24px; margin: 0; accent-color: var(--green); cursor: ew-resize; }
+.market-chart-range { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 10px; }
+.market-chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 10px; }
+.market-chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.market-chart-legend i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; }
+.market-chart-legend .up { background: #21865b; }
+.market-chart-legend .down { background: #d14d4d; }
+.market-chart-help { margin: 7px 0 0; color: var(--muted); font-size: 10px; }
 @media (max-width: 560px) {
   .market-budget-banner { padding: 15px; }
   .market-section-heading { align-items: start; }
