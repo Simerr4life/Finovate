@@ -273,6 +273,9 @@ def index(request):
         "investable_pools": pools,
         "pool_summaries": pool_summaries,
         "demo_budget": available_demo_investment_budget(request.user),
+        "demo_pool_funds": sum(
+            (pool.current_amount for pool in pools), Decimal("0.00")
+        ),
         "demo_funded_total": (
             DemoInvestmentFunding.objects.filter(user=request.user).aggregate(
                 total=Sum("amount")

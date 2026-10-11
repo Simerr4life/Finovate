@@ -270,7 +270,15 @@ def reject_order(order: SimulatedOrder) -> SimulatedOrder:
 
 
 def available_demo_investment_budget(user) -> Decimal:
+    from savings.models import Goal
+
     surplus = compute_investable_surplus(user).investable_surplus
+    pool_funds = (
+        Goal.objects.filter(user=user, is_investable=True).aggregate(
+            total=Sum("current_amount")
+        )["total"]
+        or Decimal("0.00")
+    )
     demo_funds = (
         DemoInvestmentFunding.objects.filter(user=user).aggregate(
             total=Sum("amount")
@@ -284,7 +292,10 @@ def available_demo_investment_budget(user) -> Decimal:
         ).aggregate(total=Sum("amount"))["total"]
         or Decimal("0.00")
     )
-    return max(quantize_money(surplus + demo_funds - committed), Decimal("0.00"))
+    return max(
+        quantize_money(surplus + pool_funds + demo_funds - committed),
+        Decimal("0.00"),
+    )
 
 
 def add_demo_investment_funds(user, amount: Decimal) -> DemoInvestmentFunding:
@@ -319,7 +330,8 @@ def create_demo_market_order(user, symbol: str, amount: Decimal, pool=None) -> S
     if amount > available_demo_investment_budget(user):
         raise ValueError(
             "That amount is above your available demo investing budget. "
-            "Check your investable surplus and pending orders."
+            "Check your investable pool balances, cash surplus, virtual funds, "
+            "and pending orders."
         )
 
     shares = (amount / latest_price.close).quantize(SHARE_PLACES)

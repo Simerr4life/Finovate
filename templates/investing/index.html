@@ -24,7 +24,7 @@
     <span class="eyebrow">SIMULATED ONLY</span>
     <h2>Demo investing budget</h2>
     <p>Available to use on sample-stock orders and recommendations: <strong>{{ demo_budget|money }}</strong></p>
-    <small>{{ demo_funded_total|money }} in virtual funds added so far. This only changes the demo balance; it does not add to your real cash or move money.</small>
+    <small>Includes {{ demo_pool_funds|money }} in investable savings pools and {{ demo_funded_total|money }} in virtual funds, plus estimated cash surplus. Demo orders reserve their amounts; no real money is moved.</small>
   </div>
   <form method="post" action="{% url 'investing:add_demo_investment_funds' %}" class="demo-budget-form">
     {% csrf_token %}
@@ -183,7 +183,7 @@
   <div class="demo-ai-empty">
     {% if demo_budget <= 0 %}
     <strong>Add virtual demo funds to start reviewing sample-stock ideas.</strong>
-    <span>Your simulated investing budget is $0.00. Add virtual funds above; they do not change your real account balance.</span>
+    <span>Your simulated investing budget is $0.00. Add virtual funds above or add cash to an investable savings pool; no real money moves through demo trades.</span>
     {% else %}
     <strong>Ready to explore a demo recommendation?</strong>
     <span>Suggestions use only the included sample prices and are limited to $75 total per review.</span>
