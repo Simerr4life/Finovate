@@ -243,6 +243,14 @@ def propose_surplus_investment(user, amount: Decimal, pool=None) -> SimulatedOrd
 
 def approve_order(order: SimulatedOrder, as_of: date | None = None) -> SimulatedOrder:
     """Simulate approving/filling a pending order: never a real trade."""
+    if (
+        order.demo_execution_price is not None
+        and order.demo_price_source != SimulatedOrder.PriceSource.TWELVE_DATA
+    ):
+        raise ValueError(
+            "This pending order uses an old bundled sample price and cannot be "
+            "approved. Reject it and create a new order using Twelve Data."
+        )
     as_of = as_of or timezone.now().date()
     order.status = SimulatedOrder.Status.FILLED
     order.filled_at = timezone.now()
@@ -312,7 +320,7 @@ def add_demo_investment_funds(user, amount: Decimal) -> DemoInvestmentFunding:
 
 @db_transaction.atomic
 def create_demo_market_order(user, symbol: str, amount: Decimal, pool=None) -> SimulatedOrder:
-    """Create a pending simulated buy order using the latest bundled sample close."""
+    """Create a simulated buy order using the latest available Twelve Data price."""
     if not amount.is_finite() or amount <= 0:
         raise ValueError("Enter an amount greater than $0.00.")
     amount = quantize_money(amount)
@@ -322,10 +330,10 @@ def create_demo_market_order(user, symbol: str, amount: Decimal, pool=None) -> S
     latest_price = MarketPrice.objects.filter(
         symbol=symbol,
         is_verified=True,
-        is_demo_sample=True,
+        is_twelve_data=True,
     ).order_by("-date").first()
     if latest_price is None:
-        raise ValueError("Choose an asset from the supplied sample market data.")
+        raise ValueError("Choose an asset with available Twelve Data history.")
 
     if amount > available_demo_investment_budget(user):
         raise ValueError(
@@ -334,7 +342,15 @@ def create_demo_market_order(user, symbol: str, amount: Decimal, pool=None) -> S
             "and pending orders."
         )
 
-    shares = (amount / latest_price.close).quantize(SHARE_PLACES)
+    from .live_quotes import refresh_live_market_quotes
+
+    live_quotes, _ = refresh_live_market_quotes([symbol], allow_refresh=True)
+    execution_price = (
+        live_quotes[symbol].price
+        if symbol in live_quotes
+        else latest_price.close
+    )
+    shares = (amount / execution_price).quantize(SHARE_PLACES)
     return SimulatedOrder.objects.create(
         user=user,
         pool=pool,
@@ -342,7 +358,8 @@ def create_demo_market_order(user, symbol: str, amount: Decimal, pool=None) -> S
         order_type=SimulatedOrder.OrderType.BUY,
         amount=amount,
         status=SimulatedOrder.Status.PENDING,
-        demo_execution_price=latest_price.close,
+        demo_execution_price=execution_price,
+        demo_price_source=SimulatedOrder.PriceSource.TWELVE_DATA,
         demo_shares=shares,
         demo_data_date=latest_price.date,
     )
@@ -383,7 +400,7 @@ def _demo_stock_metrics(rows: list[MarketPrice]) -> dict | None:
 
 
 def generate_demo_investment_suggestions(user) -> list[DemoInvestmentSuggestion]:
-    """Create once-per-dataset, user-reviewed ideas from the bundled sample prices.
+    """Create once-per-dataset, user-reviewed ideas from Twelve Data history.
 
     This is deterministic demo logic, not a predictive model or investment
     advice. The suggested amounts are capped by the user's available demo
@@ -396,7 +413,7 @@ def generate_demo_investment_suggestions(user) -> list[DemoInvestmentSuggestion]
     stock_rows = MarketPrice.objects.filter(
         asset_type=MarketPrice.AssetType.STOCK,
         is_verified=True,
-        is_demo_sample=True,
+        is_twelve_data=True,
     ).order_by("symbol", "date")
     grouped: dict[str, list[MarketPrice]] = {}
     for row in stock_rows:
@@ -419,6 +436,7 @@ def generate_demo_investment_suggestions(user) -> list[DemoInvestmentSuggestion]
             user=user,
             symbol=candidate["symbol"],
             data_date=candidate["data_date"],
+            data_source=DemoInvestmentSuggestion.DataSource.TWELVE_DATA,
         ).exists()
     ]
     if not new_candidates:
@@ -427,6 +445,7 @@ def generate_demo_investment_suggestions(user) -> list[DemoInvestmentSuggestion]
                 user=user,
                 symbol=candidate["symbol"],
                 data_date=candidate["data_date"],
+                data_source=DemoInvestmentSuggestion.DataSource.TWELVE_DATA,
             )
             for candidate in candidates
         ]
@@ -444,15 +463,16 @@ def generate_demo_investment_suggestions(user) -> list[DemoInvestmentSuggestion]
         amount = Decimal(base_cents + (1 if index < extra_cents else 0)) / 100
         explanation = (
             f"From {candidate['first_date']} to {candidate['data_date']}, "
-            f"{candidate['symbol']} changed {candidate['return']}% in the supplied "
-            f"sample; observed daily volatility was {candidate['volatility']}%. "
-            "The demo ranks sample-period return minus volatility. Past movement "
+            f"{candidate['symbol']} changed {candidate['return']}% in Twelve Data "
+            f"history; observed daily volatility was {candidate['volatility']}%. "
+            "The demo ranks the historical return minus volatility. Past movement "
             "does not predict future results."
         )
         suggestion, _ = DemoInvestmentSuggestion.objects.get_or_create(
             user=user,
             symbol=candidate["symbol"],
             data_date=candidate["data_date"],
+            data_source=DemoInvestmentSuggestion.DataSource.TWELVE_DATA,
             defaults={
                 "amount": amount,
                 "demo_execution_price": candidate["price"],
@@ -473,6 +493,11 @@ def accept_demo_investment_suggestion(
     suggestion = DemoInvestmentSuggestion.objects.select_for_update().get(
         pk=suggestion.pk, user=user, status=DemoInvestmentSuggestion.Status.PENDING
     )
+    if suggestion.data_source != DemoInvestmentSuggestion.DataSource.TWELVE_DATA:
+        raise ValueError(
+            "This older recommendation uses bundled sample prices. Generate a new "
+            "Twelve Data recommendation before accepting an idea."
+        )
     if pool is not None and (
         pool.user_id != user.pk or not pool.is_investable
     ):
@@ -493,6 +518,7 @@ def accept_demo_investment_suggestion(
         amount=suggestion.amount,
         status=SimulatedOrder.Status.PENDING,
         demo_execution_price=suggestion.demo_execution_price,
+        demo_price_source=SimulatedOrder.PriceSource.TWELVE_DATA,
         demo_shares=shares,
         demo_data_date=suggestion.data_date,
     )

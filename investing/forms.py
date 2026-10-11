@@ -38,10 +38,7 @@ class RoundUpSettingsForm(forms.ModelForm):
 class HypotheticalScenarioForm(forms.Form):
     """Inputs for the illustrative Oct 6, 2026 "what if" calculator.
 
-    Prices are typed in by the user — Finovate has no live or historical
-    market-data connection, so it cannot pre-fill "verified" prices. The
-    form exists to do decimal-safe arithmetic on whatever prices you (or
-    a future market-data adapter) supply, not to vouch for them.
+    Prices are typed in by the user and are not checked against market data.
     """
 
     symbol = forms.CharField(max_length=20, initial="VTI", label="Symbol (any label — not validated against a real market)")
@@ -54,17 +51,18 @@ class HypotheticalScenarioForm(forms.Form):
 
 class VerifiedScenarioForm(forms.Form):
     """Same hypothetical-gain calculation, but prices come from actual
-    source-verified MarketPrice rows instead of free-text entry. Still
-    hypothetical — no real purchase happened — but the prices themselves
-    are real and cited (see the Market Data page for sources).
+    Twelve Data MarketPrice rows instead of free-text entry. Still
+    hypothetical — no real purchase happened.
     """
 
     invest_row = forms.ModelChoiceField(
-        queryset=MarketPrice.objects.all(), label="Investment date (verified price)",
-        help_text="Pick a verified row to use as the hypothetical buy price.",
+        queryset=MarketPrice.objects.filter(is_verified=True, is_twelve_data=True),
+        label="Investment date (Twelve Data price)",
+        help_text="Pick a Twelve Data daily bar to use as the hypothetical buy price.",
     )
     valuation_row = forms.ModelChoiceField(
-        queryset=MarketPrice.objects.all(), label="Valuation date (verified price)",
+        queryset=MarketPrice.objects.filter(is_verified=True, is_twelve_data=True),
+        label="Valuation date (Twelve Data price)",
         help_text="Must be the same symbol as the investment-date row.",
     )
     amount_invested = forms.DecimalField(max_digits=12, decimal_places=2, initial=200, min_value=0.01, label="Hypothetical amount invested ($)")

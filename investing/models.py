@@ -55,6 +55,15 @@ class TwelveDataUsageWindow(models.Model):
     daily_credits = models.PositiveSmallIntegerField(default=0)
 
 
+class TwelveDataHistoryState(models.Model):
+    """Shared refresh status for each cached Twelve Data daily time series."""
+
+    symbol = models.CharField(max_length=20, primary_key=True)
+    refreshed_at = models.DateTimeField(null=True, blank=True)
+    fetch_started_at = models.DateTimeField(null=True, blank=True)
+    retry_after = models.DateTimeField(null=True, blank=True)
+
+
 class RoundUpSettings(TimeStampedModel):
     """Per-user configuration for the simulated round-up feature."""
 
@@ -186,6 +195,10 @@ class SimulatedOrder(TimeStampedModel):
         REJECTED = "rejected", "Rejected"
         CANCELLED = "cancelled", "Cancelled"
 
+    class PriceSource(models.TextChoices):
+        BUNDLED_SAMPLE = "bundled-sample", "Bundled sample"
+        TWELVE_DATA = "twelve-data", "Twelve Data"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="simulated_orders"
     )
@@ -203,6 +216,11 @@ class SimulatedOrder(TimeStampedModel):
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     filled_at = models.DateTimeField(null=True, blank=True)
     demo_execution_price = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    demo_price_source = models.CharField(
+        max_length=20,
+        choices=PriceSource.choices,
+        default=PriceSource.BUNDLED_SAMPLE,
+    )
     demo_shares = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
     demo_data_date = models.DateField(null=True, blank=True)
 
@@ -214,12 +232,16 @@ class SimulatedOrder(TimeStampedModel):
 
 
 class DemoInvestmentSuggestion(TimeStampedModel):
-    """A rule-based recommendation generated only from bundled demo prices."""
+    """A rule-based demo recommendation generated from one market-data source."""
 
     class Status(models.TextChoices):
         PENDING = "pending", "Awaiting your decision"
         ACCEPTED = "accepted", "Accepted (simulated order)"
         DECLINED = "declined", "Declined"
+
+    class DataSource(models.TextChoices):
+        BUNDLED_SAMPLE = "bundled-sample", "Bundled sample"
+        TWELVE_DATA = "twelve-data", "Twelve Data"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -229,6 +251,11 @@ class DemoInvestmentSuggestion(TimeStampedModel):
     symbol = models.CharField(max_length=20)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     data_date = models.DateField()
+    data_source = models.CharField(
+        max_length=20,
+        choices=DataSource.choices,
+        default=DataSource.BUNDLED_SAMPLE,
+    )
     demo_execution_price = models.DecimalField(max_digits=14, decimal_places=4)
     historical_return_percent = models.DecimalField(max_digits=9, decimal_places=2)
     volatility_percent = models.DecimalField(max_digits=9, decimal_places=2)
@@ -249,8 +276,8 @@ class DemoInvestmentSuggestion(TimeStampedModel):
         ordering = ["-score", "symbol"]
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "symbol", "data_date"],
-                name="unique_demo_suggestion_user_symbol_date",
+                fields=["user", "symbol", "data_date", "data_source"],
+                name="unique_demo_suggestion_user_symbol_date_source",
             )
         ]
 
@@ -288,6 +315,10 @@ class MarketPrice(TimeStampedModel):
     is_demo_sample = models.BooleanField(
         default=False,
         help_text="This row came from the bundled Excel-backed demo dataset.",
+    )
+    is_twelve_data = models.BooleanField(
+        default=False,
+        help_text="This row was fetched from the Twelve Data API.",
     )
 
     class Meta:

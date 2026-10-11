@@ -205,7 +205,7 @@
       if (priceOutput) priceOutput.textContent = formatMoney(point.close);
       if (changeOutput) {
         if (boundedIndex === 0) {
-          changeOutput.textContent = "First recorded sample date";
+          changeOutput.textContent = "First recorded trading date";
           changeOutput.className = "";
         } else {
           const previousClose = points[boundedIndex - 1].close;
@@ -234,7 +234,7 @@
       badgeText.textContent = formatMoney(point.close);
       badge.setAttribute("visibility", "visible");
       slider.setAttribute("aria-valuetext", `${point.date}, ${formatMoney(point.close)}`);
-      svg.setAttribute("aria-label", `${point.date}: ${formatMoney(point.close)} sample value`);
+      svg.setAttribute("aria-label", `${point.date}: ${formatMoney(point.close)} Twelve Data value`);
     }
 
     slider.addEventListener("input", () => selectPoint(Number(slider.value)));

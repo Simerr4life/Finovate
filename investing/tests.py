@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -20,6 +20,7 @@ from .models import (
     RoundUpSettings,
     SimulatedOrder,
     TwelveDataUsageWindow,
+    TwelveDataHistoryState,
 )
 from .services import (
     accept_demo_investment_suggestion,
@@ -38,7 +39,7 @@ from .services import (
     reject_order,
     sweep_pending_roundups,
 )
-from .live_quotes import refresh_live_market_quotes
+from .live_quotes import refresh_live_market_quotes, refresh_twelve_data_history
 
 
 class RoundUpCreationTests(TestCase):
@@ -363,10 +364,10 @@ class DemoAISuggestionTests(TestCase):
                     daily_change_percent=Decimal(change) if change is not None else None,
                     source_note="Demo test sample",
                     is_verified=True,
-                    is_demo_sample=True,
+                    is_twelve_data=True,
                 )
 
-    def test_recommendations_rank_sample_stocks_and_observe_surplus_cap(self):
+    def test_recommendations_rank_provider_stocks_and_observe_surplus_cap(self):
         suggestions = generate_demo_investment_suggestions(self.user)
 
         self.assertEqual(len(suggestions), 3)
@@ -375,7 +376,7 @@ class DemoAISuggestionTests(TestCase):
         self.assertNotIn("^INDEX", [item.symbol for item in suggestions])
         self.assertIn("does not predict future results", suggestions[0].explanation)
 
-    def test_non_demo_market_rows_do_not_influence_excel_recommendations(self):
+    def test_non_provider_market_rows_do_not_influence_recommendations(self):
         MarketPrice.objects.create(
             symbol="REAL-ROW",
             asset_type=MarketPrice.AssetType.STOCK,
@@ -408,7 +409,32 @@ class DemoAISuggestionTests(TestCase):
         self.assertEqual([item.pk for item in first], [item.pk for item in second])
         self.assertEqual(DemoInvestmentSuggestion.objects.filter(user=self.user).count(), 3)
 
-    def test_accept_creates_a_pending_simulated_order_with_excel_price_metadata(self):
+    def test_legacy_sample_suggestions_are_not_reused_or_accepted(self):
+        legacy = DemoInvestmentSuggestion.objects.create(
+            user=self.user,
+            symbol="AAA",
+            amount=Decimal("1.00"),
+            data_date="2026-09-03",
+            demo_execution_price=Decimal("1.0000"),
+            historical_return_percent=Decimal("0.00"),
+            volatility_percent=Decimal("0.00"),
+            score=Decimal("0.00"),
+            explanation="Old bundled sample recommendation",
+        )
+
+        suggestions = generate_demo_investment_suggestions(self.user)
+        provider_suggestion = next(item for item in suggestions if item.symbol == "AAA")
+
+        self.assertNotEqual(provider_suggestion.pk, legacy.pk)
+        self.assertEqual(
+            provider_suggestion.data_source,
+            DemoInvestmentSuggestion.DataSource.TWELVE_DATA,
+        )
+        self.assertEqual(provider_suggestion.demo_execution_price, Decimal("121.00"))
+        with self.assertRaisesMessage(ValueError, "older recommendation"):
+            accept_demo_investment_suggestion(self.user, legacy)
+
+    def test_accept_creates_a_pending_simulated_order_with_provider_price_metadata(self):
         suggestion = generate_demo_investment_suggestions(self.user)[0]
 
         order = accept_demo_investment_suggestion(self.user, suggestion)
@@ -533,7 +559,7 @@ class DemoAISuggestionViewTests(TestCase):
                     daily_change_percent=Decimal("1.00"),
                     source_note="Demo test sample",
                     is_verified=True,
-                    is_demo_sample=True,
+                    is_twelve_data=True,
                 )
 
     def test_index_prominently_discloses_demo_ai(self):
@@ -542,6 +568,26 @@ class DemoAISuggestionViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "FINOVATE DEMO AI")
         self.assertContains(response, "no brokerage")
+
+    def test_legacy_sample_suggestions_are_hidden_and_cannot_be_accepted(self):
+        legacy = DemoInvestmentSuggestion.objects.create(
+            user=self.user,
+            symbol="OLD",
+            amount=Decimal("1.00"),
+            data_date="2026-09-02",
+            demo_execution_price=Decimal("1.0000"),
+            historical_return_percent=Decimal("0.00"),
+            volatility_percent=Decimal("0.00"),
+            score=Decimal("0.00"),
+            explanation="Old bundled sample recommendation",
+        )
+
+        response = self.client.get("/investing/")
+
+        self.assertNotContains(response, "OLD")
+        self.assertNotIn(legacy, response.context["demo_suggestions"])
+        response = self.client.post(f"/investing/demo-ai/{legacy.pk}/accept/")
+        self.assertEqual(response.status_code, 404)
 
     def test_generate_accept_and_decline_are_explicit_post_actions(self):
         response = self.client.post("/investing/demo-ai/generate/")
@@ -567,6 +613,7 @@ class DemoAISuggestionViewTests(TestCase):
         self.assertEqual(SimulatedOrder.objects.filter(user=self.user).count(), 1)
 
 
+@override_settings(TWELVE_DATA_API_KEY="")
 class DemoMarketExplorerTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -583,23 +630,45 @@ class DemoMarketExplorerTests(TestCase):
             amount=Decimal("100.00"),
             occurred_on="2026-09-01",
         )
+        for symbol, name in (
+            ("AAPL", "Apple Inc."),
+            ("AMZN", "Amazon.com, Inc."),
+            ("GOOGL", "Alphabet Inc."),
+            ("MSFT", "Microsoft Corporation"),
+            ("NVDA", "NVIDIA Corporation"),
+        ):
+            for day, close in (
+                ("2025-01-02", Decimal("100.00")),
+                ("2025-01-03", Decimal("101.00")),
+            ):
+                MarketPrice.objects.create(
+                    symbol=symbol,
+                    asset_name=name,
+                    asset_type=MarketPrice.AssetType.STOCK,
+                    date=day,
+                    close=close,
+                    daily_change_percent=Decimal("1.00"),
+                    source_note="Twelve Data API",
+                    is_verified=True,
+                    is_twelve_data=True,
+                )
 
-    def test_migration_loaded_sample_data_is_visible_in_a_friendly_explorer(self):
+    def test_bundled_samples_are_not_used_by_the_provider_explorer(self):
         response = self.client.get("/investing/market-data/")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(MarketPrice.objects.filter(is_demo_sample=True).count(), 109)
-        self.assertContains(response, "Explore sample market data")
+        self.assertContains(response, "Explore market data")
         self.assertContains(response, "Apple")
-        self.assertContains(response, "S&amp;P 500")
-        self.assertContains(response, "View all 18 sample price days")
+        self.assertNotContains(response, "S&amp;P 500")
+        self.assertContains(response, "View all 2 Twelve Data trading days")
         self.assertContains(response, "Available demo budget")
         self.assertContains(response, "Create demo order")
         self.assertContains(response, "data-market-view=\"chart\"")
         self.assertContains(response, "data-market-view=\"table\"")
         self.assertContains(response, "data-chart-slider")
-        self.assertContains(response, "Up from prior sample date")
-        self.assertContains(response, "Down from prior sample date")
+        self.assertContains(response, "Up from prior trading date")
+        self.assertContains(response, "Down from prior trading date")
         self.assertContains(response, "market-charts.js")
 
     def test_explore_tab_shows_full_width_charts_by_default(self):
@@ -609,8 +678,8 @@ class DemoMarketExplorerTests(TestCase):
         self.assertContains(response, "Explore price movement")
         self.assertContains(response, "market-asset-card-wide")
         self.assertContains(response, 'data-default-view="chart"')
-        self.assertContains(response, "Move through sample dates")
-        self.assertEqual(len(response.context["market_assets"]), 8)
+        self.assertContains(response, "Move through trading dates")
+        self.assertEqual(len(response.context["market_assets"]), 5)
         self.assertEqual(response.context["demo_budget"], Decimal("100.00"))
 
     def test_user_can_add_virtual_funds_then_generate_ideas_and_create_orders(self):
@@ -661,14 +730,14 @@ class DemoMarketExplorerTests(TestCase):
         approve_order(approved_order)
         create_demo_market_order(self.user, "MSFT", Decimal("20.00"))
         latest_price = MarketPrice.objects.filter(
-            symbol="AAPL", is_demo_sample=True
+            symbol="AAPL", is_twelve_data=True
         ).latest("date")
 
         response = self.client.get("/investing/?tab=holdings")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "My investments")
-        self.assertContains(response, "latest available Twelve Data quote")
+        self.assertContains(response, "latest available quote")
         self.assertContains(response, "AAPL")
         self.assertContains(response, "MSFT")
         self.assertContains(response, "These are not part of your holdings yet.")
@@ -682,7 +751,45 @@ class DemoMarketExplorerTests(TestCase):
         )
         self.assertGreater(len(response.context["portfolio_series"]), 1)
 
-    def test_user_can_create_pending_order_from_a_selected_sample_asset(self):
+    def test_legacy_sample_orders_are_excluded_from_provider_holdings(self):
+        SimulatedOrder.objects.create(
+            user=self.user,
+            symbol="AAPL",
+            order_type=SimulatedOrder.OrderType.BUY,
+            amount=Decimal("20.00"),
+            status=SimulatedOrder.Status.FILLED,
+            demo_execution_price=Decimal("100.00"),
+            demo_shares=Decimal("0.200000"),
+            demo_data_date="2025-01-02",
+        )
+
+        response = self.client.get("/investing/?tab=holdings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["holdings"], [])
+        self.assertEqual(
+            response.context["unpriced_filled_total"],
+            Decimal("20.00"),
+        )
+
+    def test_legacy_sample_order_cannot_be_approved(self):
+        order = SimulatedOrder.objects.create(
+            user=self.user,
+            symbol="AAPL",
+            order_type=SimulatedOrder.OrderType.BUY,
+            amount=Decimal("20.00"),
+            demo_execution_price=Decimal("100.00"),
+            demo_shares=Decimal("0.200000"),
+            demo_data_date="2025-01-02",
+        )
+
+        response = self.client.post(f"/investing/orders/{order.pk}/approve/")
+
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.status, SimulatedOrder.Status.PENDING)
+
+    def test_user_can_create_pending_order_from_a_provider_asset(self):
         pool = Goal.objects.create(
             user=self.user,
             name="Travel pool",
@@ -690,7 +797,7 @@ class DemoMarketExplorerTests(TestCase):
             is_investable=True,
         )
         latest_price = MarketPrice.objects.filter(
-            symbol="AAPL", is_demo_sample=True
+            symbol="AAPL", is_twelve_data=True
         ).latest("date")
 
         response = self.client.post(
@@ -704,6 +811,10 @@ class DemoMarketExplorerTests(TestCase):
         self.assertEqual(order.amount, Decimal("35.00"))
         self.assertEqual(order.pool, pool)
         self.assertEqual(order.status, SimulatedOrder.Status.PENDING)
+        self.assertEqual(
+            order.demo_price_source,
+            SimulatedOrder.PriceSource.TWELVE_DATA,
+        )
         self.assertEqual(order.demo_execution_price, latest_price.close)
         self.assertEqual(order.demo_data_date, latest_price.date)
         self.assertGreater(order.demo_shares, Decimal("0"))
@@ -723,7 +834,7 @@ class DemoMarketExplorerTests(TestCase):
             status_code=200,
         )
 
-    def test_order_cannot_use_a_non_sample_market_row(self):
+    def test_order_cannot_use_a_non_provider_market_row(self):
         MarketPrice.objects.create(
             symbol="OTHER",
             asset_type=MarketPrice.AssetType.STOCK,
@@ -743,6 +854,7 @@ class DemoMarketExplorerTests(TestCase):
         self.assertFalse(SimulatedOrder.objects.filter(user=self.user).exists())
 
 
+@override_settings(TWELVE_DATA_API_KEY="")
 class LiveMarketQuoteTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="live-quote-user")
@@ -757,6 +869,20 @@ class LiveMarketQuoteTests(TestCase):
             amount=Decimal("100.00"),
             occurred_on="2026-09-01",
         )
+        for day, close in (
+            ("2025-01-02", Decimal("100.00")),
+            ("2025-01-03", Decimal("101.00")),
+        ):
+            MarketPrice.objects.create(
+                symbol="AAPL",
+                asset_name="Apple Inc.",
+                asset_type=MarketPrice.AssetType.STOCK,
+                date=day,
+                close=close,
+                source_note="Twelve Data API",
+                is_verified=True,
+                is_twelve_data=True,
+            )
 
     @override_settings(TWELVE_DATA_API_KEY="test-api-key")
     @patch("investing.live_quotes._fetch_twelve_data_price")
@@ -840,8 +966,9 @@ class LiveMarketQuoteTests(TestCase):
     def test_market_closed_uses_cache_without_spending_provider_credits(
         self, fetch_price, _market_open
     ):
-        order = create_demo_market_order(self.user, "AAPL", Decimal("20.00"))
-        approve_order(order)
+        with override_settings(TWELVE_DATA_API_KEY=""):
+            order = create_demo_market_order(self.user, "AAPL", Decimal("20.00"))
+            approve_order(order)
         LiveMarketQuote.objects.create(
             symbol="AAPL",
             price=Decimal("200.00"),
@@ -864,8 +991,9 @@ class LiveMarketQuoteTests(TestCase):
         self, fetch_price, _market_open
     ):
         fetch_price.return_value = Decimal("300.00")
-        order = create_demo_market_order(self.user, "AAPL", Decimal("20.00"))
-        approve_order(order)
+        with override_settings(TWELVE_DATA_API_KEY=""):
+            order = create_demo_market_order(self.user, "AAPL", Decimal("20.00"))
+            approve_order(order)
 
         response = self.client.get("/investing/live-quotes/")
 
@@ -886,12 +1014,116 @@ class LiveMarketQuoteTests(TestCase):
             1,
         )
 
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.views._is_us_regular_session", return_value=True)
+    @patch("investing.live_quotes._fetch_twelve_data_price")
+    def test_explore_quote_endpoint_returns_shared_twelve_data_quotes(
+        self, fetch_price, _market_open
+    ):
+        fetch_price.return_value = Decimal("250.00")
+
+        response = self.client.get("/investing/market-data/live-quotes/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(set(payload["quotes"]), {"AAPL", "AMZN", "GOOGL", "MSFT", "NVDA"})
+        self.assertEqual(payload["errors"], {})
+        self.assertEqual(payload["refresh_seconds"], 300)
+        self.assertNotIn("test-api-key", response.content.decode())
+        self.assertEqual(fetch_price.call_count, 5)
+
+
+class TwelveDataHistoryTests(TestCase):
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.live_quotes.urlopen")
+    def test_daily_history_response_is_sorted_and_changes_are_computed(self, urlopen):
+        from .live_quotes import _fetch_twelve_data_history
+
+        response = urlopen.return_value.__enter__.return_value
+        response.read.return_value = (
+            b'{"values":['
+            b'{"datetime":"2025-01-03","open":"109","high":"111","low":"108","close":"110","volume":"20"},'
+            b'{"datetime":"2025-01-02","open":"99","high":"101","low":"98","close":"100","volume":"10"}]}'
+        )
+
+        history = _fetch_twelve_data_history("AAPL")
+
+        self.assertEqual(
+            [row["date"].isoformat() for row in history],
+            ["2025-01-02", "2025-01-03"],
+        )
+        self.assertEqual(history[0]["daily_change_percent"], None)
+        self.assertEqual(history[1]["daily_change_percent"], Decimal("10.00"))
+        request = urlopen.call_args.args[0]
+        self.assertIn("interval=1day", request.full_url)
+        self.assertIn("outputsize=90", request.full_url)
+
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.live_quotes._fetch_twelve_data_history")
+    def test_history_is_stored_as_provider_data_and_shared_for_twelve_hours(
+        self, fetch_history
+    ):
+        fetch_history.return_value = [
+            {
+                "date": date(2025, 1, 2),
+                "open": Decimal("99.0000"),
+                "high": Decimal("101.0000"),
+                "low": Decimal("98.0000"),
+                "close": Decimal("100.0000"),
+                "volume": 10,
+                "daily_change_percent": None,
+            },
+            {
+                "date": date(2025, 1, 3),
+                "open": Decimal("109.0000"),
+                "high": Decimal("111.0000"),
+                "low": Decimal("108.0000"),
+                "close": Decimal("110.0000"),
+                "volume": 20,
+                "daily_change_percent": Decimal("10.00"),
+            },
+        ]
+
+        first_result = refresh_twelve_data_history(["AAPL"])
+        second_result = refresh_twelve_data_history(["AAPL"])
+
+        self.assertEqual(first_result, ({"AAPL"}, {}))
+        self.assertEqual(second_result, ({"AAPL"}, {}))
+        fetch_history.assert_called_once_with("AAPL")
+        rows = list(MarketPrice.objects.filter(symbol="AAPL", is_twelve_data=True).order_by("date"))
+        self.assertEqual([row.close for row in rows], [Decimal("100.0000"), Decimal("110.0000")])
+        self.assertTrue(all(not row.is_demo_sample for row in rows))
+        self.assertIsNotNone(
+            TwelveDataHistoryState.objects.get(symbol="AAPL").refreshed_at
+        )
+        self.assertEqual(
+            TwelveDataUsageWindow.objects.get(provider="twelve-data").daily_credits,
+            1,
+        )
+
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.live_quotes._fetch_twelve_data_history")
+    def test_unsupported_index_symbols_are_not_sent_to_twelve_data(self, fetch_history):
+        refreshed, errors = refresh_twelve_data_history(["^GSPC"])
+
+        self.assertEqual(refreshed, set())
+        self.assertEqual(errors, {"^GSPC": "unsupported-symbol"})
+        fetch_history.assert_not_called()
+        self.assertEqual(TwelveDataUsageWindow.objects.count(), 0)
+
 
 class VerifiedScenarioFormTests(TestCase):
     def setUp(self):
         from django.core.management import call_command
 
         call_command("seed_market_data")
+        MarketPrice.objects.filter(
+            pk__in=[
+                MarketPrice.objects.get(symbol="AAPL", date="2026-09-15").pk,
+                MarketPrice.objects.get(symbol="AAPL", date="2026-09-16").pk,
+                MarketPrice.objects.get(symbol="NVDA", date="2026-09-25").pk,
+            ]
+        ).update(is_twelve_data=True, source_note="Twelve Data API")
         self.sep15 = MarketPrice.objects.get(symbol="AAPL", date="2026-09-15")
         self.sep16 = MarketPrice.objects.get(symbol="AAPL", date="2026-09-16")
         self.nvda = MarketPrice.objects.get(symbol="NVDA", date="2026-09-25")

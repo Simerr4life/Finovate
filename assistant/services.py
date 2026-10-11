@@ -37,9 +37,9 @@ HELP_TEXT = (
 )
 
 MARKET_STATUS_REPLY = (
-    "I don't have a live market data connection yet, so I can't tell you what the market is doing "
-    "right now. Finovate only has a small set of verified historical September 2026 prices seeded "
-    "for demo purposes — see the Market Data page on the website for exactly what's there."
+    "I can't fetch market prices directly in chat. Current quotes and daily history for the "
+    "supported US stocks are available in Investments > Explore when the server's Twelve Data "
+    "feed is configured. The feed does not currently cover the bundled index symbols."
 )
 
 

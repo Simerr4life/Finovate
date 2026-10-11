@@ -1,58 +1,44 @@
-# Sample-data investing recommendations
+# Demo investing and market data
 
-Finovate's demo investing ideas and Explore page use the September 2026 CSV
-supplied with the project owner's Excel demo package. Applying the database
-migrations loads those 109 sample rows automatically. To load or refresh them
-manually later, run:
+Explore, recommendations, the verified historical calculator, holdings
+history, and simulated order reference prices use provider data stored in
+`MarketPrice` rows marked as Twelve Data. Runtime queries do not fall back
+to the bundled Excel-derived sample rows. Older sample rows may remain in
+existing databases, but they are not shown or used by these features.
 
-```bash
-python manage.py seed_excel_demo_market
-```
+The current supported stock list is AAPL, AMZN, GOOGL, MSFT, and NVDA. Daily
+OHLCV history is fetched from Twelve Data's
+[`/time_series`](https://twelvedata.com/docs/market-data/time-series)
+endpoint (up to 90 daily bars per symbol) and shared across users for 12
+hours. Current prices come from Twelve Data's `/price` endpoint and are
+shared for five minutes. Explore checks for stale history when opened and
+polls current quotes every five minutes while open. Refreshes share a server
+quota counter configured for eight credits per minute and 800 credits per
+UTC day; each history or quote symbol consumes a credit.
 
-The command is safe to run again and uses the CSV committed at
-`demo_data/september_2026_verified_market_data.csv`. It does not contact a
-market-data provider. The source notes travel with each imported sample row.
-The Explore page groups those rows by stock and index, shows the supplied
-price history as either a table or an interactive graph. The graph marks
-sample-to-sample rises in green and drops in red, and its slider/hover
-selection reveals the date and close. Users can also create a pending
-simulated buy order with an amount and optional savings-pool attribution.
-The available demo budget is rechecked before an order is created.
-Cash already held in a savings pool marked investable, along with estimated
-cash surplus and virtual demo funds, contributes to the simulated investing
-budget. Demo orders reserve their amounts against that combined budget.
-Virtual demo funds only increase the simulated investing budget; they do not
-change cash balances or move real money.
+The three bundled index tickers do not have verified mappings in the current
+Twelve Data stock catalog, so Explore omits them rather than showing the old
+sample values or substituting a different instrument. Add symbols to
+`MARKET_STOCKS` only after verifying their Twelve Data identity and account
+access.
 
-The My investments page fetches the latest available holding quotes from
-Twelve Data when opened, including outside market hours when no quote is
-cached yet, then refreshes stale quotes every five minutes during regular US
-market hours. Set `TWELVE_DATA_API_KEY` in the server
-environment (for Vercel, add it under the project's Environment Variables and
-redeploy); the key is never sent to the browser. Quotes are shared and cached
-for five minutes, and a shared limiter enforces the Basic-tier allowance of
-eight requests per minute and 800 per UTC day. Refreshes are requested only
-during regular US market hours on weekdays, apart from the one initial fetch
-for a missing cached quote. The historical chart stays based on supplied
-sample data, with current quote valuation points appended while the page
-remains open. Demo order execution still uses bundled sample prices and
-remains simulated.
+Set `TWELVE_DATA_API_KEY` in the server environment (for Vercel, add it under
+the project's Environment Variables and redeploy). The key remains
+server-side. Twelve Data may restrict display, redistribution, or commercial
+use depending on the subscription and intended audience. Verify that the
+account's current terms permit showing this data to your users before
+enabling the feature in a public deployment.
 
-The "Demo AI" is transparent, deterministic ranking logic, not a language
-model, machine-learning prediction, or investment advice. It ranks symbols
-with at least two supplied stock-price rows by sample-period percentage
-change minus the standard deviation of the supplied daily percentage-change
-values. It offers up to three ideas, with their amounts sharing no more than
-$75 and never exceeding the user's remaining demo investing budget (estimated
-cash surplus plus cash in investable savings pools and virtual demo funds,
-less pending or already-filled simulated orders). Only rows marked as coming
-from this bundled dataset are used; other market-data rows are excluded. It
-reviews all available sample stocks and shows the three highest-ranked ideas
-when data and budget are available.
+Recommendations rank supported stocks with at least two daily provider bars
+by historical return minus observed daily volatility. The verified
+calculator only offers Twelve Data rows. Simulated orders use the latest
+available cached Twelve Data quote when possible, otherwise the latest
+provider daily close; fractional shares are calculated from that reference
+price. No recommendation or order is investment advice or a real trade.
 
-Every idea needs a user decision. Accepting creates a pending simulated order
-with fractional shares calculated from the sample close and its date. The
-user must separately approve that order before it appears in the simulated
-portfolio. Declining creates no order. No brokerage API is called, no real
-order is submitted, and no money moves. These historical sample prices are
-not live prices and do not predict future performance.
+Cash in investable savings pools, estimated cash surplus, and user-entered
+virtual funds can contribute to the demo budget. Orders remain simulated,
+must be separately approved, and do not connect to a brokerage or move real
+money. The `seed_excel_demo_market` command and bundled CSV remain only as
+legacy/demo fixtures; running them does not make their rows eligible for
+the provider-backed investing features.

@@ -32,9 +32,10 @@ class ImmediateIntentTests(TestCase):
         reply = handle_incoming_message(self.user, "help")
         self.assertIn("budget", reply.lower())
 
-    def test_market_status_is_honest_about_no_live_feed(self):
+    def test_market_status_directs_users_to_the_twelve_data_explorer(self):
         reply = handle_incoming_message(self.user, "how is the market today")
-        self.assertIn("don't have a live market data connection", reply)
+        self.assertIn("Twelve Data", reply)
+        self.assertIn("Investments > Explore", reply)
 
     def test_budget_status_with_no_active_period(self):
         reply = handle_incoming_message(self.user, "how's my budget")
@@ -119,7 +120,7 @@ class ConfirmationFlowTests(TestCase):
         handle_incoming_message(self.user, "yes")  # resolves and deletes the pending row
         reply = handle_incoming_message(self.user, "how is the market today")
         self.assertNotIn("Record $500", reply)
-        self.assertIn("live market data", reply)
+        self.assertIn("Twelve Data", reply)
 
 
 class GoalTargetIntentTests(TestCase):
