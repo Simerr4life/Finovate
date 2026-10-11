@@ -61,11 +61,12 @@ state and the post-login session are kept in encrypted, httponly cookies
 
 `accounts/auth0.py::auth0_configured()` requires `AUTH0_DOMAIN`,
 `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_SECRET` (the
-session-cookie encryption key) to all be set. When they're not, the "Log
-in with Auth0" button doesn't render (see
-`core/context_processors.py`'s `AUTH0_ENABLED`), and the existing local
-demo signup/login flow is the only path — exactly as before this
-integration. Nothing breaks for local/demo use without credentials.
+session-cookie encryption key) to all be set. When they're not, the
+website login and signup pages say sign-in is unavailable. They do not
+create a Django user or accept a password. `python manage.py seed_demo`
+can still insert a local fixture user for management commands; that
+account is not a website registration path.
+
 Auth0's registered callback URL must be `<APP_BASE_URL>/callback` exactly
 (a top-level route in `finovate/urls.py`, not under `/accounts/`).
 
@@ -163,13 +164,31 @@ That `current_setting('app.current_user_id')` would need the backend to
 `SET` it per connection/request — not implemented, since nothing
 currently needs it.
 
+## Registration and verification
+
+Website signup collects a name, email, and optional phone number, then
+redirects to Auth0 Universal Login (`screen_hint=signup`). Auth0 creates
+the database identity and sends the verification email. Finovate stores
+`email_verified` only when that claim is true. A phone number typed into
+Finovate is contact data; `phone_verified` stays false unless Auth0
+returns `phone_number_verified`.
+
+The configured connection is email/password through Universal Login.
+Passwordless SMS is not enabled on the Finovate application, so entering
+a phone number does not prove ownership of that number. Messaging uses
+the existing one-time chat link, and only after `phone_verified`,
+messaging consent, and a linked chat are all present.
+
+Protected JSON calls go to `GET /api/me/` with an Auth0 access token
+whose audience is `AUTH0_AUDIENCE` (`https://finovate.biz/api`). An ID
+token, whose audience is the client id, is rejected.
+
 ## Phone-number login
 
 Phone login is **not enabled**. The Auth0 application named Finovate
 (`regular_web`, tenant `finovate`) allows `authorization_code`,
-`implicit`, `refresh_token`, and `client_credentials`. It does not allow
-the passwordless OTP grant, and this codebase does not collect a phone
-number or one-time SMS code.
+`refresh_token`, and `client_credentials`. It does not allow the
+passwordless OTP grant.
 
 To turn phone login on later, in the Auth0 dashboard:
 
@@ -179,14 +198,10 @@ To turn phone login on later, in the Auth0 dashboard:
 2. Enable that connection for the Finovate application.
 3. Add the passwordless OTP grant if the SDK flow requires it.
 4. Keep the callback at `<APP_BASE_URL>/callback` and logout return at
-   `<APP_BASE_URL>/`. Today those URLs are only registered for
-   `http://localhost:5000`. Add `http://127.0.0.1:8000` and the production
-   `https://finovate.biz` origins before using those hosts.
-5. Map the user by the Auth0 `sub` claim, the same way interactive login
-   already does. Do not merge accounts by phone number.
-
-Until that connection exists, the login page keeps local password login
-and the optional Auth0 button. There is no phone form.
+   `<APP_BASE_URL>/`.
+5. Map the user by the Auth0 `sub` claim. Do not merge accounts by phone
+   number. Set `phone_verified` only from Auth0's
+   `phone_number_verified` claim.
 
 ## What this integration does NOT do
 

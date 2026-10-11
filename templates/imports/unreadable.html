@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}We couldn't read this statement — Finovate{% endblock %}
+{% block crumb %}Import a statement{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 max-w-xl">
+  <h1 class="text-xl font-bold mb-2">We couldn't read this bank statement.</h1>
+  <p class="text-sm text-slate-500 mb-4">
+    Your file's format isn't supported or its transactions couldn't be identified reliably. You
+    can try another statement, or enter your monthly income and expenses manually.
+  </p>
+  {% if problems %}
+  <ul class="list-disc pl-5 text-sm text-slate-500 mb-4">
+    {% for problem in problems %}<li>{{ problem }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  <div class="flex flex-col gap-2">
+    <a href="{% url 'imports:upload' %}{% if from_onboarding %}?from=onboarding{% endif %}" class="button" style="text-align:center;">
+      Upload another file
+    </a>
+    <a href="{% url 'accounts:manual_setup' %}{% if from_onboarding %}?from=onboarding{% endif %}" class="button ghost" style="text-align:center;">
+      Enter finances manually
+    </a>
+  </div>
+</section>
+{% endblock %}

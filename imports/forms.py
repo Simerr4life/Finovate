@@ -2,13 +2,14 @@ from django import forms
 
 from transactions.models import Account
 
-from .pipeline import COLUMN_ALIASES, REQUIRED_ROLES
-
 MAX_UPLOAD_BYTES = 2_000_000
 
 
 class UploadForm(forms.Form):
-    file = forms.FileField(label="Statement file (CSV)")
+    # allow_empty_file=True so a 0-byte upload reaches the view and gets
+    # the same friendly "couldn't read this statement" page as any other
+    # unreadable file, instead of a bare Django field error.
+    file = forms.FileField(label="Statement file (CSV)", allow_empty_file=True)
 
     def clean_file(self):
         upload = self.cleaned_data["file"]
@@ -53,34 +54,3 @@ class AccountSelectForm(forms.Form):
         if masked and (not masked.isdigit() or len(masked) > 6):
             self.add_error("masked_number", "Enter only the last few digits of the account number.")
         return cleaned
-
-
-ROLE_LABELS = {
-    "date": "Transaction date",
-    "posting_date": "Posting date (optional)",
-    "description": "Description / merchant",
-    "amount": "Amount (single signed column)",
-    "debit": "Debit / withdrawal amount",
-    "credit": "Credit / deposit amount",
-    "balance": "Balance after transaction (optional)",
-    "reference": "Transaction reference / ID (optional)",
-    "currency": "Currency (optional)",
-}
-
-NOT_PRESENT = ""
-
-
-def build_column_mapping_form(headers: list[str], initial: dict, data=None) -> forms.Form:
-    """A Form built at request time, since its fields depend on the
-    uploaded file's actual header row."""
-    choices = [(NOT_PRESENT, "— Not present —")] + [(h, h) for h in headers]
-    fields = {}
-    for role in COLUMN_ALIASES:
-        fields[role] = forms.ChoiceField(
-            choices=choices,
-            required=role in REQUIRED_ROLES,
-            label=ROLE_LABELS.get(role, role),
-            initial=initial.get(role, NOT_PRESENT),
-        )
-    form_class = type("ColumnMappingForm", (forms.Form,), fields)
-    return form_class(data=data, initial=initial)

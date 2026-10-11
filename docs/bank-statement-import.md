@@ -9,12 +9,31 @@ are ordinary `Transaction` rows with `source="imported"`.
 
 ## Supported formats (tested)
 
-- **CSV** — the only format implemented. Column mapping is auto-detected
-  by header name (date, posting date, description/memo, amount, debit,
-  credit, balance, reference/ID, currency) and always shown to the user
-  to confirm or correct before anything is parsed for real. Either a
-  single signed amount column, or separate debit/credit columns, is
-  accepted.
+- **CSV** — the only format implemented. Column mapping is fully
+  automatic by header name (date, posting date, description/memo, amount,
+  net amount, debit, credit, balance, reference/ID, currency) -- **there
+  is no column-mapping screen**. Either a single signed amount column, a
+  separate net-amount column, or separate debit/credit columns is
+  accepted, including the `Money_In_USD`/`Money_Out_USD`/`Amount_USD`/
+  `Net_Amount_USD`/`Running_Balance_USD` naming style. Extra columns like
+  `Category`, `Transaction_Type`, `Recurring`, `Payment_Method`, `Month`,
+  `Is_Income` are recognized as optional metadata and simply ignored --
+  never required, never guessed at.
+
+**When more than one amount-like column is present** (e.g. both
+`Amount_USD` and `Net_Amount_USD`, or debit/credit alongside a signed
+amount), they are never added together. Each is treated as a candidate
+signed value for that row; if they all agree, that value is used; if they
+disagree, the row is flagged "needs review" and excluded from that
+import rather than guessing which one is authoritative.
+
+**If the file can't be read reliably** -- unsupported format, no
+recognizable date/description/amount columns, or a header match with no
+usable rows underneath -- the user never reaches a wizard at all. They
+land on `imports/unreadable.html` ("We couldn't read this bank
+statement.") with two actions: upload another file, or go straight to
+the manual income/expense setup (see below). The same page handles a
+genuinely corrupt/empty/binary upload too.
 
 **Not implemented:** OFX/QFX, QIF, PDF (text or scanned/OCR). The upload
 form only accepts `.csv`-shaped content; anything else is rejected with a
@@ -35,13 +54,20 @@ mirroring `transactions/services.py`:
 1. `validate_file` — content-based (decodes as text, sniffs as CSV,
    checks size/shape), not filename-based. A renamed non-CSV file fails
    here regardless of its extension.
-2. `read_headers` / `detect_columns` — best-effort mapping guess, always
-   shown to the user for confirmation, never applied silently.
-3. `parse_rows` — typed, Decimal-only parsing. A single bad row is
-   recorded in that row's `errors` and flagged for review; it never
-   raises and never blocks the rest of the file.
-4. `detect_duplicates` — see below.
-5. `summarize` — counts for the review screen.
+2. `read_headers` / `detect_columns` — fully automatic mapping by header
+   alias. This is the *only* mapping step; there is no screen asking a
+   human to confirm or correct it.
+3. `parse_rows` — typed, Decimal-only parsing, including `_resolve_amount`'s
+   candidate-reconciliation logic (see above) for files with more than
+   one amount-like column. A single bad row is recorded in that row's
+   `errors` and flagged for review; it never raises and never blocks the
+   rest of the file.
+4. `assess_readability` — run once, right after upload, on the detected
+   mapping and parsed rows: enough of a recognizable shape to import from
+   at all? If not, the user goes straight to the unreadable-file page
+   instead of into a wizard for a file that was never going to work.
+5. `detect_duplicates` — see below.
+6. `summarize` — counts for the review screen.
 
 ## Data model
 
@@ -94,51 +120,127 @@ produces 0 imported / N duplicates-skipped, never doubled totals.
 
 ## User-facing flow
 
-Onboarding gets a new first step (`accounts:onboarding` →
-`templates/accounts/onboarding_start.html`): **Import a statement**,
-**Connect a bank account** (visibly disabled — no real integration
-exists), or **Skip for now** (goes straight to the existing preferences
-form, now at `accounts:onboarding_preferences`). The import wizard
-(`/imports/upload/` → `.../account/` → `.../columns/` → `.../preview/` →
-commit) is reachable any time from the Statements page or Settings, not
-just onboarding. The dashboard is computed live from the database on
-every request (see `core/views.py::dashboard`), so a successful import is
-reflected immediately with no separate "refresh" step.
+Onboarding's first step (`accounts:onboarding` →
+`templates/accounts/onboarding_start.html`) offers four things: **Import
+a statement**, **Connect a bank account** (visibly disabled — no real
+integration exists), **Enter finances manually**, or **Skip for now**
+(goes straight to the existing preferences form, at
+`accounts:onboarding_preferences`).
+
+The import wizard is now just three steps: `/imports/upload/` →
+`.../account/` → `.../preview/` → commit. **There is no column-mapping
+step** -- columns are auto-detected at upload time (see Pipeline above),
+and a file that doesn't auto-detect well enough sends the user to the
+unreadable-file page instead of a wizard screen. It's reachable any time
+from the Statements page or Settings, not just onboarding. The dashboard
+is computed live from the database on every request (see
+`core/views.py::dashboard`), so a successful import is reflected
+immediately with no separate "refresh" step.
+
+## Manual financial setup (`accounts/manual_setup.py`)
+
+For a user with no statement to import (or whose file couldn't be read),
+a one-page form (`accounts:manual_setup`) collects monthly take-home
+income, additional income, either a lump total-monthly-expenses figure
+or a category breakdown (housing, utilities, groceries, transportation,
+insurance, debt payments, subscriptions, other -- breakdown always wins
+over the lump total if both are filled in, to avoid double-counting),
+current savings balance, minimum cash reserve, and a monthly savings
+goal. Every field is optional.
+
+**No new calculation logic**: submitting the form writes ordinary
+`IncomeSource`/`RecurringExpense` rows (the same tables `budgets/urls.py`
+already has add/delete views for), each named with an `"(estimate)"`
+suffix -- e.g. `"Take-home income (estimate)"` -- which is how a
+manually-declared row is distinguished from anything else in the budgets
+UI, without a new source column. `budgets.services.build_budget_plan()`
+is the one and only surplus/shortfall calculation; `accounts/manual_setup.py`
+never computes its own estimate. Resubmitting the form updates the same
+reserved-name rows (keyed by name + user) rather than piling up
+duplicates.
+
+Two numbers have nowhere existing to live and got two small `Profile`
+fields instead (migration `accounts/0006_...`): `manual_savings_balance`
+(+ `manual_savings_balance_updated_at`) and `manual_monthly_savings_goal`.
+The minimum cash reserve reuses the existing `Profile.cash_reserve_target`
+field directly -- the same field the round-up/investing-eligibility logic
+already reads, so filling it in here has the same effect as setting it
+in Settings. **Nothing here ever creates a `Transaction`** -- an
+estimate is never turned into fake transaction history, and it never
+overwrites a balance that came from an import or (if one ever exists) a
+live bank connection; it's purely additive, read by `build_budget_plan`
+alongside whatever real data exists.
+
+The dashboard shows a labeled "estimate, not verified bank data" banner
+when a manual estimate exists and there are still zero real transactions
+(see `core/views.py::dashboard`'s `has_manual_estimate` context flag and
+the banner in `templates/core/dashboard.html`); it disappears the moment
+any real transaction exists, since `month_income`/`cash_balance` etc. are
+already computed from real `Transaction` rows elsewhere on the page.
 
 ## Known limitations
 
-- CSV only; no OFX/QFX/QIF/PDF/OCR (see above).
+- CSV only; no OFX/QFX/QIF/PDF/OCR.
 - No background job queue — parsing happens synchronously in the request.
   Fine for CSVs up to the 2 MB / 20,000-row cap; would need a queue for
   anything bigger.
 - A row flagged "needs review" (bad date/amount, ambiguous duplicate,
-  non-USD currency) is never imported in that pass. There's no in-wizard
-  correction UI yet — fix the source file and re-upload, or enter that
-  one manually.
-- Column-mapping auto-detection is header-name matching against a fixed
-  alias list; an unusual or non-English header just means the user maps
-  it manually — never guessed silently.
+  conflicting amount columns, non-USD currency, zero amount) is never
+  imported in that pass, and there is no way to override that from the
+  UI — fix the source file and re-upload, or enter that one manually.
+  This is deliberate: the whole point of removing the mapping screen was
+  to stop asking a user to adjudicate things a machine can't safely guess
+  either.
+- Column detection is header-name matching against a fixed alias list; an
+  unusual or non-English header just means that file won't auto-detect
+  (and the user lands on the unreadable-file page) — it's never guessed.
+- No multi-currency support: `Account`/`Transaction` have no currency
+  field, so a mismatched currency column is a review flag, not a
+  conversion.
+- The manual-setup "monthly savings goal" is stored but not wired into
+  any goal-progress UI yet — it's informational until a `savings.Goal`
+  is created separately.
 
 ## Env vars / migrations
 
-No new environment variables. One migration: `imports/migrations/0001_initial.py`.
+No new environment variables. Migrations: `imports/migrations/0001_initial.py`,
+`accounts/migrations/0006_profile_manual_monthly_savings_goal_and_more.py`
+(four additive `Profile` fields for the manual-setup feature).
 
 ## Tests run
 
-`python manage.py test imports` — 29 tests: file validation (empty,
-oversized, binary-content-despite-.csv-extension, malformed), column
-auto-detection, single-amount vs. debit/credit parsing, alternate date
-formats, parenthesized/negative refund amounts, non-USD currency
-flagging, both-debit-and-credit-filled flagging, exact-reference
+`python manage.py test imports` — 41 tests covering file validation
+(empty, oversized, binary-content-despite-.csv-extension, no
+recognizable columns), automatic column detection including the
+`Money_In_USD`/`Money_Out_USD`/`Amount_USD`/`Net_Amount_USD`/
+`Running_Balance_USD` naming style and ignored optional-metadata columns,
+single-amount vs. debit/credit vs. net-amount parsing, alternate date
+formats, parenthesized/negative refund amounts, zero-amount flagging,
+non-USD currency flagging, both-debit-and-credit-filled flagging,
+agreeing vs. disagreeing amount columns (used once when they agree,
+flagged for review rather than guessed when they don't, and
+`Running_Balance_USD` never treated as a second amount), exact-reference
 duplicate detection, in-batch ambiguous-fingerprint detection, the full
-upload→account→columns→preview→confirm happy path (asserting the
-dashboard reflects it immediately), excluding a row via its checkbox,
-re-importing the same file (no double-count), atomic rollback on a
-simulated mid-commit failure (zero transactions persisted, no raw
-exception text in the stored error message), cross-user 404s on every
-step, and delete/retry behavior.
+upload→account→preview→confirm happy path with **no column-mapping step**
+(asserting the dashboard reflects it immediately), excluding a row via
+its checkbox, re-importing the same file (no double-count), atomic
+rollback on a simulated mid-commit failure (zero transactions persisted,
+no raw exception text in the stored error message), cross-user 404s on
+every step, and delete/retry behavior.
 
-`python manage.py test` (full suite, 154 pre-existing + 29 new) — all
-pass except 4 pre-existing failures in `transactions.tests` unrelated to
-this feature (`seed_peachtree_demo` refusing its demo password when
-`DEBUG` is false in this environment; not touched by this change).
+`python manage.py test accounts.tests.ManualFinancialSetupTests` — 11
+tests: minimum-fields-only submission, a single field being enough,
+breakdown-vs-lump-total precedence (never both), negative amounts
+rejected, negative surplus shown as a shortfall, savings balance/goal
+persisting across logout, idempotent resubmission, no fabricated
+transactions, form prefill for editing, `cash_reserve_target` untouched
+when its field is left blank, and cross-user isolation.
+
+`python manage.py test core.tests.DashboardManualEstimateTests` — 3
+tests: banner hidden with nothing entered, shown with a manual estimate
+and zero real transactions, hidden again once a real transaction exists.
+
+`python manage.py test` (full suite, 227 tests) — all pass except the
+same 4 pre-existing failures in `transactions.tests` unrelated to this
+feature (`seed_peachtree_demo` refusing its demo password when `DEBUG`
+is false in this environment; not touched by either change in this doc).

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Finovate | Verify your email{% endblock %}
+{% block content %}
+<section class="card auth-card">
+  {% include "partials/brand_logo.html" with large=True %}
+  <div class="page-title">Verification pending</div>
+  <p class="page-subtitle">Status: {{ identity_status }}. This account is not fully verified yet.</p>
+  <p>Check the verification email from Auth0, then come back and continue. Opening this page does not mark the email verified.</p>
+  <form method="post" action="{% url 'accounts:verify_refresh' %}">
+    {% csrf_token %}
+    <button type="submit" class="button" style="width:100%;margin-top:18px;">I've verified my email</button>
+  </form>
+  <form method="post" action="{% url 'accounts:verify_resend' %}">
+    {% csrf_token %}
+    <button type="submit" class="button ghost" style="width:100%;margin-top:12px;">Resend verification email</button>
+  </form>
+</section>
+{% endblock %}

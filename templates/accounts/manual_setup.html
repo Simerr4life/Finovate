@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Enter finances manually — Finovate{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 max-w-xl">
+  <h1 class="text-xl font-bold mb-2">Enter your finances manually</h1>
+  <p class="text-sm text-slate-500 mb-4">
+    Every field below is optional — fill in what you know. This becomes an estimate on your
+    dashboard, clearly separate from any real transaction history.
+  </p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if from_onboarding %}<input type="hidden" name="from" value="onboarding">{% endif %}
+
+    {% for field in form %}
+      {% if field.name == "take_home_income" or field.name == "additional_income" or field.name == "total_monthly_expenses" %}
+      <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}
+        {% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}
+        {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+      </label>
+      {% endif %}
+    {% endfor %}
+
+    <details class="mt-4 mb-2">
+      <summary class="cursor-pointer text-sm text-brand-700 font-medium">Break down my expenses instead</summary>
+      <div class="grid sm:grid-cols-2 gap-3 mt-3">
+        {% for field in form.breakdown_fields %}
+        <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}
+          {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+        </label>
+        {% endfor %}
+      </div>
+    </details>
+
+    <p class="text-xs text-slate-400 uppercase tracking-wide mt-4 mb-1">Savings (optional)</p>
+    {% for field in form %}
+      {% if field.name == "current_savings_balance" or field.name == "minimum_cash_reserve" or field.name == "monthly_savings_goal" %}
+      <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}
+        {% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}
+        {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+      </label>
+      {% endif %}
+    {% endfor %}
+
+    <button type="submit" class="button" style="width:100%;margin-top:18px;">Save estimate</button>
+  </form>
+</section>
+{% endblock %}

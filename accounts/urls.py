@@ -1,4 +1,3 @@
-from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from . import views
@@ -7,14 +6,15 @@ app_name = "accounts"
 
 urlpatterns = [
     path("signup/", views.signup, name="signup"),
-    path(
-        "login/",
-        auth_views.LoginView.as_view(template_name="accounts/login.html"),
-        name="login",
-    ),
+    path("login/", views.login_view, name="login"),
     path("logout/", views.auth0_logout, name="logout"),
+    path("verify/", views.verification_pending, name="verify"),
+    path("verify/resend/", views.verification_resend, name="verify_resend"),
+    path("verify/refresh/", views.verification_refresh, name="verify_refresh"),
     path("onboarding/", views.onboarding, name="onboarding"),
     path("onboarding/preferences/", views.onboarding_preferences, name="onboarding_preferences"),
+    path("manual-setup/", views.manual_setup, name="manual_setup"),
+    path("manual-setup/summary/", views.manual_setup_summary, name="manual_setup_summary"),
     path("settings/", views.settings_view, name="settings"),
     path("settings/messaging/link/", views.messaging_link_issue, name="messaging_link"),
     path("settings/messaging/unlink/", views.messaging_unlink, name="messaging_unlink"),

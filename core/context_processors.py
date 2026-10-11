@@ -17,7 +17,6 @@ NAV_MAP = {
     "imports:history": "transactions",
     "imports:upload": "transactions",
     "imports:choose_account": "transactions",
-    "imports:map_columns": "transactions",
     "imports:preview": "transactions",
     "imports:batch_detail": "transactions",
     "savings:index": "savings",

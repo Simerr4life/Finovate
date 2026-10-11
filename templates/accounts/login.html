@@ -4,19 +4,19 @@
 <section class="card auth-card">
   {% include "partials/brand_logo.html" with large=True %}
   <div class="page-title">Log in</div>
-  <p class="page-subtitle">Use your Finovate account to see your own records.</p>
-  {% if AUTH0_ENABLED %}
-  <a class="button" style="width:100%;display:block;text-align:center;margin-bottom:14px;" href="{% url 'accounts:auth0_login' %}">Log in with Auth0</a>
-  <p class="muted" style="text-align:center;margin:10px 0;">or use a local account</p>
+  {% if not auth0_ready %}
+  <p class="page-subtitle">Auth0 isn't configured on this server, so sign-in is unavailable.</p>
+  {% else %}
+  <p class="page-subtitle">Continue to Auth0 to sign in. Finovate does not store your password.</p>
+  {% if rate_limited %}
+  <p class="field-error">Please wait a moment and try again.</p>
   {% endif %}
   <form method="post" novalidate>
     {% csrf_token %}
-    {% for field in form %}
-    <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
-    {% endfor %}
-    {% for error in form.non_field_errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-    <button type="submit" class="button" style="width:100%;margin-top:18px;">Log in</button>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="button" style="width:100%;margin-top:18px;">Continue with Auth0</button>
   </form>
   <p class="muted">New here? <a class="text-link" href="{% url 'accounts:signup' %}">Create an account</a></p>
+  {% endif %}
 </section>
 {% endblock %}

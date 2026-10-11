@@ -124,6 +124,30 @@ class Profile(TimeStampedModel):
         blank=True,
         help_text="When the one-time welcome record was written. Stops retries from sending it again.",
     )
+    manual_savings_balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=(
+            "User-declared current savings balance from the manual setup form. "
+            "An estimate, not a verified bank balance -- never overwritten by "
+            "import/live-connection logic, and never used to fabricate transactions."
+        ),
+    )
+    manual_savings_balance_updated_at = models.DateTimeField(null=True, blank=True)
+    manual_monthly_savings_goal = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="User-declared target monthly savings amount from the manual setup form.",
+    )
+    manual_setup_completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the manual income/expense setup form was last submitted.",
+    )
 
     def __str__(self) -> str:
         return f"Profile<{self.user_id}>"

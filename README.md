@@ -38,9 +38,12 @@ python manage.py seed_demo          # creates user "demo" / password "demo-pass-
 python manage.py runserver
 ```
 
-Visit `http://127.0.0.1:8000/`. Log in with the demo account above, or
-sign up for a fresh account (onboarding will ask a few preference
-questions, then take you to the dashboard).
+Visit `http://127.0.0.1:8000/`. New accounts register through Auth0.
+Until `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and
+`AUTH0_SECRET` are set, the login and signup pages stay unavailable and
+do not create a local password user. `seed_demo` still inserts a fixture
+user for management commands such as `chat_demo`; that fixture is not a
+website login.
 
 To create an admin user for `/admin/`: `python manage.py createsuperuser`.
 
@@ -48,11 +51,11 @@ To create an admin user for `/admin/`: `python manage.py createsuperuser`.
 
 Copy `.env.example` to `.env` to override any setting. **The app runs
 with no `.env` file at all** — nothing is required to get started.
-`python manage.py seed_demo` creates a local user named `demo` (password
-`demo-pass-1234` while `DEBUG` is true). That password is refused when
-`DEBUG` is false unless `DEMO_ACCOUNT_PASSWORD` is set. Auth0 remains
-the identity provider for real accounts; the seeded user is only a local
-development login and does not bypass Auth0.
+`python manage.py seed_demo` creates a local fixture user named `demo`
+(password `demo-pass-1234` while `DEBUG` is true). That password is
+refused when `DEBUG` is false unless `DEMO_ACCOUNT_PASSWORD` is set.
+The website does not offer that password as a login. Auth0 is the
+identity provider for accounts created from the site.
 
 ### Optional: Auth0 login and Supabase/Postgres database
 
@@ -60,7 +63,7 @@ Both are off by default — the app runs fully on local demo auth + SQLite
 with no configuration. To turn either on, add to `.env`:
 
 ```bash
-# Auth0 — enables the "Log in with Auth0" button. Credentials live in
+# Auth0 — required for website signup and login. Credentials live in
 # .env.local (written by Auth0 onboarding). The app callback is
 # <APP_BASE_URL>/callback. Run the server on that same origin, for example:
 #   python manage.py runserver localhost:5000
@@ -68,6 +71,7 @@ AUTH0_DOMAIN=your-tenant.us.auth0.com
 AUTH0_CLIENT_ID=...
 AUTH0_CLIENT_SECRET=...
 AUTH0_SECRET=...
+AUTH0_AUDIENCE=https://finovate.biz/api
 APP_BASE_URL=http://localhost:5000
 
 # Supabase/Postgres — switches off SQLite. Use the pooled connection

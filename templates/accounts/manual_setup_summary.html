@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Your estimate — Finovate{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 max-w-xl">
+  <h1 class="text-xl font-bold mb-1">Your financial estimate</h1>
+  <p class="text-xs text-coral-600 font-medium mb-4 uppercase tracking-wide">
+    Based on what you entered — not verified bank data
+  </p>
+
+  <div class="grid sm:grid-cols-2 gap-4 text-sm mb-4">
+    <div class="rounded-lg p-3 bg-mint-500/10">
+      <p class="text-slate-500">Estimated monthly income</p>
+      <p class="font-bold text-mint-600">${{ plan.monthly_income }}</p>
+    </div>
+    <div class="rounded-lg p-3 bg-slate-100">
+      <p class="text-slate-500">Estimated monthly expenses</p>
+      <p class="font-bold">${{ plan.monthly_recurring_expenses }}</p>
+    </div>
+  </div>
+
+  {% if plan.leftover_after_plan >= 0 %}
+  <div class="rounded-lg p-4 bg-mint-500/10 mb-4">
+    <p class="text-slate-500 text-sm">Estimated monthly surplus</p>
+    <p class="font-bold text-mint-600 text-xl">${{ plan.leftover_after_plan }}</p>
+  </div>
+  {% else %}
+  <div class="rounded-lg p-4 bg-coral-500/10 mb-4">
+    <p class="text-slate-500 text-sm">Estimated monthly shortfall</p>
+    <p class="font-bold text-coral-600 text-xl">${{ plan.leftover_after_plan }}</p>
+    <p class="text-xs text-slate-500 mt-1">Your estimated expenses are higher than your estimated income.</p>
+  </div>
+  {% endif %}
+
+  <div class="grid sm:grid-cols-3 gap-3 text-sm mb-6">
+    <div><p class="text-slate-400">Current savings</p><p class="font-semibold">{% if profile.manual_savings_balance is not None %}${{ profile.manual_savings_balance }}{% else %}Not provided{% endif %}</p></div>
+    <div><p class="text-slate-400">Minimum cash reserve</p><p class="font-semibold">${{ profile.cash_reserve_target }}</p></div>
+    <div><p class="text-slate-400">Monthly savings goal</p><p class="font-semibold">{% if profile.manual_monthly_savings_goal is not None %}${{ profile.manual_monthly_savings_goal }}{% else %}Not set{% endif %}</p></div>
+  </div>
+
+  <p class="text-xs text-slate-400 mb-4">
+    This is a planning estimate from numbers you entered, not a verified bank balance. No money is
+    moved, invested, or transferred because of this estimate. Import a bank statement any time to
+    replace it with real transaction data.
+  </p>
+
+  {% if from_onboarding and not user.profile.onboarding_completed %}
+  <a class="button" style="width:100%;" href="{% url 'accounts:onboarding_preferences' %}">Continue setup</a>
+  {% else %}
+  <a class="button" style="width:100%;" href="{% url 'dashboard' %}">Go to dashboard</a>
+  {% endif %}
+  <a class="text-sm text-slate-500 underline mt-3 inline-block" href="{% url 'accounts:manual_setup' %}">Update these numbers</a>
+</section>
+{% endblock %}

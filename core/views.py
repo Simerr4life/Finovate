@@ -6,6 +6,7 @@ from django.db.models import Sum
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from accounts.manual_setup import has_manual_estimate
 from budgets.models import Budget, BudgetPeriod, RecurringExpense
 from budgets.services import build_budget_plan, compute_budget_progress
 from core.display import (
@@ -102,6 +103,8 @@ def dashboard(request):
         "recurring_count": recurring_count,
         "recurring_total": recurring_total,
         "has_transactions": Transaction.objects.filter(user=user).exists(),
+        "plan": plan,
+        "has_manual_estimate": has_manual_estimate(user),
     }
     return render(request, "core/dashboard.html", context)
 

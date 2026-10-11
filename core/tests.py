@@ -57,3 +57,36 @@ class EmptyStateTests(TestCase):
     def test_statement_list_with_no_accounts(self):
         response = self.client.get("/statements/")
         self.assertEqual(response.status_code, 200)
+
+
+class DashboardManualEstimateTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="estimate-user", password="x")
+        self.user.profile.onboarding_completed = True
+        self.user.profile.save()
+        self.client.force_login(self.user)
+
+    def test_banner_hidden_with_no_manual_estimate_and_no_transactions(self):
+        response = self.client.get("/dashboard/")
+        self.assertNotContains(response, "Showing a manual estimate")
+
+    def test_banner_shown_with_manual_estimate_and_no_real_transactions(self):
+        from accounts.manual_setup import apply_manual_setup
+
+        apply_manual_setup(self.user, {"take_home_income": Decimal("4000.00"), "total_monthly_expenses": Decimal("3000.00")})
+        response = self.client.get("/dashboard/")
+        self.assertContains(response, "Showing a manual estimate")
+        self.assertContains(response, "surplus")
+
+    def test_banner_hidden_once_real_transactions_exist(self):
+        from datetime import date
+
+        from accounts.manual_setup import apply_manual_setup
+        from transactions.models import Transaction
+
+        apply_manual_setup(self.user, {"take_home_income": Decimal("4000.00")})
+        Transaction.objects.create(
+            user=self.user, kind=Transaction.Kind.INCOME, amount=Decimal("100.00"), occurred_on=date(2026, 1, 1),
+        )
+        response = self.client.get("/dashboard/")
+        self.assertNotContains(response, "Showing a manual estimate")

@@ -11,26 +11,26 @@ that's a decision for whoever owns credentials and legal/consent review.
 **Update:** built. Full writeup in
 [docs/architecture-auth0-supabase.md](architecture-auth0-supabase.md).
 
-- **Where it plugs in:** `accounts/auth0.py` (OIDC client, built only
-  when configured), `accounts/views.py::auth0_login` /
-  `auth0_callback` / `auth0_logout`, wired in `accounts/urls.py`. Django
-  sessions remain the single source of truth post-login — Auth0 is a way
-  to *establish* that session (via `django.contrib.auth.login()`), not a
-  parallel auth system. Existing `@login_required` views and local
-  signup/login are completely unchanged.
-- **Token validation:** handled by `authlib`'s OIDC client
-  (`authorize_access_token()`), which verifies signature (via Auth0's
-  JWKS), issuer, audience, and expiration as part of the standard flow —
-  not hand-rolled.
+- **Where it plugs in:** `accounts/auth0.py` (official
+  `auth0-server-python` client), `accounts/views.py` signup, login,
+  callback, logout, and verification pages. Django sessions are
+  established only after Auth0 completes the code exchange. The website
+  does not create a password account.
+- **Token validation:** the SDK validates the OIDC login (signature,
+  issuer, audience, expiration). `GET /api/me/` separately validates an
+  API access token with Authlib against the tenant JWKS. An ID token is
+  not accepted as that access token.
 - **Identity mapping:** `Profile.auth0_sub` stores the `sub` claim,
   unique. Never matched/merged by email — two Auth0 accounts sharing an
-  email become two separate Finovate users (tested).
+  email become two separate Finovate users (tested). `email_verified` is
+  copied only from Auth0's claim.
 - **Config required to activate:** set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
-  `AUTH0_CLIENT_SECRET` in `.env`. In your Auth0 tenant, create a
-  "Regular Web Application" with Allowed Callback URL
-  `<your-url>/callback` and Allowed Logout URL
-  `<your-url>/`. Until these are set, the "Log in with Auth0" button
-  doesn't render and local login/signup is the only path (tested).
+  `AUTH0_CLIENT_SECRET`, and `AUTH0_SECRET` in `.env`. Set
+  `AUTH0_AUDIENCE` to the Finovate API identifier before `/api/me/` will
+  accept tokens. In the Auth0 tenant, the Finovate Regular Web
+  Application needs Allowed Callback URL `<APP_BASE_URL>/callback` and
+  Allowed Logout URL `<APP_BASE_URL>/`. Until the four core values are
+  set, signup and login render an unavailable state and create no user.
 - **Tests:** `accounts/tests.py` — unconfigured fallback, successful
   login creates exactly one mapped user, repeat login doesn't duplicate,
   shared-email accounts aren't merged, failed token exchange creates no

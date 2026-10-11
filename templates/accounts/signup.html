@@ -4,18 +4,21 @@
 <section class="card auth-card">
   {% include "partials/brand_logo.html" with large=True %}
   <div class="page-title">Create your account</div>
-  <p class="page-subtitle">Auth0 is the account provider when it is configured. A local account remains available for this server.</p>
-  {% if AUTH0_ENABLED %}
-  <a class="button" style="width:100%;display:block;text-align:center;margin-bottom:14px;" href="{% url 'accounts:auth0_login' %}?screen_hint=signup">Sign up with Auth0</a>
-  <p class="muted" style="text-align:center;margin:10px 0;">or create a local account</p>
+  {% if not auth0_ready %}
+  <p class="page-subtitle">Auth0 isn't configured on this server, so registration is unavailable.</p>
+  {% else %}
+  <p class="page-subtitle">Auth0 creates the account and sends the verification email. A phone number entered here is not verified.</p>
+  {% if rate_limited %}
+  <p class="field-error">Please wait a moment and try again.</p>
   {% endif %}
   <form method="post" novalidate>
     {% csrf_token %}
     {% for field in form %}
     <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
     {% endfor %}
-    <button type="submit" class="button" style="width:100%;margin-top:18px;">Create account</button>
+    <button type="submit" class="button" style="width:100%;margin-top:18px;">Continue with Auth0</button>
   </form>
   <p class="muted">Already have an account? <a class="text-link" href="{% url 'accounts:login' %}">Log in</a></p>
+  {% endif %}
 </section>
 {% endblock %}

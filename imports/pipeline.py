@@ -20,18 +20,33 @@ from decimal import Decimal, InvalidOperation
 
 MAX_ROWS = 20_000
 
-# Role -> header aliases we recognize automatically, checked case-insensitively
-# with whitespace/punctuation stripped. First match wins.
+# Role -> header aliases we recognize automatically, checked against a
+# normalized header (lowercased, underscores/hyphens treated as spaces,
+# punctuation stripped). First match wins. Only used for auto-detection --
+# there's no user-facing mapping step, so these have to be good enough on
+# their own; anything not recognized is kept in a row's `raw` dict but
+# never guessed at.
 COLUMN_ALIASES = {
     "date": ["date", "transaction date", "trans date", "txn date", "posted date"],
     "posting_date": ["posting date", "post date", "settlement date"],
     "description": ["description", "memo", "merchant", "payee", "narrative", "details"],
-    "amount": ["amount", "transaction amount", "amt"],
-    "debit": ["debit", "withdrawal", "withdrawals", "money out", "debit amount"],
-    "credit": ["credit", "deposit", "deposits", "money in", "credit amount"],
-    "balance": ["balance", "running balance", "account balance", "ending balance"],
+    "amount": ["amount", "transaction amount", "amt", "amount usd"],
+    "net_amount": ["net amount", "net amount usd", "signed amount"],
+    "debit": ["debit", "withdrawal", "withdrawals", "money out", "money out usd", "debit amount"],
+    "credit": ["credit", "deposit", "deposits", "money in", "money in usd", "credit amount"],
+    "balance": ["balance", "running balance", "account balance", "ending balance", "running balance usd"],
     "reference": ["reference", "reference number", "transaction id", "id", "check number"],
     "currency": ["currency", "currency code"],
+}
+
+# Recognized but never required and never used to derive amount/date/kind --
+# e.g. a bank's own "Category" column, a "Transaction_Type" or "Recurring"
+# flag. Kept out of parsing entirely; still visible in a row's `raw` dict.
+OPTIONAL_METADATA_ALIASES = {
+    "category_hint": ["category"],
+    "transaction_type": ["transaction type"],
+    "recurring_flag": ["recurring"],
+    "payment_method": ["payment method"],
 }
 
 REQUIRED_ROLES = ("date", "description")
@@ -126,12 +141,16 @@ def read_headers(text: str) -> list[str]:
 
 
 def _normalize_header(name: str) -> str:
-    return "".join(ch for ch in name.lower().strip() if ch.isalnum() or ch == " ").strip()
+    name = name.lower().strip().replace("_", " ").replace("-", " ")
+    cleaned = "".join(ch for ch in name if ch.isalnum() or ch == " ")
+    return " ".join(cleaned.split())
 
 
 def detect_columns(headers: list[str]) -> dict:
-    """Best-effort role -> header-name guesses, for pre-filling the mapping
-    form. Never used directly to import -- the user always confirms it."""
+    """Best-effort, fully-automatic role -> header-name mapping. This is
+    the only mapping step there is -- there's no screen asking the user to
+    confirm it, so `assess_readability` is what decides whether the guess
+    was good enough to import from, not a human."""
     normalized = {_normalize_header(h): h for h in headers}
     mapping = {}
     for role, aliases in COLUMN_ALIASES.items():
@@ -143,18 +162,32 @@ def detect_columns(headers: list[str]) -> dict:
 
 
 def validate_mapping(mapping: dict) -> list[str]:
-    """Return a list of user-facing problems with a proposed mapping, empty
-    if it's usable. Doesn't require perfection -- just enough to parse."""
+    """Return a list of problems with a detected mapping, empty if it's
+    usable. Doesn't require perfection -- just enough to parse."""
     problems = []
     for role in REQUIRED_ROLES:
         if not mapping.get(role):
-            problems.append(f"Pick a column for {role.replace('_', ' ')}.")
-    if not mapping.get("amount") and not (mapping.get("debit") or mapping.get("credit")):
-        problems.append("Pick either an amount column, or debit/credit columns.")
-    chosen = [v for v in mapping.values() if v]
-    if len(chosen) != len(set(chosen)):
-        problems.append("The same column is mapped to more than one field.")
+            problems.append(f"Couldn't find a {role.replace('_', ' ')} column.")
+    if not mapping.get("amount") and not mapping.get("net_amount") and not (mapping.get("debit") or mapping.get("credit")):
+        problems.append("Couldn't find an amount, or debit/credit, column.")
     return problems
+
+
+def assess_readability(mapping: dict, rows: list) -> tuple[bool, list[str]]:
+    """Whether this file has enough of a recognizable shape to import from
+    at all. Used right after upload, before asking the user anything else --
+    if this says no, they go straight to the unreadable-file fallback
+    (retry with another file, or enter finances manually) instead of
+    wading through a wizard for a file that was never going to work.
+    """
+    problems = validate_mapping(mapping)
+    if problems:
+        return False, problems
+    if not rows:
+        return False, ["No transaction rows were found in this file."]
+    if not any(not r.errors for r in rows):
+        return False, ["None of the rows in this file could be read reliably."]
+    return True, []
 
 
 def _parse_date(value: str) -> date | None:
@@ -194,6 +227,52 @@ def _normalize_description(text: str) -> str:
     return " ".join((text or "").lower().split())
 
 
+def _resolve_amount(raw: dict, mapping: dict) -> tuple[Decimal | None, str | None, list]:
+    """Figures out the signed amount for one row from whichever of
+    debit/credit, net_amount, and amount are mapped -- without ever adding
+    them together. When more than one is present, they must agree (same
+    signed value); if they don't, the row is flagged for review rather
+    than silently trusting one field over another.
+
+    Returns (positive amount, kind, errors).
+    """
+    candidates: dict = {}
+
+    if mapping.get("debit") or mapping.get("credit"):
+        debit = _parse_decimal(raw.get(mapping.get("debit", ""), "")) if mapping.get("debit") else None
+        credit = _parse_decimal(raw.get(mapping.get("credit", ""), "")) if mapping.get("credit") else None
+        if debit and credit:
+            return None, None, ["Both debit and credit are filled in for this row."]
+        if debit:
+            candidates["debit/credit"] = -abs(debit)
+        elif credit:
+            candidates["debit/credit"] = abs(credit)
+
+    if mapping.get("net_amount"):
+        net = _parse_decimal(raw.get(mapping["net_amount"], ""))
+        if net is not None:
+            candidates["net amount"] = net
+
+    if mapping.get("amount"):
+        amt = _parse_decimal(raw.get(mapping["amount"], ""))
+        if amt is not None:
+            candidates["amount"] = amt
+
+    if not candidates:
+        return None, None, ["No amount found for this row."]
+
+    distinct = set(candidates.values())
+    if len(distinct) > 1:
+        names = " and ".join(candidates.keys())
+        return None, None, [f"The {names} columns disagree on this row's amount -- skipped rather than guessed."]
+
+    signed = distinct.pop()
+    if signed == 0:
+        return None, None, ["This row's amount is zero -- please review."]
+    kind = "expense" if signed < 0 else "income"
+    return abs(signed), kind, []
+
+
 def fingerprint(account_id, occurred_on, amount: Decimal, kind: str, description: str) -> str:
     key = "|".join([
         str(account_id or ""),
@@ -227,26 +306,8 @@ def parse_rows(text: str, mapping: dict, account_id=None) -> list[ParsedRow]:
 
         row.description = (raw.get(mapping.get("description", ""), "") or "").strip()
 
-        amount = None
-        kind = None
-        if mapping.get("amount"):
-            signed = _parse_decimal(raw.get(mapping["amount"], ""))
-            if signed is None:
-                row.errors.append("Couldn't read the amount for this row.")
-            else:
-                kind = "expense" if signed < 0 else "income"
-                amount = abs(signed)
-        else:
-            debit = _parse_decimal(raw.get(mapping.get("debit", ""), "")) if mapping.get("debit") else None
-            credit = _parse_decimal(raw.get(mapping.get("credit", ""), "")) if mapping.get("credit") else None
-            if debit and credit:
-                row.errors.append("Both debit and credit are filled in for this row.")
-            elif debit:
-                amount, kind = abs(debit), "expense"
-            elif credit:
-                amount, kind = abs(credit), "income"
-            else:
-                row.errors.append("No amount found in the debit or credit column for this row.")
+        amount, kind, amount_errors = _resolve_amount(raw, mapping)
+        row.errors.extend(amount_errors)
         row.amount = amount
         row.kind = kind
 

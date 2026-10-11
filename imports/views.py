@@ -9,7 +9,7 @@ from transactions.models import Account
 from transactions.services import record_transaction
 
 from . import pipeline
-from .forms import AccountSelectForm, UploadForm, build_column_mapping_form
+from .forms import AccountSelectForm, UploadForm
 from .models import ImportBatch, MAX_RAW_FILE_BYTES
 
 
@@ -24,28 +24,49 @@ def _parsed_rows(batch):
     return rows
 
 
+def _from_onboarding(request) -> bool:
+    return request.GET.get("from") == "onboarding" or request.POST.get("from") == "onboarding"
+
+
+def _unreadable_response(request, problems, *, from_onboarding):
+    return render(
+        request,
+        "imports/unreadable.html",
+        {"problems": problems, "from_onboarding": from_onboarding},
+    )
+
+
 @login_required
 def upload(request):
+    from_onboarding = _from_onboarding(request)
     if request.method == "POST":
         form = UploadForm(request.POST, request.FILES)
         if form.is_valid():
             upload_file = form.cleaned_data["file"]
             content = upload_file.read()
             try:
-                pipeline.validate_file(upload_file.name, content, MAX_RAW_FILE_BYTES)
+                text = pipeline.validate_file(upload_file.name, content, MAX_RAW_FILE_BYTES)
             except pipeline.ImportValidationError as exc:
-                form.add_error("file", str(exc))
-            else:
-                batch = ImportBatch.objects.create(
-                    user=request.user,
-                    original_filename=upload_file.name[:255],
-                    raw_file=content,
-                    started_from_onboarding=request.GET.get("from") == "onboarding",
-                )
-                return redirect("imports:choose_account", pk=batch.pk)
+                return _unreadable_response(request, [str(exc)], from_onboarding=from_onboarding)
+
+            headers = pipeline.read_headers(text)
+            mapping = pipeline.detect_columns(headers)
+            rows = pipeline.parse_rows(text, mapping)
+            readable, problems = pipeline.assess_readability(mapping, rows)
+            if not readable:
+                return _unreadable_response(request, problems, from_onboarding=from_onboarding)
+
+            batch = ImportBatch.objects.create(
+                user=request.user,
+                original_filename=upload_file.name[:255],
+                raw_file=content,
+                column_mapping=mapping,
+                started_from_onboarding=from_onboarding,
+            )
+            return redirect("imports:choose_account", pk=batch.pk)
     else:
         form = UploadForm()
-    return render(request, "imports/upload.html", {"form": form})
+    return render(request, "imports/upload.html", {"form": form, "from_onboarding": from_onboarding})
 
 
 @login_required
@@ -68,37 +89,10 @@ def choose_account(request, pk):
                 )
             batch.account = account
             batch.save(update_fields=["account", "updated_at"])
-            return redirect("imports:map_columns", pk=batch.pk)
+            return redirect("imports:preview", pk=batch.pk)
     else:
         form = AccountSelectForm(user=request.user)
     return render(request, "imports/choose_account.html", {"form": form, "batch": batch})
-
-
-@login_required
-def map_columns(request, pk):
-    batch = _get_batch(request, pk)
-    if batch.status != ImportBatch.Status.DRAFT:
-        return redirect("imports:history")
-    if batch.account_id is None:
-        return redirect("imports:choose_account", pk=batch.pk)
-    text = pipeline.decode_text(bytes(batch.raw_file))
-    headers = pipeline.read_headers(text)
-    initial = batch.column_mapping or pipeline.detect_columns(headers)
-    if request.method == "POST":
-        form = build_column_mapping_form(headers, initial, data=request.POST)
-        if form.is_valid():
-            mapping = {role: value for role, value in form.cleaned_data.items() if value}
-            problems = pipeline.validate_mapping(mapping)
-            if problems:
-                for problem in problems:
-                    messages.error(request, problem)
-            else:
-                batch.column_mapping = mapping
-                batch.save(update_fields=["column_mapping", "updated_at"])
-                return redirect("imports:preview", pk=batch.pk)
-    else:
-        form = build_column_mapping_form(headers, initial)
-    return render(request, "imports/map_columns.html", {"form": form, "batch": batch, "headers": headers})
 
 
 @login_required
@@ -108,8 +102,12 @@ def preview(request, pk):
         return redirect("imports:batch_detail", pk=batch.pk)
     if batch.account_id is None:
         return redirect("imports:choose_account", pk=batch.pk)
+    # column_mapping is always set at upload time now (auto-detected, and
+    # checked readable before the batch was even created) -- this is just
+    # a defensive guard against a batch created some other way.
     if not batch.column_mapping:
-        return redirect("imports:map_columns", pk=batch.pk)
+        messages.error(request, "This import is missing its column mapping and can't be previewed.")
+        return redirect("imports:history")
 
     rows = _parsed_rows(batch)
     summary = pipeline.summarize(rows)
@@ -205,9 +203,9 @@ def retry(request, pk):
     batch.status = ImportBatch.Status.DRAFT
     batch.error_message = ""
     batch.save(update_fields=["status", "error_message", "updated_at"])
-    if batch.column_mapping:
-        return redirect("imports:preview", pk=batch.pk)
-    return redirect("imports:map_columns", pk=batch.pk)
+    if batch.account_id is None:
+        return redirect("imports:choose_account", pk=batch.pk)
+    return redirect("imports:preview", pk=batch.pk)
 
 
 @login_required

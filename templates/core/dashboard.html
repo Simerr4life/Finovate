@@ -15,6 +15,16 @@
   {% endif %}
 </div>
 
+{% if has_manual_estimate and not has_transactions %}
+<div class="card" style="padding:14px 18px;margin-bottom:16px;border-left:4px solid var(--coral-500, #f97066);">
+  <strong>Showing a manual estimate, not verified bank data.</strong>
+  Estimated monthly income {{ plan.monthly_income|money }}, expenses {{ plan.monthly_recurring_expenses|money }},
+  {% if plan.leftover_after_plan >= 0 %}surplus {{ plan.leftover_after_plan|money }}{% else %}shortfall {{ plan.leftover_after_plan|money }}{% endif %}.
+  <a href="{% url 'accounts:manual_setup' %}">Update these numbers</a> or
+  <a href="{% url 'imports:upload' %}">import a statement</a> to replace this with real transactions.
+</div>
+{% endif %}
+
 <div class="summary-grid">
   <section class="card summary-card">
     <div class="label">Total cash</div>

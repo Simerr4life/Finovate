@@ -56,8 +56,6 @@ if ON_VERCEL:
         "https://*.vercel.app",
     ]
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
 
 # Kept so existing environment files still parse. The product UI no longer
 # shows a demo-mode banner from this flag.
@@ -86,6 +84,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.Auth0SessionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -199,13 +198,31 @@ LOGGING = {
 }
 
 # --- Auth0 -------------------------------------------------------------
-# Empty unless .env / .env.local sets them. The login button stays hidden
-# until domain, client id, client secret, and the session secret are all set.
+# Empty unless .env / .env.local sets them. Website signup and login stay
+# unavailable until domain, client id, client secret, and the session
+# secret are all set. AUTH0_AUDIENCE is the Finovate API identifier used
+# to validate access tokens. Management credentials are optional and are
+# only used on the server to resend verification email.
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "")
 AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID", "")
 AUTH0_CLIENT_SECRET = os.environ.get("AUTH0_CLIENT_SECRET", "")
 AUTH0_SECRET = os.environ.get("AUTH0_SECRET", "")
-APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://127.0.0.1:8000")
+AUTH0_AUDIENCE = os.environ.get("AUTH0_AUDIENCE", "")
+AUTH0_MGMT_CLIENT_ID = os.environ.get("AUTH0_MGMT_CLIENT_ID", "")
+AUTH0_MGMT_CLIENT_SECRET = os.environ.get("AUTH0_MGMT_CLIENT_SECRET", "")
+_app_base = os.environ.get("APP_BASE_URL", "").strip()
+if not _app_base and ON_VERCEL:
+    _app_base = "https://finovate.biz"
+APP_BASE_URL = _app_base or "http://127.0.0.1:8000"
+
+_cookie_secure = APP_BASE_URL.startswith("https://")
+SESSION_COOKIE_SECURE = _cookie_secure
+CSRF_COOKIE_SECURE = _cookie_secure
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_AGE = 60 * 60 * 8
 
 BANK_PROVIDER_API_KEY = os.environ.get("BANK_PROVIDER_API_KEY", "")
 BROKERAGE_PROVIDER_API_KEY = os.environ.get("BROKERAGE_PROVIDER_API_KEY", "")
