@@ -1,5 +1,5 @@
 {% load finovate %}
-<article class="holding-chart-card interactive-chart-card" data-series-id="{{ chart_id }}" data-default-view="chart">
+<article class="holding-chart-card interactive-chart-card" data-series-id="{{ chart_id }}" data-default-view="chart"{% if holding %} data-live-symbol="{{ holding.symbol }}" data-live-shares="{{ holding.shares }}"{% endif %}{% if live_portfolio %} data-live-portfolio{% endif %}>
   <header class="holding-chart-heading">
     <div>
       <div class="eyebrow">{% if holding %}{{ holding.symbol }} · SIMULATED HOLDING{% else %}PORTFOLIO VALUE{% endif %}</div>
@@ -7,8 +7,8 @@
       <p>{{ subtitle }}</p>
     </div>
     <div class="holding-chart-current">
-      <small>Latest sample valuation{% if latest_date %} · {{ latest_date }}{% endif %}</small>
-      <strong>{{ latest_value|money }}</strong>
+      <small data-live-value-caption>Latest sample valuation{% if latest_date %} · {{ latest_date }}{% endif %}</small>
+      <strong data-live-value>{{ latest_value|money }}</strong>
       {% if holding %}<span>{{ holding.shares }} simulated shares · cost {{ holding.cost_basis|money }}</span>{% endif %}
     </div>
   </header>
@@ -32,7 +32,7 @@
       <span><i class="up"></i> Up from prior sample date</span>
       <span><i class="down"></i> Down from prior sample date</span>
     </div>
-    <p class="market-chart-help">Value is estimated from your simulated shares and the supplied historical sample closes, not live prices.</p>
+    <p class="market-chart-help">Older points use supplied sample prices. The latest valuation updates from Twelve Data every five minutes during US market hours when configured. Demo orders remain simulated.</p>
   </div>
   {{ chart_data|json_script:chart_id }}
 </article>

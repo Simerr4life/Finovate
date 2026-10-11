@@ -21,4 +21,5 @@ urlpatterns = [
     path("historical-demo/", views.historical_demo, name="historical_demo"),
     path("market-data/", views.market_data, name="market_data"),
     path("market-data/invest/", views.buy_demo_market_asset, name="buy_demo_market_asset"),
+    path("live-quotes/", views.live_demo_quotes, name="live_demo_quotes"),
 ]

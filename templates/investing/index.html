@@ -63,18 +63,19 @@
   <div>
     <div class="eyebrow">YOUR SIMULATED PORTFOLIO</div>
     <h2>My investments</h2>
-    <p>See your approved demo holdings and how their sample-based value has moved. Pending orders are not counted as invested yet.</p>
+    <p>See your approved demo holdings. Historical points use sample prices; the latest values can refresh every five minutes during US market hours. Pending orders are not counted as invested yet.</p>
+    {% if holdings %}<p class="live-quotes-status" data-live-quotes-status data-quotes-url="{% url 'investing:live_demo_quotes' %}" role="status">Checking live quote availability…</p>{% endif %}
   </div>
   <a class="button secondary" href="?tab=explore">Explore sample assets</a>
 </section>
 <div class="summary-grid compact holdings-summary">
-  <section class="card summary-card"><div class="label">Sample-priced value</div><div class="money">{{ holdings_market_value|money }}</div><div class="summary-detail">Latest supplied sample closes</div></section>
+  <section class="card summary-card"><div class="label">Portfolio value</div><div class="money" data-live-portfolio-value>{{ holdings_market_value|money }}</div><div class="summary-detail" data-live-portfolio-caption>Latest supplied sample closes</div></section>
   <section class="card summary-card"><div class="label">Amount invested</div><div class="money">{{ holdings_cost_basis|money }}</div><div class="summary-detail">Cost basis of tracked demo holdings</div></section>
-  <section class="card summary-card"><div class="label">Change in sample value</div><div class="money {% if holdings_gain_loss >= 0 %}positive{% else %}negative{% endif %}">{{ holdings_gain_loss|money }}</div><div class="summary-detail">Illustrative only, based on sample data</div></section>
+  <section class="card summary-card"><div class="label">Change in value</div><div class="money {% if holdings_gain_loss >= 0 %}positive{% else %}negative{% endif %}" data-live-portfolio-change>{{ holdings_gain_loss|money }}</div><div class="summary-detail" data-live-change-caption>Illustrative only, based on sample data</div></section>
 </div>
 {% if holdings %}
 {% if portfolio_series|length > 1 %}
-  {% include "investing/holdings_chart.html" with chart_id=portfolio_chart_id chart_data=portfolio_series title="Total sample-priced holdings" subtitle="Combined estimated value across the sample dates" latest_value=holdings_market_value latest_date=portfolio_latest_date chart_color="portfolio" %}
+  {% include "investing/holdings_chart.html" with chart_id=portfolio_chart_id chart_data=portfolio_series title="Total holdings value" subtitle="Combined estimated value across the sample dates" latest_value=holdings_market_value latest_date=portfolio_latest_date chart_color="portfolio" live_portfolio=True %}
 {% endif %}
 <div class="holding-chart-list">
   {% for holding in holdings %}
@@ -342,6 +343,9 @@
 
 {% block extra_js %}
 <script src="{% static 'js/market-charts.js' %}?v=2" defer></script>
+{% if tab == 'holdings' and holdings %}
+<script src="{% static 'js/live-holdings.js' %}?v=1" defer></script>
+{% endif %}
 <script>
 (function () {
   const years = document.getElementById("calc-years");

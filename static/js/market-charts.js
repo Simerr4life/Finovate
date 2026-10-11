@@ -275,8 +275,36 @@
     }
 
     selectPoint(points.length - 1);
+
+    card.appendLivePoint = (point) => {
+      const latestPoints = JSON.parse(dataElement.textContent);
+      if (latestPoints[latestPoints.length - 1].date === point.date) return;
+      latestPoints.push(point);
+      dataElement.textContent = JSON.stringify(latestPoints);
+
+      const currentSvg = card.querySelector(".market-price-chart");
+      const replacementSvg = currentSvg.cloneNode(false);
+      currentSvg.replaceWith(replacementSvg);
+      const replacementSlider = slider.cloneNode();
+      slider.replaceWith(replacementSlider);
+      replacementSlider.max = String(latestPoints.length - 1);
+      replacementSlider.value = String(latestPoints.length - 1);
+      setupChart(card);
+    };
   }
 
   document.querySelectorAll("[data-series-id]").forEach(setupChart);
+  document.addEventListener("finovate:live-quotes", (event) => {
+    document.querySelectorAll("[data-live-symbol]").forEach((card) => {
+      const quote = event.detail.quotes[card.dataset.liveSymbol];
+      if (quote && typeof card.appendLivePoint === "function") {
+        card.appendLivePoint({ date: event.detail.label, close: quote.market_value });
+      }
+    });
+    const portfolioCard = document.querySelector("[data-live-portfolio]");
+    if (portfolioCard && event.detail.portfolioValue && typeof portfolioCard.appendLivePoint === "function") {
+      portfolioCard.appendLivePoint({ date: event.detail.label, close: event.detail.portfolioValue });
+    }
+  });
   document.body.classList.add("has-market-chart-js");
 })();
