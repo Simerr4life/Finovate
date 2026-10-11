@@ -26,6 +26,14 @@
   {% else %}
   <p class="page-subtitle">Sign-in isn't configured on this server.</p>
   {% endif %}
+  {% if demo_ready %}
+  <form method="post" action="{% url 'accounts:demo_login' %}" style="margin-top:18px;">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="button secondary" style="width:100%;">Explore with sample data</button>
+  </form>
+  <p class="muted" style="margin-top:10px;">Local demo fixture only. Available while DEBUG is on.</p>
+  {% endif %}
   <p class="muted">New here? <a class="text-link" href="{% url 'accounts:signup' %}">Create an account</a></p>
 </section>
 {% endblock %}
