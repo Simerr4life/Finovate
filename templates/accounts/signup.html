@@ -17,13 +17,17 @@
     {% endfor %}
     <button type="submit" class="button" style="width:100%;margin-top:18px;">Continue with Auth0 (recommended)</button>
   </form>
-  <details style="margin-top:18px;"{% if local_form.is_bound %} open{% endif %}>
-    <summary class="muted" style="cursor:pointer;">Or create a Finovate account with a username and password</summary>
-    {% include "accounts/_local_signup_form.html" %}
+  {% if email_ready %}
+  <details style="margin-top:18px;"{% if email_form.is_bound %} open{% endif %}>
+    <summary class="muted" style="cursor:pointer;">Or sign up with email and password</summary>
+    {% include "accounts/_email_signup_form.html" %}
   </details>
+  {% endif %}
+  {% elif email_ready %}
+  <p class="page-subtitle">Sign up with your email and a password. You'll get a confirmation email before your first login.</p>
+  {% include "accounts/_email_signup_form.html" %}
   {% else %}
-  <p class="page-subtitle">Create a Finovate account with a username and password.</p>
-  {% include "accounts/_local_signup_form.html" %}
+  <p class="page-subtitle">Registration isn't configured on this server.</p>
   {% endif %}
   <p class="muted">Already have an account? <a class="text-link" href="{% url 'accounts:login' %}">Log in</a></p>
 </section>

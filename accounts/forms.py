@@ -1,8 +1,7 @@
 from decimal import Decimal
 
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth.models import User
+from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 
@@ -48,15 +47,33 @@ class RegistrationForm(forms.Form):
         return phone
 
 
-class LocalSignUpForm(UserCreationForm):
-    """A Finovate-only account with a password stored (hashed) by Django.
-    Offered alongside Auth0, which stays the recommended way to sign up."""
+class EmailSignUpForm(forms.Form):
+    """Email-and-password registration. Supabase stores the password."""
 
-    email = forms.EmailField(required=False, label="Email (optional)")
+    name = forms.CharField(max_length=150, label="Name")
+    email = forms.EmailField(label="Email")
+    password1 = forms.CharField(label="Password", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
+    password2 = forms.CharField(label="Confirm password", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
 
-    class Meta:
-        model = User
-        fields = ["username", "email", "password1", "password2"]
+    def clean_name(self):
+        return " ".join(self.cleaned_data["name"].split())
+
+    def clean(self):
+        cleaned = super().clean()
+        password = cleaned.get("password1")
+        if password and password != cleaned.get("password2"):
+            self.add_error("password2", "The two passwords don't match.")
+        elif password:
+            try:
+                password_validation.validate_password(password)
+            except ValidationError as exc:
+                self.add_error("password1", exc)
+        return cleaned
+
+
+class EmailLoginForm(forms.Form):
+    email = forms.CharField(label="Email", max_length=254, widget=forms.TextInput(attrs={"autocomplete": "username"}))
+    password = forms.CharField(label="Password", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}))
 
 
 class OnboardingForm(forms.ModelForm):

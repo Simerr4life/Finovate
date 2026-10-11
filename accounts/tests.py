@@ -23,9 +23,12 @@ from .auth0 import auth0_configured, get_auth0_client
 from .identity import safe_next, sync_profile_from_claims
 from .manual_setup import TAKE_HOME_INCOME_NAME, apply_manual_setup, has_manual_estimate, initial_from_existing
 from .models import NotificationEvent, Profile
+from .supabase_auth import SupabaseAuthError
 
 
 @override_settings(
+    SUPABASE_URL="",
+    SUPABASE_PUBLIC_KEY="",
     AUTH0_AUDIENCE="",
     AUTH0_DOMAIN="",
     AUTH0_CLIENT_ID="",
@@ -48,42 +51,20 @@ class Auth0UnconfiguredFallbackTests(TestCase):
         messages = list(response.context["messages"])
         self.assertTrue(any("isn't configured" in str(m) for m in messages))
 
-    def test_signup_creates_a_local_account_when_auth0_is_off(self):
+    def test_with_nothing_configured_no_password_form_is_offered(self):
+        for name in ("accounts:login", "accounts:signup"):
+            response = self.client.get(reverse(name))
+            self.assertNotContains(response, "Continue with Auth0")
+            self.assertNotContains(response, 'type="password"')
+            self.assertContains(response, "isn't configured")
+
+    def test_a_django_password_alone_no_longer_creates_an_account(self):
         cache.clear()
         response = self.client.post(reverse("accounts:signup"), {
-            "username": "localuser",
-            "email": "local@example.com",
-            "password1": "a-strong-pass-123",
-            "password2": "a-strong-pass-123",
+            "username": "localuser", "password1": "a-strong-pass-123", "password2": "a-strong-pass-123",
         })
-        self.assertRedirects(response, reverse("accounts:onboarding"))
-        user = User.objects.get(username="localuser")
-        self.assertTrue(user.has_usable_password())
-        self.assertIsNone(user.profile.auth0_sub)
-
-    def test_login_page_offers_only_the_local_form(self):
-        response = self.client.get(reverse("accounts:login"))
-        self.assertNotContains(response, "Continue with Auth0")
-        self.assertContains(response, 'type="password"')
-
-    def test_local_login_and_wrong_password(self):
-        cache.clear()
-        User.objects.create_user(username="localuser", password="a-strong-pass-123")
-        bad = self.client.post(reverse("accounts:login"), {"username": "localuser", "password": "nope"})
-        self.assertEqual(bad.status_code, 200)
-        self.assertNotIn("_auth_user_id", self.client.session)
-        good = self.client.post(reverse("accounts:login"), {"username": "localuser", "password": "a-strong-pass-123"})
-        self.assertRedirects(good, reverse("accounts:onboarding"))
-
-    def test_local_login_ignores_an_off_site_next(self):
-        cache.clear()
-        user = User.objects.create_user(username="localuser", password="a-strong-pass-123")
-        user.profile.onboarding_completed = True
-        user.profile.save()
-        response = self.client.post(reverse("accounts:login"), {
-            "username": "localuser", "password": "a-strong-pass-123", "next": "https://evil.example/",
-        })
-        self.assertRedirects(response, reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(User.objects.count(), 0)
 
     def test_login_page_shows_the_logo_and_no_demo_banner(self):
         response = self.client.get(reverse("accounts:login"))
@@ -95,6 +76,8 @@ class Auth0UnconfiguredFallbackTests(TestCase):
 
 
 @override_settings(
+    SUPABASE_URL="",
+    SUPABASE_PUBLIC_KEY="",
     AUTH0_AUDIENCE="",
     AUTH0_DOMAIN="test.auth0.com",
     AUTH0_CLIENT_ID="cid",
@@ -109,32 +92,7 @@ class Auth0ConfiguredTests(TestCase):
     def test_login_page_shows_auth0_button(self):
         response = self.client.get(reverse("accounts:login"))
         self.assertContains(response, "Continue with Auth0 (recommended)")
-        self.assertContains(response, 'type="password"')
-
-    def test_local_account_still_works_when_auth0_is_configured(self):
-        cache.clear()
-        response = self.client.post(reverse("accounts:signup"), {
-            "method": "local",
-            "username": "localuser",
-            "password1": "a-strong-pass-123",
-            "password2": "a-strong-pass-123",
-        })
-        self.assertRedirects(response, reverse("accounts:onboarding"))
-        self.client.post(reverse("accounts:logout"))
-        response = self.client.post(reverse("accounts:login"), {
-            "method": "local", "username": "localuser", "password": "a-strong-pass-123",
-        })
-        self.assertRedirects(response, reverse("accounts:onboarding"))
-        self.assertEqual(self.client.get(reverse("accounts:onboarding")).status_code, 200)
-
-    def test_auth0_user_cannot_log_in_with_a_local_password(self):
-        cache.clear()
-        profile, _ = sync_profile_from_claims({"sub": "auth0|x", "email": "x@example.com", "email_verified": True})
-        response = self.client.post(reverse("accounts:login"), {
-            "method": "local", "username": profile.user.username, "password": "",
-        })
-        self.assertEqual(response.status_code, 200)
-        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertNotContains(response, 'type="password"')
 
     def _client(self, result=None, error=None):
         if isinstance(result, dict):
@@ -301,6 +259,8 @@ class SafeRedirectTests(TestCase):
 
 
 @override_settings(
+    SUPABASE_URL="",
+    SUPABASE_PUBLIC_KEY="",
     AUTH0_AUDIENCE="",
     AUTH0_DOMAIN="test.auth0.com",
     AUTH0_CLIENT_ID="cid",
@@ -439,6 +399,8 @@ class Auth0RegistrationTests(TestCase):
 
 
 @override_settings(
+    SUPABASE_URL="",
+    SUPABASE_PUBLIC_KEY="",
     AUTH0_DOMAIN="test.auth0.com",
     AUTH0_CLIENT_ID="cid",
     AUTH0_CLIENT_SECRET="secret",
@@ -537,6 +499,8 @@ class AccessTokenApiTests(TestCase):
 
 
 @override_settings(
+    SUPABASE_URL="",
+    SUPABASE_PUBLIC_KEY="",
     AUTH0_AUDIENCE="",
     AUTH0_DOMAIN="test.auth0.com",
     AUTH0_CLIENT_ID="cid",
@@ -669,3 +633,181 @@ class ManualFinancialSetupTests(TestCase):
         response = self.client.get(reverse("accounts:manual_setup_summary"))
         plan = response.context["plan"]
         self.assertEqual(plan.monthly_income, Decimal("0"))
+
+
+SUPA_UID = "11111111-2222-3333-4444-555555555555"
+
+
+def _supabase_user(uid=SUPA_UID, email="ada@example.com", confirmed=True):
+    return {
+        "id": uid,
+        "email": email,
+        "email_confirmed_at": "2026-10-10T00:00:00Z" if confirmed else None,
+        "user_metadata": {"name": "Ada Lovelace"},
+    }
+
+
+@override_settings(
+    AUTH0_DOMAIN="test.auth0.com",
+    AUTH0_CLIENT_ID="cid",
+    AUTH0_CLIENT_SECRET="secret",
+    AUTH0_SECRET="test-secret",
+    AUTH0_AUDIENCE="",
+    SUPABASE_URL="https://example.supabase.co",
+    SUPABASE_PUBLIC_KEY="public-key",
+    SUPABASE_SERVICE_KEY="service-key",
+)
+class SupabaseEmailAuthTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def _login(self, email="ada@example.com", password="a-strong-pass-123", **extra):
+        return self.client.post(reverse("accounts:login"), {
+            "method": "email", "email": email, "password": password, **extra,
+        })
+
+    def test_both_options_are_offered_with_auth0_recommended(self):
+        for name in ("accounts:login", "accounts:signup"):
+            response = self.client.get(reverse(name))
+            self.assertContains(response, "Continue with Auth0 (recommended)")
+            self.assertContains(response, "email and password")
+            self.assertContains(response, 'type="password"')
+
+    @patch("accounts.views.sign_up", return_value=None)
+    def test_signup_awaiting_confirmation_creates_no_user(self, mock_sign_up):
+        response = self.client.post(reverse("accounts:signup"), {
+            "method": "email", "name": "Ada Lovelace", "email": "ada@example.com",
+            "password1": "a-strong-pass-123", "password2": "a-strong-pass-123",
+        })
+        self.assertRedirects(response, reverse("accounts:login"))
+        self.assertEqual(User.objects.count(), 0)
+        mock_sign_up.assert_called_once_with("ada@example.com", "a-strong-pass-123", "Ada Lovelace")
+
+    @patch("accounts.views.sign_up")
+    def test_signup_rejects_mismatched_and_weak_passwords_before_calling_supabase(self, mock_sign_up):
+        for p1, p2 in (("a-strong-pass-123", "different-pass-123"), ("12345678", "12345678")):
+            response = self.client.post(reverse("accounts:signup"), {
+                "method": "email", "name": "Ada", "email": "ada@example.com", "password1": p1, "password2": p2,
+            })
+            self.assertEqual(response.status_code, 200)
+        mock_sign_up.assert_not_called()
+
+    @patch("accounts.views.sign_in")
+    def test_login_creates_one_profile_keyed_by_supabase_id(self, mock_sign_in):
+        mock_sign_in.return_value = _supabase_user()
+        self.assertRedirects(self._login(), reverse("accounts:onboarding"))
+        self.client.post(reverse("accounts:logout"))
+        cache.clear()
+        self._login()
+        self.assertEqual(User.objects.count(), 1)
+        profile = Profile.objects.get(supabase_uid=SUPA_UID)
+        self.assertTrue(profile.email_verified)
+        self.assertIsNone(profile.auth0_sub)
+        self.assertFalse(profile.user.has_usable_password())
+
+    @patch("accounts.views.sign_in")
+    def test_supabase_login_never_merges_into_an_auth0_account_with_the_same_email(self, mock_sign_in):
+        auth0_profile, _ = sync_profile_from_claims({"sub": "auth0|x", "email": "ada@example.com", "email_verified": True})
+        mock_sign_in.return_value = _supabase_user()
+        self._login()
+        self.assertEqual(User.objects.count(), 2)
+        auth0_profile.refresh_from_db()
+        self.assertIsNone(auth0_profile.supabase_uid)
+
+    @patch("accounts.views.sign_in", side_effect=SupabaseAuthError("invalid_credentials"))
+    def test_wrong_password_logs_nobody_in(self, _mock):
+        response = self._login(password="nope")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "match an account")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @patch("accounts.views.sign_in", side_effect=SupabaseAuthError("email_not_confirmed"))
+    def test_unconfirmed_email_is_told_to_confirm(self, _mock):
+        response = self._login()
+        self.assertContains(response, "Confirm your email first")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @patch("accounts.views.sign_in")
+    def test_off_site_next_is_ignored(self, mock_sign_in):
+        mock_sign_in.return_value = _supabase_user()
+        self._login()
+        profile = Profile.objects.get(supabase_uid=SUPA_UID)
+        profile.onboarding_completed = True
+        profile.save()
+        self.client.post(reverse("accounts:logout"))
+        cache.clear()
+        self.assertRedirects(self._login(next="https://evil.example/"), reverse("dashboard"))
+
+    @patch("accounts.supabase_auth.sign_in")
+    @patch("accounts.supabase_auth._request")
+    def test_legacy_password_moves_to_supabase_on_first_login(self, mock_request, mock_inner_sign_in):
+        legacy = User.objects.create_user(username="olduser", email="old@example.com", password="a-strong-pass-123")
+        Transaction.objects.create(user=legacy, kind="expense", amount=Decimal("5.00"), occurred_on=date(2026, 1, 1))
+        mock_request.return_value = {"id": SUPA_UID}
+        mock_inner_sign_in.return_value = _supabase_user(email="old@example.com")
+
+        response = self._login(email="olduser")
+        self.assertRedirects(response, reverse("accounts:onboarding"))
+        legacy.refresh_from_db()
+        self.assertFalse(legacy.has_usable_password())
+        self.assertEqual(str(legacy.profile.supabase_uid), SUPA_UID)
+        create = mock_request.call_args_list[0]
+        self.assertEqual(create.args[:2], ("POST", "/admin/users"))
+        self.assertEqual(create.args[2]["email"], "old@example.com")
+        self.assertIs(create.args[2]["email_confirm"], False)
+        self.assertTrue(create.kwargs["admin"])
+        self.assertEqual(mock_request.call_args_list[1].args[:2], ("POST", "/resend"))
+
+        # Next time the same person signs in through Supabase and lands on
+        # the same Finovate user, with their records intact.
+        self.client.post(reverse("accounts:logout"))
+        cache.clear()
+        with patch("accounts.views.sign_in", return_value=_supabase_user(email="old@example.com")):
+            self._login(email="old@example.com")
+        self.assertEqual(User.objects.count(), 1)
+        self.assertEqual(Transaction.objects.filter(user=legacy).count(), 1)
+
+    @patch("accounts.supabase_auth.sign_in")
+    @patch("accounts.supabase_auth._request")
+    def test_legacy_account_already_listed_in_supabase_gets_its_password_set(self, mock_request, mock_inner_sign_in):
+        legacy = User.objects.create_user(username="olduser", email="old@example.com", password="a-strong-pass-123")
+        legacy.profile.supabase_uid = SUPA_UID
+        legacy.profile.save()
+        mock_inner_sign_in.return_value = _supabase_user(email="old@example.com")
+        self._login(email="old@example.com")
+        method, path = mock_request.call_args.args[:2]
+        self.assertEqual((method, path), ("PUT", f"/admin/users/{SUPA_UID}"))
+        legacy.refresh_from_db()
+        self.assertFalse(legacy.has_usable_password())
+
+    @patch("accounts.supabase_auth.sign_in", side_effect=SupabaseAuthError("email_not_confirmed"))
+    @patch("accounts.supabase_auth._request", return_value={"id": SUPA_UID})
+    def test_unconfirmed_legacy_email_keeps_the_old_password_and_is_not_marked_verified(self, _request, _sign_in):
+        legacy = User.objects.create_user(username="olduser", email="old@example.com", password="a-strong-pass-123")
+        response = self._login(email="olduser")
+        self.assertRedirects(response, reverse("accounts:onboarding"))
+        legacy.refresh_from_db()
+        self.assertTrue(legacy.has_usable_password())
+        self.assertFalse(legacy.profile.email_verified)
+        self.assertEqual(str(legacy.profile.supabase_uid), SUPA_UID)
+
+    @patch("accounts.views.sign_in", side_effect=SupabaseAuthError("invalid_credentials"))
+    def test_legacy_account_with_the_wrong_password_is_refused(self, _mock):
+        User.objects.create_user(username="olduser", email="old@example.com", password="a-strong-pass-123")
+        response = self._login(email="old@example.com", password="wrong")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(SUPABASE_SERVICE_KEY="")
+    def test_legacy_login_still_works_when_the_move_cannot_run(self):
+        legacy = User.objects.create_user(username="olduser", email="old@example.com", password="a-strong-pass-123")
+        self.assertRedirects(self._login(email="olduser"), reverse("accounts:onboarding"))
+        legacy.refresh_from_db()
+        self.assertTrue(legacy.has_usable_password())
+
+    @patch("accounts.views.sign_in", side_effect=SupabaseAuthError("invalid_credentials"))
+    def test_auth0_account_cannot_be_entered_through_the_email_form(self, _mock):
+        profile, _ = sync_profile_from_claims({"sub": "auth0|x", "email": "x@example.com", "email_verified": True})
+        response = self._login(email=profile.user.username, password="")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)

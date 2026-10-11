@@ -224,6 +224,14 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_AGE = 60 * 60 * 8
 
+# --- Supabase Auth (email-and-password sign-in) --------------------------
+# The public key may be the publishable key or the legacy anon key. The
+# service key is server-side only and is used solely to carry a pre-Supabase
+# account's password across on its first login.
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_PUBLIC_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
 BANK_PROVIDER_API_KEY = os.environ.get("BANK_PROVIDER_API_KEY", "")
 BROKERAGE_PROVIDER_API_KEY = os.environ.get("BROKERAGE_PROVIDER_API_KEY", "")
 MESSAGING_PROVIDER_API_KEY = os.environ.get("MESSAGING_PROVIDER_API_KEY", "")

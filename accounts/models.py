@@ -77,6 +77,16 @@ class Profile(TimeStampedModel):
             "Finovate user."
         ),
     )
+    supabase_uid = models.UUIDField(
+        null=True,
+        blank=True,
+        unique=True,
+        help_text=(
+            "Supabase Auth user id for accounts that sign in with email and "
+            "password. Null for Auth0-only accounts. This id, never the "
+            "email, maps a Supabase sign-in to a Finovate user."
+        ),
+    )
     messaging_linked_at = models.DateTimeField(
         null=True,
         blank=True,

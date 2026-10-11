@@ -8,19 +8,23 @@
   <p class="field-error">Please wait a moment and try again.</p>
   {% endif %}
   {% if auth0_ready %}
-  <p class="page-subtitle">Auth0 is the recommended way to sign in. Finovate does not store your password when you use it.</p>
+  <p class="page-subtitle">Auth0 is the recommended way to sign in. Finovate does not store your password.</p>
   <form method="post" novalidate>
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ next }}">
     <button type="submit" class="button" style="width:100%;margin-top:18px;">Continue with Auth0 (recommended)</button>
   </form>
-  <details style="margin-top:18px;"{% if local_form.is_bound %} open{% endif %}>
-    <summary class="muted" style="cursor:pointer;">Or log in with a Finovate username and password</summary>
-    {% include "accounts/_local_login_form.html" %}
+  {% if email_ready %}
+  <details style="margin-top:18px;"{% if email_form.is_bound %} open{% endif %}>
+    <summary class="muted" style="cursor:pointer;">Or log in with email and password</summary>
+    {% include "accounts/_email_login_form.html" %}
   </details>
+  {% endif %}
+  {% elif email_ready %}
+  <p class="page-subtitle">Log in with your email and password. Finovate does not store your password.</p>
+  {% include "accounts/_email_login_form.html" %}
   {% else %}
-  <p class="page-subtitle">Log in with your Finovate username and password.</p>
-  {% include "accounts/_local_login_form.html" %}
+  <p class="page-subtitle">Sign-in isn't configured on this server.</p>
   {% endif %}
   <p class="muted">New here? <a class="text-link" href="{% url 'accounts:signup' %}">Create an account</a></p>
 </section>

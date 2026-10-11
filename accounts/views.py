@@ -5,7 +5,6 @@ from asgiref.sync import async_to_sync
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm
 from django.core.cache import cache
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -20,7 +19,7 @@ from assistant.models import MessagingLinkCode
 from budgets.services import build_budget_plan
 
 from .auth0 import apply_auth0_cookies, auth0_configured, get_auth0_client, logout_return_url
-from .forms import LocalSignUpForm, ManualSetupForm, OnboardingForm, ProfileSettingsForm, RegistrationForm
+from .forms import EmailLoginForm, EmailSignUpForm, ManualSetupForm, OnboardingForm, ProfileSettingsForm, RegistrationForm
 from .manual_setup import apply_manual_setup, initial_from_existing
 from .identity import (
     ACCOUNT_BLOCKED,
@@ -33,28 +32,75 @@ from .identity import (
     safe_next,
     sync_profile_from_claims,
 )
+from .supabase_auth import (
+    EMAIL_NOT_CONFIRMED,
+    INVALID_CREDENTIALS,
+    RATE_LIMITED,
+    WEAK_PASSWORD,
+    SupabaseAuthError,
+    legacy_user_for,
+    migrate_legacy_password,
+    profile_for_supabase_user,
+    sign_in,
+    sign_up,
+    supabase_configured,
+)
 from .verification import resend_verification_email
 
 logger = logging.getLogger(__name__)
 
 
+_EMAIL_ERRORS = {
+    INVALID_CREDENTIALS: "That email and password don't match an account.",
+    EMAIL_NOT_CONFIRMED: "Confirm your email first. Use the link Supabase sent when you signed up.",
+    WEAK_PASSWORD: "Choose a stronger password.",
+    RATE_LIMITED: "Too many attempts. Please wait a moment and try again.",
+}
+_EMAIL_UNAVAILABLE = "Email sign-in is unavailable right now. Please try again."
+
+
+def _session_login(request, user):
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+
+
 def signup(request):
-    """Auth0 is the recommended way to register. A local Finovate account
-    (username and password) is offered beside it, and is the only option
-    when Auth0 isn't configured on this server.
+    """Auth0 is the recommended way to register. Email-and-password
+    registration through Supabase Auth is offered beside it. Finovate
+    stores no password either way.
     """
     if request.user.is_authenticated:
         return redirect(destination_for(request.user))
     auth0_ready = auth0_configured()
+    email_ready = supabase_configured()
     nxt = safe_next(request.POST.get("next") or request.GET.get("next"))
     form = RegistrationForm() if auth0_ready else None
-    local_form = LocalSignUpForm()
+    email_form = EmailSignUpForm() if email_ready else None
     status = 200
     rate_limited = False
+    use_email = email_ready and (request.POST.get("method") == "email" or not auth0_ready)
     if request.method == "POST":
         if _rate_limited(request, "signup", limit=10, period=600):
             rate_limited, status = True, 429
-        elif auth0_ready and request.POST.get("method") != "local":
+        elif use_email:
+            email_form = EmailSignUpForm(request.POST)
+            if email_form.is_valid():
+                data = email_form.cleaned_data
+                try:
+                    supabase_user = sign_up(data["email"], data["password1"], data["name"])
+                except SupabaseAuthError as exc:
+                    email_form.add_error(None, _EMAIL_ERRORS.get(exc.code, _EMAIL_UNAVAILABLE))
+                else:
+                    if supabase_user is None:
+                        messages.success(
+                            request,
+                            "Check your email for a confirmation link, then log in. "
+                            "If you already have an account, log in instead.",
+                        )
+                        return redirect("accounts:login")
+                    profile = profile_for_supabase_user(supabase_user)
+                    _session_login(request, profile.user)
+                    return redirect(destination_for(profile.user, nxt))
+        elif auth0_ready:
             form = RegistrationForm(request.POST)
             if form.is_valid():
                 request.session["auth0_pending"] = {
@@ -68,19 +114,14 @@ def signup(request):
                     login_hint=form.cleaned_data["email"],
                     next_url=nxt,
                 )
-        else:
-            local_form = LocalSignUpForm(request.POST)
-            if local_form.is_valid():
-                user = local_form.save()
-                login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-                return redirect(destination_for(user, nxt))
     return render(
         request,
         "accounts/signup.html",
         {
             "form": form,
-            "local_form": local_form,
+            "email_form": email_form,
             "auth0_ready": auth0_ready,
+            "email_ready": email_ready,
             "rate_limited": rate_limited,
             "next": nxt,
         },
@@ -88,30 +129,63 @@ def signup(request):
     )
 
 
+def _email_login(request, form):
+    """Sign in through Supabase. An account that predates Supabase is
+    checked against its old Django password and moved across on the spot.
+    Returns the Finovate user, or None after adding an error to the form.
+    """
+    identifier = form.cleaned_data["email"].strip()
+    password = form.cleaned_data["password"]
+    legacy = legacy_user_for(identifier, password)
+    if legacy is not None:
+        # The old password was correct, so the person is who they say they
+        # are whether or not the move to Supabase can finish just now.
+        if not migrate_legacy_password(legacy, password) and legacy.profile.supabase_uid:
+            messages.info(
+                request,
+                "Check your email for a confirmation link from Supabase to finish moving your login.",
+            )
+        return legacy
+    if "@" not in identifier:
+        form.add_error(None, _EMAIL_ERRORS[INVALID_CREDENTIALS])
+        return None
+    try:
+        supabase_user = sign_in(identifier, password)
+    except SupabaseAuthError as exc:
+        form.add_error(None, _EMAIL_ERRORS.get(exc.code, _EMAIL_UNAVAILABLE))
+        return None
+    return profile_for_supabase_user(supabase_user).user
+
+
 def login_view(request):
     nxt = safe_next(request.POST.get("next") or request.GET.get("next"))
     if request.user.is_authenticated:
         return redirect(destination_for(request.user, nxt))
     auth0_ready = auth0_configured()
-    local_form = AuthenticationForm(request)
+    email_ready = supabase_configured()
+    email_form = EmailLoginForm() if email_ready else None
     status = 200
     rate_limited = False
+    use_email = email_ready and (request.POST.get("method") == "email" or not auth0_ready)
     if request.method == "POST":
         if _rate_limited(request, "login", limit=20, period=600):
             rate_limited, status = True, 429
-        elif auth0_ready and request.POST.get("method") != "local":
+        elif use_email:
+            email_form = EmailLoginForm(request.POST)
+            if email_form.is_valid():
+                user = _email_login(request, email_form)
+                if user is not None:
+                    _session_login(request, user)
+                    return redirect(destination_for(user, nxt))
+        elif auth0_ready:
             return _begin_auth0(request, next_url=nxt)
-        else:
-            local_form = AuthenticationForm(request, data=request.POST)
-            if local_form.is_valid():
-                login(request, local_form.get_user())
-                return redirect(destination_for(local_form.get_user(), nxt))
     return render(
         request,
         "accounts/login.html",
         {
-            "local_form": local_form,
+            "email_form": email_form,
             "auth0_ready": auth0_ready,
+            "email_ready": email_ready,
             "rate_limited": rate_limited,
             "next": nxt,
         },
@@ -123,7 +197,7 @@ def auth0_login(request):
     if request.user.is_authenticated:
         return redirect(destination_for(request.user, safe_next(request.GET.get("next"))))
     if get_auth0_client() is None:
-        messages.error(request, "Auth0 isn't configured on this server. Use a Finovate account instead.")
+        messages.error(request, "Auth0 isn't configured on this server. Use email sign-in instead.")
         return redirect("accounts:login")
     screen_hint = request.GET.get("screen_hint") if request.GET.get("screen_hint") in {"signup", "login"} else None
     return _begin_auth0(
@@ -141,7 +215,7 @@ def auth0_callback(request):
     """
     client = get_auth0_client()
     if client is None:
-        messages.error(request, "Auth0 isn't configured on this server. Use a Finovate account instead.")
+        messages.error(request, "Auth0 isn't configured on this server. Use email sign-in instead.")
         return redirect("accounts:login")
 
     try:
@@ -204,7 +278,7 @@ def _auth_failure(request, exc):
 def _begin_auth0(request, screen_hint=None, login_hint=None, next_url="", max_age=None):
     client = get_auth0_client()
     if client is None:
-        messages.error(request, "Auth0 isn't configured on this server. Use a Finovate account instead.")
+        messages.error(request, "Auth0 isn't configured on this server. Use email sign-in instead.")
         return redirect("accounts:login")
     authorization_params = {}
     if screen_hint:
