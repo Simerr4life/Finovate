@@ -23,7 +23,7 @@ from assistant.models import MessagingLinkCode
 from budgets.services import build_budget_plan
 
 from .auth0 import apply_auth0_cookies, auth0_configured, get_auth0_client, logout_return_url
-from .auth0_backup import upsert_from_auth0_event
+from .auth0_backup import reconcile_from_profiles, upsert_from_auth0_event
 from .forms import EmailLoginForm, EmailSignUpForm, ManualSetupForm, OnboardingForm, ProfileSettingsForm, RegistrationForm
 from .manual_setup import apply_manual_setup, initial_from_existing
 from .identity import (
@@ -512,6 +512,41 @@ def _action_secret(request):
     if header.lower().startswith("bearer "):
         return header[7:].strip()
     return (request.META.get("HTTP_X_FINOVATE_AUTH0_SECRET") or "").strip()
+
+
+def _bearer_secret(request):
+    header = request.META.get("HTTP_AUTHORIZATION", "")
+    if header.lower().startswith("bearer "):
+        return header[7:].strip()
+    return ""
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def auth0_backup_reconcile(request):
+    """Scheduled reconcile for Auth0UserBackup drift (Vercel Cron / ops).
+
+    Authenticated with CRON_SECRET via Authorization: Bearer. Vercel Cron
+    sends that header automatically when CRON_SECRET is set on the project.
+    """
+    expected = (settings.CRON_SECRET or "").strip()
+    if not expected:
+        return JsonResponse({"error": "not_configured"}, status=503)
+    if _bearer_secret(request) != expected:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+    if _rate_limited(request, "auth0-reconcile", limit=12, period=60):
+        return JsonResponse({"error": "rate_limited"}, status=429)
+    try:
+        limit = int(request.GET.get("limit") or request.POST.get("limit") or 500)
+    except (TypeError, ValueError):
+        limit = 500
+    limit = max(1, min(limit, 2000))
+    try:
+        stats = reconcile_from_profiles(limit=limit)
+    except Exception:
+        logger.warning("auth0 backup reconcile failed")
+        return JsonResponse({"error": "reconcile_failed"}, status=503)
+    return JsonResponse({"ok": True, **stats})
 
 
 @require_POST

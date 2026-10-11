@@ -50,12 +50,18 @@ of Auth0 credentials or password hashes.
 | `APP_BASE_URL` | Yes | Callback origin (`/callback`, logout `/`) |
 | `AUTH0_MGMT_CLIENT_ID` / `AUTH0_MGMT_CLIENT_SECRET` | Recommended | Resend verification + authoritative `email_verified` refresh |
 | `AUTH0_ACTION_SECRET` | Recommended | Shared secret for Post-User-Registration webhook |
+| `CRON_SECRET` | Recommended on Vercel | Bearer for `/accounts/auth0/hooks/reconcile/` (Vercel Cron) |
 | `DATABASE_URL` or `SUPABASE_DB_URL` | Production | Hosted Postgres (Supabase) where `accounts_auth0userbackup` lives |
 | `SUPABASE_URL` / keys | Optional | Email/password Supabase Auth path (unchanged); not used for backup writes |
 
 Never put Management secrets, Action secrets, or service-role keys in browser code.
 
 ## Auth0 dashboard configuration (required outside this repo)
+
+Automation: `scripts/configure_auth0_dashboard.py` applies items 2–4 below once
+Management API credentials can obtain a token. Finovate already has
+`AUTH0_ACTION_SECRET` and `CRON_SECRET` on Vercel; Vercel Cron hits the
+reconcile hook every 6 hours (item 5).
 
 ### 1. Application URLs
 
@@ -133,7 +139,14 @@ Set the same value in Finovate as `AUTH0_ACTION_SECRET`.
 
 ### 5. Scheduled reconciliation
 
-Run periodically (cron / platform scheduler):
+Production uses Vercel Cron (`vercel.json`) every 6 hours:
+
+```text
+GET/POST https://finovate.biz/accounts/auth0/hooks/reconcile/
+Authorization: Bearer <CRON_SECRET>
+```
+
+Locally or as a one-off:
 
 ```bash
 python manage.py reconcile_auth0_backups --limit 500
@@ -141,6 +154,19 @@ python manage.py reconcile_auth0_backups --limit 500
 
 This creates missing backup rows from `Profile.auth0_sub` and retries
 `pending` / `failed` syncs.
+
+### 6. Apply tenant settings via Management API
+
+When `AUTH0_MGMT_CLIENT_*` and `AUTH0_ACTION_SECRET` are available:
+
+```bash
+python scripts/configure_auth0_dashboard.py
+```
+
+That script sets verification email `resultUrl`, ensures M2M scopes
+(`read:users`, `update:users`, `create:user_tickets`), and creates /
+deploys / binds the Post-User-Registration Action that POSTs to
+`/accounts/auth0/hooks/signup/`.
 
 ## Security notes
 

@@ -213,6 +213,9 @@ AUTH0_MGMT_CLIENT_SECRET = os.environ.get("AUTH0_MGMT_CLIENT_SECRET", "")
 # Shared secret for the Auth0 Post-User-Registration Action webhook.
 # Server-side only. Empty disables /accounts/auth0/hooks/signup/.
 AUTH0_ACTION_SECRET = os.environ.get("AUTH0_ACTION_SECRET", "")
+# Vercel Cron (and manual ops) Authorization bearer for backup reconcile.
+# Empty disables /accounts/auth0/hooks/reconcile/.
+CRON_SECRET = os.environ.get("CRON_SECRET", "")
 _app_base = os.environ.get("APP_BASE_URL", "").strip()
 if not _app_base and ON_VERCEL:
     _app_base = "https://finovate.biz"

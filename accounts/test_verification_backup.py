@@ -29,6 +29,7 @@ from .verification import apply_authoritative_verification, mark_verified_from_t
     AUTH0_MGMT_CLIENT_ID="",
     AUTH0_MGMT_CLIENT_SECRET="",
     AUTH0_ACTION_SECRET="action-secret",
+    CRON_SECRET="cron-secret",
     APP_BASE_URL="http://127.0.0.1:8000",
 )
 class Auth0VerificationLifecycleTests(TestCase):
@@ -225,6 +226,7 @@ class Auth0VerificationLifecycleTests(TestCase):
     AUTH0_CLIENT_SECRET="secret",
     AUTH0_SECRET="test-secret",
     AUTH0_ACTION_SECRET="action-secret",
+    CRON_SECRET="cron-secret",
     APP_BASE_URL="http://127.0.0.1:8000",
 )
 class Auth0UserBackupTests(TestCase):
@@ -377,3 +379,27 @@ class Auth0UserBackupTests(TestCase):
         row = Auth0UserBackup.objects.get(auth0_user_id="auth0|orphan")
         self.assertTrue(row.email_verified)
         self.assertEqual(row.sync_status, Auth0UserBackup.SyncStatus.SYNCED)
+
+    def test_reconcile_hook_requires_cron_secret(self):
+        response = self.client.get(reverse("accounts:auth0_backup_reconcile"))
+        self.assertEqual(response.status_code, 401)
+
+    def test_reconcile_hook_runs_with_bearer(self):
+        user = User.objects.create(username="auth0_cron")
+        user.set_unusable_password()
+        user.email = "cron@example.com"
+        user.save()
+        profile = user.profile
+        profile.auth0_sub = "auth0|cron"
+        profile.email_verified = False
+        profile.save()
+        Auth0UserBackup.objects.filter(auth0_user_id="auth0|cron").delete()
+        response = self.client.get(
+            reverse("accounts:auth0_backup_reconcile"),
+            HTTP_AUTHORIZATION="Bearer cron-secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["ok"])
+        self.assertGreaterEqual(body["created"], 1)
+        self.assertTrue(Auth0UserBackup.objects.filter(auth0_user_id="auth0|cron").exists())

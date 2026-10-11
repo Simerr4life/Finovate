@@ -22,4 +22,9 @@ urlpatterns = [
     path("auth0/login/", views.auth0_login, name="auth0_login"),
     path("auth0/callback/", views.auth0_callback, name="auth0_callback"),
     path("auth0/hooks/signup/", views.auth0_signup_webhook, name="auth0_signup_webhook"),
+    path(
+        "auth0/hooks/reconcile/",
+        views.auth0_backup_reconcile,
+        name="auth0_backup_reconcile",
+    ),
 ]

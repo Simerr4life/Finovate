@@ -5,5 +5,11 @@
     "finovate/wsgi.py": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/accounts/auth0/hooks/reconcile/",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }
