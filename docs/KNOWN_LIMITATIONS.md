@@ -6,11 +6,11 @@
 
 | # | Component | Current behavior | Expected | Impact | Severity | Depends on | Recommended fix | Blocks |
 |---|---|---|---|---|---|---|---|---|
-| K1 | Hackathon rules | Official Hacker Guide not reviewed (network blocked) | Every rule checked | Unknown eligibility risks, wrong limits | Critical | Guide access | Paste or export the guide; update [HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md) | Submission |
+| K1 | Hackathon deadline | Guide reviewed: everything is due on Devpost by **9:00 AM EDT, Sunday October 11**, plus the Google Form | On-time submission | Ineligible if late | Critical | Team | Submit now ([HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md)) | Submission |
 | K2 | Demo video | Not recorded | Uploaded video link | Probably required | Critical | Team | Record using [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | Submission |
 | K3 | Judge access | Website sign-in needs Auth0 or Supabase credentials; with neither, login says "Sign-in isn't configured." There is no local password login by design | Judges can sign in | Judges may not get past the landing page | Critical | Configured deployment or credentials | Provide a working deployed URL with Auth0 enabled, plus a judge test account or open sign-up; or demo from a presenter laptop | Demo |
 | K4 | Live deployment | Vercel project exists; URL, health, and env not verifiable here | A known-good URL | No live link to submit | Critical | Vercel access | Open the production URL, sign in, and run [DEMO_CHECKLIST.md](DEMO_CHECKLIST.md) | Submission (if required) |
-| K5 | GoDaddy track | No code or infrastructure evidence of GoDaddy use (only the `finovate.biz` string) | Demonstrable GoDaddy product use | Sponsor claim unsupported | Critical *for that track* | Registrar/DNS access | Provide proof ([THIRD_PARTY_SERVICES.md §3](THIRD_PARTY_SERVICES.md#3-godaddy)) or drop the track | Track eligibility |
+| K5 | GoDaddy Registry challenge | The challenge is "Best Domain Name from GoDaddy Registry". The app is configured for `finovate.biz` (`.biz` is a GoDaddy Registry TLD), but registration couldn't be verified from the build environment | A registered domain, ideally serving the app | Challenge entry unsupported if unregistered | Critical *for that challenge* | Registrar access | Confirm registration ([THIRD_PARTY_SERVICES.md §3](THIRD_PARTY_SERVICES.md#3-godaddy-registry-domain)) | Challenge eligibility |
 
 ## High
 

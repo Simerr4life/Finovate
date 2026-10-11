@@ -1,102 +1,85 @@
 # Hacklanta 2026 — Requirements and Compliance Checklist
 
-**Prepared:** 2026-10-11 · **Project:** Finovate · **Team:** Turn It Off and On Again
+**Source:** the official Hacklanta 2026 Hacker Guide (Notion export provided by the team on 2026-10-11). Rules excerpt: [reference/hacker-guide-excerpt.md](reference/hacker-guide-excerpt.md). Updated 2026-10-11 08:30 EDT.
 
-## ⚠️ Read this first: the official guide could not be read
+## ⏰ Deadline
 
-The authoritative source is the Hacklanta 2026 Hacker Guide:
-`https://aluminum-soprano-222.notion.site/Hacklanta-2026-Hacker-Guide-3b81ccc4ed5c80f4b717c0ccc4b5df54`
+> **"Hacking ends at 9:00 AM on SUNDAY OCTOBER 11th. ALL MATERIALS MUST BE SUBMITTED BY THE END OF HACKING TIME. NO EXCEPTIONS!"** — Hacker Guide, *Submissions*
 
-During preparation, the documentation environment's network policy **blocked** `notion.site`, `hacklanta.dev`, and `devpost.com` (HTTP 403 at the proxy / DNS failure). No copy of the guide exists in the repository. Therefore:
-
-- **No requirement below is marked "Pass" on the basis of the guide.** Every guide-derived row is **Unverified** until someone with access fills in the exact wording.
-- Rows are organized by the categories the team asked to be extracted. The *"What Finovate can show"* column is real evidence from the codebase; it is not a claim that the rule exists or is satisfied.
-- **Action for the team (highest priority):** open the guide, paste each rule into the *Requirement* column, and update *Status*. Or export the Notion page (Markdown/PDF) into `docs/reference/` and ask for this file to be regenerated.
-
-### Facts from public secondary sources (not the guide)
-
-A web search returned the following about Hacklanta '26. Treat them as **unconfirmed** until checked against the guide:
-
-| Fact | Secondary source | Confidence |
-|---|---|---|
-| Event runs **October 9–11, 2026** at Georgia State University, Atlanta | Search-result summary of an event listing | Medium |
-| Four main tracks plus sponsor challenges | Same | Medium |
-| A separate application at hacklanta.dev is required; Devpost registration alone does not make a participant eligible to submit or win | Same | Medium |
-| Teams of up to **four** members | Same | Medium |
-
-**If the October 9–11 dates are right, the submission deadline is today or has passed.** Confirm the exact deadline time immediately.
-
-## Status legend
-
-| Status | Meaning |
+| Event (guide, *Summary*) | Time (EDT) |
 |---|---|
-| **Pass** | Evidence shows the requirement is met *and* the requirement text was confirmed in the guide |
-| **Likely pass** | Finovate has strong evidence for a requirement that is standard or stated by the team, but the guide wording is unconfirmed |
-| **Partial** | Some evidence; gaps listed |
-| **Fail** | Evidence shows it is not met |
-| **Unverified** | Cannot be assessed without the guide or an external system |
+| Hacking period | Fri Oct 9, 8:30 PM → **Sun Oct 11, 9:00 AM** |
+| Judging Expo | Sun Oct 11, 9:30–11:30 AM, Student Center East State Ballroom |
+| Closing Ceremony | Sun Oct 11, 12:45 PM, State Ballroom |
+
+## Track selection
+
+Guide: *"Teams may submit to only **ONE** main track and a **MAXIMUM of 3** side challenges."*
+
+| Choice | Official name and prompt | Finovate fit | Status |
+|---|---|---|---|
+| **Main track** | **Fintech** — "rethink how money moves: payments, budgeting, investing, and the tools that make finances easier to manage." | Budgeting, savings planning, round-ups, simulated investing | ✅ Strong fit |
+| Side challenge 1 | **MLH: Best Use of Auth0** | Universal Login, verification gate, Management API, Action webhook, API token validation | 🟠 Implemented and tested with mocks; show a live login in the demo |
+| Side challenge 2 | **Photon: Agents in iMessage** — "Build an agent that lives in iMessage using Photon. Projects must integrate Spectrum, Photon's open source SDK." | `spectrum/` adapter built on `spectrum-ts` with the iMessage provider; confirmation-gated assistant | 🟠 Meets "integrate Spectrum"; live iMessage not verified here. The linked "Photon Guidelines" page was not in the export |
+| Side challenge 3 | **MLH: Best Domain Name from GoDaddy Registry** | App configured for **finovate.biz** (`.biz` is a GoDaddy Registry TLD) | ⚠️ Registration not verifiable from the build environment; confirm the domain is registered |
+| Not eligible | Shock Tracker: Zero Data ("no accounts, tracking, profiles, or stored personal info") | Finovate requires accounts | ✗ Do not select |
 
 ## Requirements matrix
 
-Columns: requirement · source · mandatory? · what Finovate must demonstrate · current status · evidence · remaining work · priority. "Owner" and "Deadline" are blank where the repository does not say.
+Status: **Pass** (evidence meets the rule) · **Partial** · **Fail** (not done yet) · **Team** (only the team can confirm).
 
-### A. Eligibility and registration
+### What to build (guide, *Requirements → What to Build*)
 
-| # | Requirement (category) | Source | Mandatory? | What Finovate must demonstrate | Status | Evidence | Remaining work | Priority |
-|---|---|---|---|---|---|---|---|---|
-| A1 | Team size limit | Guide — *not accessed*; secondary source says ≤ 4 | Unverified | Team roster within the limit | Unverified | Team name given by the team; member list not in repo | List members and confirm count | **P0** |
-| A2 | Every member registered/accepted (hacklanta.dev application) | Secondary source | Likely mandatory | Each member accepted | Unverified | None in repo | Each member confirms acceptance | **P0** |
-| A3 | Project created during the event / original work rules | Guide — not accessed | Unverified | Commit history within the hacking window | Likely pass (unverified) | All 49 commits are dated 2026-10-10 17:01 to 2026-10-11 (EDT), inside the reported event dates. The first commit ("Initial Push") already contains a large codebase, so its origin should be explained if asked | Read the rule. If pre-event work is allowed only with disclosure, disclose it | **P0** |
-| A4 | Ownership / IP of submitted work | Guide — not accessed | Unverified | Team owns the code; third-party code is licensed | Unverified | Dependencies are open-source packages (see [THIRD_PARTY_SERVICES.md](THIRD_PARTY_SERVICES.md)); the repo has **no LICENSE file** | Confirm the rule; add a license if required | P1 |
+| # | Requirement (guide wording or summary) | Mandatory | Finovate evidence | Status | Remaining work | Priority |
+|---|---|---|---|---|---|---|
+| R1 | "An original, working project built during the official Hacklanta hacking period" | Yes | All 49 commits dated Oct 10 17:01 EDT – Oct 11 (inside Fri 8:30 PM – Sun 9:00 AM); 381 passing tests | Pass | Be ready to explain the large first commit ("Initial Push") | P0 |
+| R2 | Fits a track or challenge | Yes | Fintech | Pass | — | — |
+| R3 | Open-source libraries, APIs, frameworks, AI tools, starter templates allowed; **"Disclose anything that existed before Hacklanta."** | Yes | Disclosure section in [SUBMISSION.md](SUBMISSION.md#disclosure-built-before-hacklanta--not-ours) (Figma Make layout, libraries, APIs, dataset, AI assistants) | Pass (text ready) | Paste into Devpost | **P0** |
+| R4 | "The main design, development, and integration must happen during the event." | Yes | Commit history | Team | Team confirms | P0 |
+| R5 | Not a previously completed or reused project; must not misrepresent how it was built | Yes | Disclosure is honest; investing labeled simulated | Team | Team confirms | P0 |
 
-### B. Submission materials
+### What to submit (guide, *Requirements → What to Submit* and *Submission Instructions*)
 
-| # | Requirement (category) | Source | Mandatory? | What Finovate must demonstrate | Status | Evidence | Remaining work | Priority |
-|---|---|---|---|---|---|---|---|---|
-| B1 | Submission platform and procedure (likely Devpost) | Secondary source mentions Devpost | Unverified | A completed submission entry | Unverified | — | Confirm the platform; submit before the deadline | **P0** |
-| B2 | Project title + short and long description, character limits | Guide — not accessed | Unverified | Text within limits | Partial | Ready text in short/medium/extended forms with counts: [SUBMISSION.md](SUBMISSION.md) | Trim to the official limits once known | **P0** |
-| B3 | Public code repository link | Guide — not accessed | Unverified | Accessible repo | Partial | GitHub remote `Simerr4life/Finovate` exists; visibility (public/private) not verified | Confirm the repo is accessible to judges; merge final work to the default branch | **P0** |
-| B4 | Demo video (length, hosting) | Guide — not accessed | Unverified | Video within limit | **Fail (not yet made)** | Script ready: [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | Record, upload, and add the link | **P0** |
-| B5 | Live deployment / demo link | Guide — not accessed | Unverified | Working URL | Unverified | `vercel.json`; a Vercel project named `finovate` exists; deployments and domains could not be read (403) | Confirm a working URL and that judges can sign in | P0 |
-| B6 | Track selection at submission (Finance + sponsor tracks) | Guide — not accessed | Unverified | Tracks chosen correctly | Unverified | Track rationale: [JUDGE_READINESS.md](JUDGE_READINESS.md) | Select tracks on the platform | **P0** |
-| B7 | Screenshots / images | Guide — not accessed | Unverified | Real screenshots | Likely pass | 27 real captures: [SCREENSHOT_CATALOG.md](SCREENSHOT_CATALOG.md) | Upload the chosen images | P1 |
+| # | Requirement | Mandatory | Evidence | Status | Remaining work | Priority |
+|---|---|---|---|---|---|---|
+| S1 | Submit through **Devpost** (hacklanta.devpost.com) by 9:00 AM | Yes | — | **Fail (not yet)** | Submit now | **P0** |
+| S2 | Project title and description; **write-up outlining ideation and development process**, on the Devpost page | Yes | [SUBMISSION.md → Devpost write-up](SUBMISSION.md#devpost-write-up-paste-into-the-description-covers-ideation-and-development-process) | Pass (text ready) | Paste | **P0** |
+| S3 | The problem and who it serves | Yes | Write-up *Inspiration*, *Who it's for* | Pass | — | — |
+| S4 | Team roster (**max 4**) | Yes | Two GitHub handles in history | **Team** | Enter all members | **P0** |
+| S5 | Main track and any side challenges | Yes | Table above | Pass | Select on Devpost | **P0** |
+| S6 | **Public** GitHub repo with all the code and a useful README | Yes | README rewritten; repo `Simerr4life/Finovate` | Partial | **Make the repo public.** Merge `claude/codebase-audit-fixes` into the default branch so the README and fixes are what judges see | **P0** |
+| S7 | Working demo link **or** clear run instructions | Yes (either) | README *Run it locally*; [USER_GUIDE.md §1](USER_GUIDE.md#1-getting-access) | Pass (instructions) | Add the live link only if verified | P0 |
+| S8 | **2–3 minute** demo video, **public** (YouTube/Google Drive, etc.) | Yes | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) (video version) | **Fail (not recorded)** | Record, upload as Public/Anyone-with-link, paste the URL | **P0** |
+| S9 | Technologies, APIs, datasets, sponsor tools used | Yes | "Built with" + disclosure in SUBMISSION | Pass | Paste | P0 |
+| S10 | Disclosure of anything made before Hacklanta | Yes | See R3 | Pass | Paste | P0 |
+| S11 | Test credentials or special instructions for judges | If applicable | "Instructions for judges" in SUBMISSION | Pass | Add judge test-account details if you deploy with Auth0 | P1 |
+| S12 | **All links must stay accessible throughout judging** | Yes | — | Team | Don't make the repo or video private; keep any deployment up through 11:30 AM | P0 |
+| S13 | **Google Form** with Devpost link, project name, team members' details, track, challenge(s); "You MUST submit this form and upload your project on Devpost" | Yes | Form link in Discord | **Fail (not yet)** | One member submits after Devpost | **P0** |
+| S14 | Only **one** member submits Devpost and the form | Yes | — | Team | Pick the submitter | P0 |
 
-### C. Judging and presentation
+### Judging (guide, *Judging*)
 
-| # | Requirement (category) | Source | Mandatory? | What Finovate must demonstrate | Status | Evidence | Remaining work | Priority |
-|---|---|---|---|---|---|---|---|---|
-| C1 | Judging criteria and weights | Guide — not accessed | — | Coverage of each criterion | Unverified | A criteria map against *common* hackathon criteria (labeled as such): [JUDGE_READINESS.md](JUDGE_READINESS.md) | Replace with the official criteria | **P0** |
-| C2 | Live presentation / expo format and time limit | Guide — not accessed | Unverified | Demo fits the slot | Partial | 60 s / 3 min / 5 min scripts | Choose the script that matches the official slot | P0 |
-| C3 | Judging schedule | Guide — not accessed | Unverified | Team present on time | Unverified | — | Record the time and location | P0 |
+| # | Item | Finovate preparation |
+|---|---|---|
+| J1 | Format: **3-minute pitch + 2-minute Q&A** at a table with 2 judges | 3-minute script and Q&A answers in [JUDGE_READINESS.md](JUDGE_READINESS.md) |
+| J2 | Criteria (sample questions): track prompt fit · polish of prototype/demo · presentation effectiveness · clear, compelling use case | Mapped in [JUDGE_READINESS.md](JUDGE_READINESS.md) |
+| J3 | Expo 9:30–11:30 AM; demoing earns 200 points | Have a laptop ready, signed in, with sample data |
 
-### D. Tracks
+### Conduct
 
-| # | Requirement (category) | Source | Mandatory? | What Finovate must demonstrate | Status | Evidence | Remaining work | Priority |
-|---|---|---|---|---|---|---|---|---|
-| D1 | **Finance track** expectations | Guide — not accessed | — | A finance product solving a real problem | Likely pass (substance) | Budgeting, imports, savings engine, goals, round-ups, simulated investing ([FEATURE_REFERENCE.md](FEATURE_REFERENCE.md)) | Map to the official track wording | P0 |
-| D2 | **Auth0** sponsor criteria | Guide — not accessed | Unverified | Real Auth0 use | Partial | Full Universal Login flow, callback, verification, Management API refresh, Post-Registration Action webhook, API token validation (`/api/me/`) — covered by mocked tests; **no live-tenant login was executed during documentation** | Do one recorded live login against the tenant; confirm the tenant is configured in production | **P0** |
-| D3 | **GoDaddy** sponsor criteria | Guide — not accessed | Unverified | Real GoDaddy product use | **Unverified / weak** | Only the domain string `finovate.biz` in `finovate/settings.py`. No GoDaddy API, DNS record, or registrar proof in the repo. DNS lookup of `finovate.biz` failed from this environment | Produce evidence (registrar account, DNS pointing to the deployment) or do not claim the track | **P0** |
-| D4 | **Photon** sponsor criteria | Guide — not accessed | Unverified | Real Photon Spectrum use | Partial | Signed webhook verification (`assistant/spectrum.py`), bridge endpoint, `spectrum/` adapter using `spectrum-ts` iMessage provider; in-process chat verified; **live iMessage round-trip not executed** | Record one live iMessage exchange | **P0** |
-
-### E. Rules on tools, data and safety
-
-| # | Requirement (category) | Source | Mandatory? | What Finovate must demonstrate | Status | Evidence | Remaining work | Priority |
-|---|---|---|---|---|---|---|---|---|
-| E1 | AI-generated code policy | Guide — not accessed | Unverified | Compliance and any required disclosure | Unverified | The repo contains AI-assistant config (`.cursor/`, `spectrum/CLAUDE.md`, `AGENTS.md`) and AI-co-authored commits | Read the policy; disclose AI use if required (draft text in [SUBMISSION.md](SUBMISSION.md#responsible-ai-and-financial-safety)) | **P0** |
-| E2 | Third-party APIs, libraries, assets | Guide — not accessed | Unverified | Allowed use, credited | Likely pass | [THIRD_PARTY_SERVICES.md](THIRD_PARTY_SERVICES.md) lists every service and library | Confirm nothing is disallowed | P1 |
-| E3 | Restrictions on financial apps, user data, simulated transactions | Guide — not accessed | Unverified | No real money movement; honest labeling; data protection | Likely pass (substance) | Investing simulated and labeled on every page; withdrawals refused; [SECURITY_AND_PRIVACY.md](SECURITY_AND_PRIVACY.md) | Confirm against the rule text | P1 |
-| E4 | Code of conduct | Guide — not accessed | Unverified | — | Unverified | — | Read it | P2 |
+| # | Item | Status |
+|---|---|---|
+| C1 | MLH Code of Conduct applies | Team |
+| C2 | Discord is the required communication channel (Google Form link announced there) | Team |
 
 ## Items that could make the project ineligible
 
-1. **Missing submission before the deadline** (B1/B4): the video is not recorded yet, and the deadline may be today.
-2. **Registration** (A2): any member not accepted through hacklanta.dev may make the team ineligible, according to the secondary source.
-3. **Pre-existing work** (A3): if the rules require that the project be started at the event, the commit history must be checked.
-4. **Sponsor claims without evidence** (D3 GoDaddy especially): claiming a sponsor track without real use can be disqualifying or simply wasted. Only claim what can be shown.
-5. **Undisclosed AI use** (E1), if disclosure is required.
+1. **Missing the 9:00 AM Devpost submission** (S1), or the **Google Form** (S13).
+2. **Private repo or private video** (S6, S8, S12).
+3. **No video** (S8).
+4. **Missing disclosure** of pre-existing work (R3): the Figma Make layout, dataset, and AI tools.
+5. **More than one main track or more than three challenges** (track rule).
 
-## Recommendations (ours, not hackathon rules)
+## Sponsor-challenge evidence
 
-- Use the 3-minute demo as the default; it shows budgeting → plan → goals → round-ups → simulated investing → chat.
-- Show the Auth0 login live or on video. It is the strongest sponsor evidence besides Photon.
-- Pre-record a fallback video in case Wi-Fi or a provider fails during judging.
+Details: [THIRD_PARTY_SERVICES.md](THIRD_PARTY_SERVICES.md). For GoDaddy, the MLH challenge judges the domain name. Confirm `finovate.biz` is registered (GoDaddy Registry operates `.biz`) and, ideally, that it points to the deployed app.

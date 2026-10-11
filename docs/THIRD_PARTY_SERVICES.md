@@ -3,15 +3,17 @@
 **Reviewed:** 2026-10-11, from the repository at branch `claude/codebase-audit-fixes`.
 **Rule followed:** a service counts as integrated only if code calls it **and** there is evidence it works. An installed SDK, a configured variable name, or a mention in a comment does not count.
 
+**Official challenges entered (Hacker Guide, max 3):** MLH: Best Use of Auth0 · Photon: Agents in iMessage (*"Projects must integrate Spectrum, Photon's open source SDK"*) · MLH: Best Domain Name from GoDaddy Registry.
+
 Status legend: ✅ verified · 🟡 implemented, not live-tested · 🟠 partial · 🧪 simulated · 📝 planned · ⛔ blocked.
 
 ## Summary
 
-| Service | Role in Finovate | Code integration | Live evidence collected here | Sponsor-track readiness |
+| Service | Role in Finovate | Code integration | Live evidence collected here | Challenge readiness |
 |---|---|---|---|---|
 | **Auth0** | Primary identity provider for the website and API | Deep (login, callback, logout, verification, Management API, Action webhook, API token validation) | ⛔ No tenant credentials in this environment; covered by mocked tests | 🟠 Strong code; needs one live login on record |
 | **Photon Spectrum** | iMessage transport for the chat assistant | Signed webhook + bridge in Django; `spectrum-ts` adapter in `spectrum/` | ✅ Bridge and assistant exercised in-process; ⛔ no live iMessage round-trip | 🟠 Strong code; needs one live iMessage exchange on record |
-| **GoDaddy** | Reportedly the registrar for `finovate.biz` | **None** (only the domain string in settings) | ⛔ DNS lookup failed from this environment; no registrar evidence in repo | ⚠️ **Unverified, do not claim without proof** |
+| **GoDaddy Registry** | Domain `finovate.biz` (`.biz` is a GoDaddy Registry TLD) for the "Best Domain Name" challenge | Domain configured in settings (no API needed for this challenge) | ⛔ Registration and DNS not verifiable from this environment | 🟠 Confirm the domain is registered before selecting |
 | Supabase | Optional Postgres host and optional email/password sign-in | `DATABASE_URL` parsing; Supabase Auth REST calls | Mocked tests only | n/a |
 | Twelve Data | Optional live quotes and daily history | REST calls with shared quota and cache | ⛔ No API key here | n/a |
 | Vercel | Hosting configuration | `vercel.json`, Vercel-specific settings branch, boot-time migrate | Project `finovate` exists in the team account; deployments/domains not readable (403) | n/a |
@@ -76,20 +78,18 @@ Status legend: ✅ verified · 🟡 implemented, not live-tested · 🟠 partial
 
 **Remaining for the sponsor track:** run `bun start` with project credentials, link a chat from Settings, and record one round-trip (question → reply; change → "yes" → website updates).
 
-## 3. GoDaddy
+## 3. GoDaddy Registry (domain)
 
-**What the repository shows:** the production host names `finovate.biz` and `www.finovate.biz` appear in `finovate/settings.py` (`ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, default `APP_BASE_URL`). An earlier doc says *"GoDaddy was mentioned for the domain"* (`docs/integration-readiness.md`).
+**Official challenge (Hacker Guide):** *MLH: Best Domain Name from GoDaddy Registry.* The prize is for the domain name itself; the guide does not ask for an API integration.
 
-**What it does not show:** any GoDaddy API call, SDK, DNS configuration, hosting, email, or website-builder use. From this environment, `finovate.biz` did not resolve (network policy), and Vercel domain settings could not be read (403).
+**What the repository shows:** the production host names `finovate.biz` and `www.finovate.biz` are configured in `finovate/settings.py` (`ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, default `APP_BASE_URL = https://finovate.biz`), and `AUTH0_AUDIENCE` uses `https://finovate.biz/api` (`.env.example`). `.biz` is a top-level domain operated by GoDaddy Registry.
 
-**Status:** ⚠️ **Unverified.** Nothing in the code shows GoDaddy is used.
+**What could not be verified:** whether `finovate.biz` is actually registered to the team and resolves. DNS was blocked from the build environment, and Vercel domain settings returned 403.
 
-**To support a GoDaddy track claim** (subject to the official track rules, which were not readable):
-1. Show the domain registered in a GoDaddy account (screenshot with personal details redacted).
-2. Show DNS records at GoDaddy pointing `finovate.biz` to the deployment, and the site loading on that domain over HTTPS.
-3. Check whether the track requires a specific GoDaddy product (domains, Airo, APIs); if so, that use must exist.
-
-If none of this can be shown, leave GoDaddy out of the submission.
+**Status:** 🟠 Fits the challenge if the domain is registered. **Before selecting the challenge, confirm:**
+1. `finovate.biz` is registered (through MLH's GoDaddy Registry offer or a registrar). Keep proof (a registrar screenshot with personal data redacted).
+2. Ideally it points to the deployed app over HTTPS, so judges can open `https://finovate.biz`.
+3. In the Devpost write-up, explain the name: *Finovate* = finance + innovate, and `.biz` fits a money-management product.
 
 ## 4. Supabase
 

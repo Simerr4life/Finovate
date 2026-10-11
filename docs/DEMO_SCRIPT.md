@@ -1,5 +1,7 @@
 # Demo Script
 
+**Official formats (Hacker Guide):** the Devpost demo video must be **2–3 minutes** and **public**; live judging is a **3-minute pitch + 2-minute Q&A** at a table with two judges. Use section 2 for both (it runs exactly 3:00). For the video, keep it between 2:00 and 3:00.
+
 Every step below uses a feature verified on 2026-10-11 (see [TESTING_AND_VALIDATION.md](TESTING_AND_VALIDATION.md)). Steps that depend on credentials are marked **[needs config]**, each with a verified fallback. Say "simulated" whenever investing appears on screen.
 
 **Setup assumed:** signed in as a user with sample data (`seed_demo` + `seed_peachtree_demo`). Numbers on screen depend on the date and your data; read them from the screen rather than from this script. Have a terminal open with `python manage.py chat_demo --username demo` as the messaging fallback.
@@ -32,7 +34,7 @@ Every step below uses a feature verified on 2026-10-11 (see [TESTING_AND_VALIDAT
 | 2:25–2:50 | "Same brain over text. Recording income asks first." | **[needs config]** iMessage via Photon. *Fallback:* `chat_demo` terminal: `I got paid $500` → `yes`; `withdraw $50` | Confirmation prompt, then recorded; withdrawal refused | Photon track, consent |
 | 2:50–3:00 | "Finovate: clear numbers, explained decisions, and you approve every change." | Dashboard (new income visible) | Website reflects the chat change | One shared backend |
 
-## 3. Extended 5-minute presentation
+## 3. Extended 5-minute presentation (not used at judging; for a longer demo or the Q&A follow-up)
 
 Use the 3-minute flow and add:
 
@@ -52,5 +54,5 @@ Use the 3-minute flow and add:
 
 - Don't say trades were "executed," money was "invested," or a bank is "connected."
 - Don't claim the bundled market sample is live data, or that Explore works without the Twelve Data key.
-- Don't claim GoDaddy integration unless the team has shown evidence ([THIRD_PARTY_SERVICES.md §3](THIRD_PARTY_SERVICES.md#3-godaddy)).
+- For GoDaddy, talk only about the domain name (`finovate.biz`, a GoDaddy Registry `.biz` domain); don't describe any other GoDaddy integration ([THIRD_PARTY_SERVICES.md §3](THIRD_PARTY_SERVICES.md#3-godaddy-registry-domain)).
 - Don't promise returns; the calculator is hypothetical.

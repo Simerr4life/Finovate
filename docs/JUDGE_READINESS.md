@@ -1,21 +1,25 @@
 # Judge Readiness
 
-> **The official judging criteria were not available** (the Hacker Guide was blocked; see [HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md)). The criteria below are **commonly used hackathon categories, assumed, not official**. Replace them with the guide's wording and weights before judging.
+**Official format (Hacker Guide, *Judging*):** Judging Expo, Sunday October 11, 9:30–11:30 AM, State Ballroom. **3 minutes to pitch + 2 minutes of Q&A** at a table with two judges. Wait in line until staff call you to an open table, then exit after presenting.
 
-## Criteria map (assumed criteria)
+## Official judging questions
 
-| Criterion (assumed) | What judges look for | Finovate's strongest capability | Evidence | Current weakness | Recommended improvement | One-line pitch |
-|---|---|---|---|---|---|---|
-| Technical complexity | Non-trivial engineering that works | Scenario-based savings engine; idempotent CSV importer with a fallback reader; Auth0 with verification and API token validation; signed Photon webhook plus bridge; row locking for money actions | 381 passing tests; [FEATURE_REFERENCE.md](FEATURE_REFERENCE.md) | Provider integrations not shown live | Record live Auth0 and iMessage clips | "Eight Django apps and 381 tests: identity, imports, a planning engine, and a messaging bridge that share one backend." |
-| Innovation / originality | A fresh angle | Explainability and consent as the product: separated money buckets, pending-first round-ups, approve-before-act, a chat that cannot move money | Dashboard, plan page, chat transcript | Round-ups and budgeting exist elsewhere | Lead with "every dollar has a purpose" and explainability | "Other apps show numbers or move money. Finovate explains the numbers and waits for your yes." |
-| Impact / usefulness | A real problem for real people | Safe-to-save for irregular incomes; emergency-reserve-first logic; debt prioritization | Savings plan scenarios | No real bank data | Show the CSV import of real-format data | "It answers the question everyone has: how much can I safely save this month?" |
-| Design / UX | Polished, coherent, accessible | Consistent design system, light/dark themes, mobile layout, empty states, clear errors | Screenshots 01–26 | Two similar "available" labels; onboarding button text alignment | Explain the two numbers in the demo | "Every screen tells you what's real, what's estimated, and what's simulated." |
-| Completeness / functionality | Works end to end | Full flow: sign-in → onboarding → budget → plan → goals → round-ups → simulated invest → chat | Browser flows in [TESTING_AND_VALIDATION.md](TESTING_AND_VALIDATION.md) | Explore needs a Twelve Data key; sign-in needs Auth0 configured | Configure both on the demo server | "Every button you see does something real or says clearly that it's simulated." |
-| Presentation | Clear story, good demo | Scripts at 60 s / 3 min / 5 min | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | Video not recorded | Record today | — |
-| Finance track fit | Financial empowerment, responsible handling | Budgeting, savings, investing education, risk disclosures, no money movement | Investing disclaimers on every page | — | — | "A financial co-pilot that's honest about what it doesn't know." |
-| Sponsor: Auth0 | Meaningful Auth0 use | Universal Login, sub-based identity, verification gate, Management API, Action webhook, API audience validation | [THIRD_PARTY_SERVICES.md §1](THIRD_PARTY_SERVICES.md#1-auth0) | Not shown live | Live login on video | "Auth0 isn't a login button here; it gates verification and protects the API too." |
-| Sponsor: Photon | Meaningful Photon use | Spectrum iMessage adapter, HMAC-verified webhook, confirmation-gated assistant, one-time-code linking | [§2](THIRD_PARTY_SERVICES.md#2-photon-spectrum-imessage) | Not shown live | Live iMessage on video | "Text your budget; Finovate asks before it changes anything." |
-| Sponsor: GoDaddy | Meaningful GoDaddy use | — | Only the domain string | **No evidence** | Show registrar/DNS proof or don't enter | — |
+The guide lists these as the questions judges ask themselves:
+
+| Official question | What Finovate shows | Evidence | Weakness to manage | One-line answer |
+|---|---|---|---|---|
+| **Does the project address the track's prompt?** (Fintech: "rethink how money moves: payments, budgeting, investing, and the tools that make finances easier to manage") | Budgeting from real or imported data, an explainable safe-to-save engine, round-ups, simulated investing with approvals, money questions by iMessage | [FEATURE_REFERENCE.md](FEATURE_REFERENCE.md) | Investing is simulated; no payments rail | "Finovate rethinks how money moves by making every movement explained and approved: budget, save, round up, invest, by web or text." |
+| **How polished is the prototype or demo?** | Consistent design system, light/dark, mobile layout, empty states, clear errors; 381 passing tests; 98-page crawl with no errors | Screenshots 01–26; [TESTING_AND_VALIDATION.md](TESTING_AND_VALIDATION.md) | Explore tab needs a Twelve Data key; sign-in needs Auth0 configured | "Every button does something real, or says clearly that it's simulated." |
+| **How effective is the team's presentation?** | 3-minute script that is one continuous story, not a tour of screens | [DEMO_SCRIPT.md §2](DEMO_SCRIPT.md#2-recommended-3-minute-demo) | Live provider risk | Rehearse twice; keep the `chat_demo` fallback open |
+| **Is there a clear, compelling use case?** | "How much can I safely save this month?" for students and irregular earners | Savings plan page | Two similar "available" labels | "It answers the question everyone has, and shows its math." |
+
+### Side challenges
+
+| Challenge | Strongest evidence | Gap | Pitch line |
+|---|---|---|---|
+| MLH: Best Use of Auth0 | Universal Login, sub-based identity, verification gate with Management API refresh, Post-Registration Action webhook, RS256 API audience validation | Not shown live in docs prep | "Auth0 isn't just a login button here: it gates verification and protects our API." |
+| Photon: Agents in iMessage (must integrate Spectrum) | Bun adapter on `spectrum-ts` (iMessage provider) → secret-protected bridge; confirmation-gated agent; one-time-code linking; duplicate protection | Live iMessage not verified in docs prep | "Text your budget; the agent asks before it changes anything and can never move money." |
+| MLH: Best Domain Name from GoDaddy Registry | `finovate.biz` (`.biz` = GoDaddy Registry): Finovate = finance + innovate | Confirm the domain is registered | "finovate.biz: finance plus innovate, on a business domain." |
 
 ## Defensible differentiators
 
@@ -29,7 +33,7 @@
 
 *People don't fail at saving because they lack apps; they fail because no app tells them what is safe to save, and automated tools act without explaining. Finovate turns income, bills, debts, and goals into one explained number — safe-to-save — and makes every automated step visible and approvable, on the web or by text.*
 
-## Why Finance track
+## Why the Fintech track
 
 It addresses budgeting, emergency savings, debt prioritization, and investing literacy, the core of personal financial health. It handles financial data carefully (no credentials, last-few-digit account identifiers only) and is honest about simulation.
 
@@ -57,16 +61,16 @@ It addresses budgeting, emergency savings, debt prioritization, and investing li
 | Explore tab empty | Set `TWELVE_DATA_API_KEY` or skip Explore |
 | iMessage fails live | `chat_demo` terminal fallback |
 | Deployed data reset (SQLite on Vercel) | Set `DATABASE_URL` or demo locally |
-| Claiming more than is built (GoDaddy, real trades) | Follow "What not to say" in [DEMO_SCRIPT.md](DEMO_SCRIPT.md) |
+| Claiming more than is built (real trades, GoDaddy beyond the domain) | Follow "What not to say" in [DEMO_SCRIPT.md](DEMO_SCRIPT.md) |
 | Confusion between the two "available" figures | One sentence: "monthly flow vs. cash on hand" |
 
 ## Prioritized final checklist
 
-1. **P0** Read the official guide; confirm the deadline, video limit, and criteria; update this file and HACKATHON_REQUIREMENTS.md.
+1. **P0** Submit on Devpost **before 9:00 AM EDT**, then the Google Form (one member).
 2. **P0** Confirm every member is registered/accepted.
-3. **P0** Record and upload the demo video (3-minute script).
+3. **P0** Record and upload a **2–3 minute public** demo video (3-minute script).
 4. **P0** Verify the live URL and sign-in, or choose the local demo.
-5. **P0** Decide sponsor tracks: Auth0 and Photon with live clips; GoDaddy only with proof.
+5. **P0** Select Fintech + up to 3 challenges (Auth0, Photon, GoDaddy Registry only if the domain is registered); make the repo **public**.
 6. **P1** Set `TWELVE_DATA_API_KEY` and `DATABASE_URL` on the demo server; confirm `FINOVATE_SECRET_KEY`.
 7. **P1** Merge the audit and docs branch to the default branch so judges see the current code.
 8. **P1** Fill in team member names in README and SUBMISSION.

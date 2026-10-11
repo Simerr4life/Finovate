@@ -55,7 +55,7 @@ Run through this list 30 minutes before judging and again before recording the v
 ## 7. Recording
 
 - ☐ Screen recorder at 1080p; microphone tested; system sounds off
-- ☐ Video length within the official limit (**confirm the limit in the Hacker Guide**)
+- ☐ Video is **2–3 minutes** (official requirement) and set to **Public**
 - ☐ Say "sample data" and "simulated" on camera
 - ☐ Upload to the required host; set visibility so judges can watch; copy the link into the submission
 
@@ -75,6 +75,9 @@ Problem → dashboard → transaction → round-up → savings plan → goal →
 - ☐ Repository link opens for someone signed out (if public access is required)
 - ☐ Live demo link works in a private window
 - ☐ Video link plays in a private window
-- ☐ Tracks selected: Finance, plus only the sponsor tracks you can evidence
+- ☐ Main track **Fintech** (exactly one); side challenges (max 3): **MLH: Best Use of Auth0**, **Photon: Agents in iMessage**, **MLH: Best Domain Name from GoDaddy Registry** (only if `finovate.biz` is registered)
+- ☐ Disclosure of pre-existing work pasted into Devpost
+- ☐ **Google Form** submitted by one member (link in Discord)
+- ☐ Repo and video are **Public** and stay accessible through judging (until 11:30 AM)
 - ☐ Team members listed and registered
 - ☐ Description text within the platform's character limits ([SUBMISSION.md](SUBMISSION.md))

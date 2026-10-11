@@ -9,8 +9,8 @@ A Python personal-finance assistant for budgeting, savings goals, round-ups, and
 |---|---|
 | **Hackathon** | Hacklanta 2026 |
 | **Team** | Turn It Off and On Again |
-| **Main track** | Finance |
-| **Side tracks** | Auth0 · GoDaddy · Photon (see [sponsor evidence](docs/THIRD_PARTY_SERVICES.md) — GoDaddy use is **unverified**) |
+| **Main track** | Fintech |
+| **Side challenges** | MLH: Best Use of Auth0 · Photon: Agents in iMessage · MLH: Best Domain Name from GoDaddy Registry (`finovate.biz`; registration to be confirmed). Evidence: [THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md) |
 | **Submission package** | [docs/SUBMISSION.md](docs/SUBMISSION.md) |
 
 > **Status legend used across the docs:** ✅ verified · 🟡 implemented, not fully tested · 🟠 partial · 🧪 simulated / sample data · 📝 planned · ⛔ blocked on credentials or configuration.
@@ -130,7 +130,7 @@ Coverage includes the $4.35 → $0.65 round-up, Decimal precision, idempotent im
 | Document | For |
 |---|---|
 | [SUBMISSION.md](docs/SUBMISSION.md) | Copy-ready submission text |
-| [HACKATHON_REQUIREMENTS.md](docs/HACKATHON_REQUIREMENTS.md) | Rules compliance checklist (official guide not yet accessible — see file) |
+| [HACKATHON_REQUIREMENTS.md](docs/HACKATHON_REQUIREMENTS.md) | Compliance checklist against the official Hacker Guide ([rules excerpt](docs/reference/hacker-guide-excerpt.md)) |
 | [JUDGE_READINESS.md](docs/JUDGE_READINESS.md) | Criteria mapping, likely questions |
 | [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) · [DEMO_CHECKLIST.md](docs/DEMO_CHECKLIST.md) | Presenting |
 | [USER_GUIDE.md](docs/USER_GUIDE.md) | Judges and first-time users |
@@ -138,7 +138,7 @@ Coverage includes the $4.35 → $0.65 round-up, Decimal precision, idempotent im
 | [TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md) · [FEATURE_REFERENCE.md](docs/FEATURE_REFERENCE.md) | Engineers |
 | [SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) | Security posture and gaps |
 | [TESTING_AND_VALIDATION.md](docs/TESTING_AND_VALIDATION.md) | Evidence |
-| [THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md) | Auth0, GoDaddy, Photon, others |
+| [THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md) | Auth0, Photon Spectrum, GoDaddy Registry domain, others |
 | [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Gaps and blockers |
 | [SCREENSHOT_CATALOG.md](docs/SCREENSHOT_CATALOG.md) | Image index |
 | [glossary.md](docs/glossary.md) · [docs/README.md](docs/README.md) | Earlier reference documentation |
@@ -146,6 +146,10 @@ Coverage includes the $4.35 → $0.65 round-up, Decimal precision, idempotent im
 ## Known limitations (short)
 
 No bank or brokerage connection; investing and order fills are simulated. Live prices, the Explore tab, and demo investment ideas need `TWELVE_DATA_API_KEY`. Notifications are recorded in-app but not delivered by email/SMS. Website sign-in needs Auth0 or Supabase credentials. Live iMessage delivery and the production deployment were not verified during documentation. See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+
+## Disclosure (per the Hacker Guide)
+
+Built during Hacklanta 2026 (all commits dated October 10–11, 2026). Existing work we built on: a **Figma Make** layout export (`.figma-make-inspect/`), open-source libraries (Django, auth0-server-python, Authlib, psycopg, python-dotenv, spectrum-ts), third-party APIs and services (Auth0, Photon Spectrum, Twelve Data, Supabase, Vercel, Google Fonts), and a bundled September 2026 market-data sample (`demo_data/`). AI coding assistants (Cursor, Claude Code) were used during development.
 
 ## Team and attribution
 
