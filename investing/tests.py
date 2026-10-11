@@ -22,6 +22,7 @@ from .services import (
     available_demo_investment_budget,
     compute_hypothetical_scenario,
     compute_investable_surplus,
+    create_demo_market_order,
     create_roundup_for_transaction,
     decline_demo_investment_suggestion,
     generate_demo_investment_suggestions,
@@ -282,18 +283,23 @@ class MarketDataSeedTests(TestCase):
     def test_seed_command_is_idempotent(self):
         from django.core.management import call_command
 
+        self.assertEqual(MarketPrice.objects.filter(is_demo_sample=True).count(), 109)
         call_command("seed_market_data")
         first_count = MarketPrice.objects.count()
         call_command("seed_market_data")
         self.assertEqual(MarketPrice.objects.count(), first_count)
-        self.assertEqual(first_count, 18)
+        self.assertEqual(MarketPrice.objects.filter(is_demo_sample=True).count(), 109)
 
     def test_verified_rows_are_never_fabricated_outside_the_given_set(self):
         from django.core.management import call_command
 
         call_command("seed_market_data")
         self.assertTrue(MarketPrice.objects.filter(symbol="AAPL", date="2026-09-16", close=Decimal("332.41")).exists())
-        self.assertFalse(MarketPrice.objects.filter(symbol="AAPL", date="2026-09-17").exists())
+        self.assertFalse(
+            MarketPrice.objects.filter(
+                symbol="AAPL", date="2026-09-17", is_demo_sample=False
+            ).exists()
+        )
 
     def test_reset_clears_rows_before_reseeding(self):
         from django.core.management import call_command
@@ -458,6 +464,7 @@ class DemoAISuggestionTests(TestCase):
 
 class DemoAISuggestionViewTests(TestCase):
     def setUp(self):
+        MarketPrice.objects.filter(is_demo_sample=True).delete()
         self.user = User.objects.create_user(username="demo-ai-view", password="test-password")
         self.client.force_login(self.user)
         Transaction.objects.create(
@@ -508,6 +515,96 @@ class DemoAISuggestionViewTests(TestCase):
         suggestions[1].refresh_from_db()
         self.assertEqual(suggestions[1].status, DemoInvestmentSuggestion.Status.DECLINED)
         self.assertEqual(SimulatedOrder.objects.filter(user=self.user).count(), 1)
+
+
+class DemoMarketExplorerTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="market-explorer-user", password="test-password"
+        )
+        self.client.force_login(self.user)
+        RoundUpSettings.objects.update_or_create(
+            user=self.user,
+            defaults={"minimum_cash_reserve": Decimal("0.00")},
+        )
+        Transaction.objects.create(
+            user=self.user,
+            kind=Transaction.Kind.INCOME,
+            amount=Decimal("100.00"),
+            occurred_on="2026-09-01",
+        )
+
+    def test_migration_loaded_sample_data_is_visible_in_a_friendly_explorer(self):
+        response = self.client.get("/investing/market-data/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(MarketPrice.objects.filter(is_demo_sample=True).count(), 109)
+        self.assertContains(response, "Explore sample market data")
+        self.assertContains(response, "Apple")
+        self.assertContains(response, "S&amp;P 500")
+        self.assertContains(response, "View all 18 sample price days")
+        self.assertContains(response, "Available demo budget")
+        self.assertContains(response, "Create demo order")
+
+    def test_user_can_create_pending_order_from_a_selected_sample_asset(self):
+        pool = Goal.objects.create(
+            user=self.user,
+            name="Travel pool",
+            target_amount=Decimal("500.00"),
+            is_investable=True,
+        )
+        latest_price = MarketPrice.objects.filter(
+            symbol="AAPL", is_demo_sample=True
+        ).latest("date")
+
+        response = self.client.post(
+            "/investing/market-data/invest/",
+            {"symbol": "AAPL", "amount": "35.00", "pool": str(pool.pk)},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        order = SimulatedOrder.objects.get(user=self.user)
+        self.assertEqual(order.symbol, "AAPL")
+        self.assertEqual(order.amount, Decimal("35.00"))
+        self.assertEqual(order.pool, pool)
+        self.assertEqual(order.status, SimulatedOrder.Status.PENDING)
+        self.assertEqual(order.demo_execution_price, latest_price.close)
+        self.assertEqual(order.demo_data_date, latest_price.date)
+        self.assertGreater(order.demo_shares, Decimal("0"))
+        self.assertFalse(PortfolioSnapshot.objects.filter(user=self.user).exists())
+
+    def test_order_cannot_exceed_available_demo_budget(self):
+        response = self.client.post(
+            "/investing/market-data/invest/",
+            {"symbol": "AAPL", "amount": "101.00"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(SimulatedOrder.objects.filter(user=self.user).exists())
+        self.assertContains(
+            self.client.get("/investing/market-data/"),
+            "above your available demo investing budget",
+            status_code=200,
+        )
+
+    def test_order_cannot_use_a_non_sample_market_row(self):
+        MarketPrice.objects.create(
+            symbol="OTHER",
+            asset_type=MarketPrice.AssetType.STOCK,
+            date="2026-09-30",
+            close=Decimal("25.00"),
+            source_note="Other source",
+            is_verified=True,
+            is_demo_sample=False,
+        )
+
+        response = self.client.post(
+            "/investing/market-data/invest/",
+            {"symbol": "OTHER", "amount": "10.00"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(SimulatedOrder.objects.filter(user=self.user).exists())
 
 
 class VerifiedScenarioFormTests(TestCase):

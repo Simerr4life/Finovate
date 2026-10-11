@@ -3,6 +3,8 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
 from accounts.models import NotificationEvent
@@ -21,6 +23,7 @@ from .services import (
     approve_order,
     compute_hypothetical_scenario,
     compute_investable_surplus,
+    create_demo_market_order,
     decline_demo_investment_suggestion,
     generate_demo_investment_suggestions,
     get_or_create_settings,
@@ -83,11 +86,16 @@ def index(request):
         is_demo_sample=True,
     ).exists()
     market_rows = []
-    for row in MarketPrice.objects.all().order_by("symbol", "-date"):
+    for row in MarketPrice.objects.filter(
+        is_verified=True,
+        is_demo_sample=True,
+    ).order_by("symbol", "-date"):
         if not any(existing["symbol"] == row.symbol for existing in market_rows):
             market_rows.append(
                 {
                     "symbol": row.symbol,
+                    "asset_name": row.asset_name or row.symbol,
+                    "asset_type": row.get_asset_type_display(),
                     "date": row.date,
                     "close": row.close,
                     "source_note": row.source_note,
@@ -299,11 +307,91 @@ def historical_demo(request):
 
 @login_required
 def market_data(request):
-    rows = MarketPrice.objects.all()
-    by_symbol = {}
+    rows = MarketPrice.objects.filter(
+        is_verified=True,
+        is_demo_sample=True,
+    ).order_by("symbol", "date")
+    grouped_rows = {}
     for row in rows:
-        by_symbol.setdefault(row.symbol, []).append(row)
-    return render(request, "investing/market_data.html", {"by_symbol": by_symbol})
+        grouped_rows.setdefault(row.symbol, []).append(row)
+
+    stock_assets = []
+    index_assets = []
+    for symbol, history in grouped_rows.items():
+        first_price, latest_price = history[0], history[-1]
+        period_change = Decimal("0.00")
+        if first_price.close:
+            period_change = (
+                (latest_price.close - first_price.close)
+                / first_price.close
+                * Decimal("100")
+            ).quantize(Decimal("0.01"))
+        asset = {
+            "symbol": symbol,
+            "name": latest_price.asset_name or symbol,
+            "asset_type": latest_price.asset_type,
+            "asset_type_label": latest_price.get_asset_type_display(),
+            "latest": latest_price,
+            "history": list(reversed(history)),
+            "period_change": period_change,
+            "anchor": slugify(symbol),
+        }
+        if latest_price.asset_type == MarketPrice.AssetType.STOCK:
+            stock_assets.append(asset)
+        else:
+            index_assets.append(asset)
+
+    return render(
+        request,
+        "investing/market_data.html",
+        {
+            "stock_assets": stock_assets,
+            "index_assets": index_assets,
+            "demo_budget": available_demo_investment_budget(request.user),
+            "investable_pools": investable_pools(request.user),
+        },
+    )
+
+
+@login_required
+@require_POST
+def buy_demo_market_asset(request):
+    symbol = request.POST.get("symbol", "").strip()
+    try:
+        amount = Decimal(request.POST.get("amount", ""))
+    except (InvalidOperation, TypeError, ValueError):
+        messages.error(request, "Enter a valid amount to simulate.")
+        return redirect("investing:market_data")
+
+    if not amount.is_finite() or amount <= 0:
+        messages.error(request, "Enter an amount greater than $0.00 with up to two decimal places.")
+        return redirect("investing:market_data")
+    try:
+        rounded_amount = amount.quantize(Decimal("0.01"))
+    except InvalidOperation:
+        rounded_amount = None
+    if rounded_amount is None or amount != rounded_amount or amount > Decimal("9999999999.99"):
+        messages.error(request, "Enter an amount greater than $0.00 with up to two decimal places.")
+        return redirect("investing:market_data")
+
+    pool = None
+    pool_id = request.POST.get("pool", "").strip()
+    if pool_id:
+        pool = get_object_or_404(investable_pools(request.user), pk=pool_id)
+
+    try:
+        order = create_demo_market_order(request.user, symbol, amount, pool)
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("investing:market_data")
+
+    target = f'"{pool.name}"' if pool else "the general bucket"
+    messages.success(
+        request,
+        f"Created a simulated {order.symbol} buy order for ${order.amount} in {target}. "
+        "Review and approve it on Investments to add it to your demo portfolio.",
+    )
+    return redirect(f"{reverse('investing:market_data')}#asset-{slugify(symbol)}")
 
 
 @login_required

@@ -21,26 +21,26 @@
 {% if tab == 'explore' %}
 <section class="card">
   <div class="filter-row">
-    <p class="muted">Verified prices already stored in Finovate. Rows are omitted when a date was not verified.</p>
-    <a class="button secondary" href="{% url 'investing:market_data' %}">Market data</a>
+  <p class="muted">Browse the included September 2026 stock and index sample, see each recorded price day, and try a simulated buy.</p>
+  <a class="button secondary" href="{% url 'investing:market_data' %}">Browse sample data &amp; invest</a>
   </div>
   {% if market_rows %}
   <div class="etf-list">
     {% for row in market_rows %}
-    <a class="etf-row" href="{% url 'investing:market_data' %}">
+  <a class="etf-row" href="{% url 'investing:market_data' %}#asset-{{ row.symbol|slugify }}">
       <span class="ticker">{{ row.symbol }}</span>
-      <span><strong>{{ row.symbol }}</strong><small>{{ row.source_note }}</small></span>
+    <span><strong>{{ row.asset_name }}</strong><small>{{ row.asset_type }} · {{ row.source_note }}</small></span>
       <span><small>Latest close</small><strong>{{ row.close }}</strong></span>
       <span><small>As of</small><strong>{{ row.date }}</strong></span>
-      <span class="pill">Verified price</span>
+    <span class="pill">Demo sample</span>
       {% include "partials/icon.html" with name="chevron" size=16 %}
     </a>
     {% endfor %}
   </div>
   {% else %}
-  <p class="empty">No verified market prices are loaded. Seed market data before this list can show symbols.</p>
+<p class="empty">Sample market prices will appear after the database migrations are applied.</p>
   {% endif %}
-  <div class="estimate-note">Closes are source-cited prices, not a projection of your portfolio.</div>
+<div class="estimate-note">These are historical sample closes, not live prices or a projection of your portfolio.</div>
 </section>
 
 {% elif tab == 'calculator' %}

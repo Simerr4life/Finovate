@@ -34,6 +34,7 @@ class Command(BaseCommand):
                             if ticker.startswith("^")
                             else MarketPrice.AssetType.STOCK
                         ),
+                        "asset_name": row["asset"].strip()[:80],
                         "open": Decimal(row["open"]) if row["open"] else None,
                         "high": Decimal(row["high"]) if row["high"] else None,
                         "low": Decimal(row["low"]) if row["low"] else None,
