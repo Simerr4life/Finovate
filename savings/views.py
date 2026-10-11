@@ -4,12 +4,14 @@ from django.contrib import messages
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from accounts.models import NotificationEvent
 from investing.models import PortfolioSnapshot
 
-from .forms import ContributionForm, GoalForm
-from .models import Goal
+from .forms import ContributionForm, DebtObligationForm, GoalForm, PlanAllocationForm
+from .models import DebtObligation, Goal, SavingsPlan
+from .plan_engine import ensure_default_pools, get_or_build_plan, refresh_savings_plan
 from .services import MILESTONES, contribution_pace, estimate_completion_date
 
 
@@ -17,10 +19,15 @@ from .services import MILESTONES, contribution_pace, estimate_completion_date
 def index(request):
     from investing.services import compute_investable_surplus
 
+    ensure_default_pools(request.user)
     goals = list(Goal.objects.filter(user=request.user))
     saved = sum((g.current_amount for g in goals), Decimal("0"))
-    emergency = next((g for g in goals if g.category == Goal.Category.EMERGENCY), None)
+    emergency = next(
+        (g for g in goals if g.system_key == Goal.SystemKey.RAINY_DAY),
+        next((g for g in goals if g.category == Goal.Category.EMERGENCY), None),
+    )
     surplus = compute_investable_surplus(request.user)
+    plan = get_or_build_plan(request.user)
     return render(
         request,
         "savings/index.html",
@@ -29,12 +36,140 @@ def index(request):
             "saved_total": saved,
             "emergency": emergency,
             "surplus": surplus,
+            "plan": plan,
         },
     )
 
 
 @login_required
+def plan_detail(request):
+    plan = get_or_build_plan(request.user)
+    pools = ensure_default_pools(request.user)
+    revisions = []
+    if plan is not None:
+        revisions = plan.revisions.all()[:10]
+    return render(
+        request,
+        "savings/plan.html",
+        {
+            "plan": plan,
+            "pools": pools,
+            "revisions": revisions,
+            "allocation_form": PlanAllocationForm(
+                initial={
+                    "rainy_day_percent": plan.rainy_day_percent if plan else 20,
+                    "investment_percent": plan.investment_percent if plan else 30,
+                    "regular_percent": plan.regular_percent if plan else 50,
+                }
+            )
+            if plan
+            else None,
+        },
+    )
+
+
+@login_required
+@require_POST
+def plan_refresh(request):
+    plan = refresh_savings_plan(request.user, reason="user_refresh", force=True)
+    if plan is None:
+        messages.error(
+            request,
+            "Not enough income or expense information yet to build a savings plan. "
+            "Add income sources or recurring expenses first.",
+        )
+    else:
+        messages.success(request, "Savings plan recalculated from your latest numbers.")
+    return redirect("savings:plan")
+
+
+@login_required
+@require_POST
+def plan_status(request):
+    plan = get_object_or_404(SavingsPlan, user=request.user)
+    action = request.POST.get("action")
+    if action == "pause":
+        plan.status = SavingsPlan.Status.PAUSED
+        plan.save(update_fields=["status", "updated_at"])
+        messages.success(request, "Recommendations paused. No money was moved.")
+    elif action == "resume":
+        plan.status = SavingsPlan.Status.ACTIVE
+        plan.save(update_fields=["status", "updated_at"])
+        refresh_savings_plan(request.user, reason="resumed", force=True)
+        messages.success(request, "Recommendations resumed.")
+    elif action == "disable":
+        plan.status = SavingsPlan.Status.DISABLED
+        plan.save(update_fields=["status", "updated_at"])
+        messages.success(request, "Recommendations disabled.")
+    return redirect("savings:plan")
+
+
+@login_required
+@require_POST
+def plan_allocations(request):
+    plan = get_object_or_404(SavingsPlan, user=request.user)
+    form = PlanAllocationForm(request.POST)
+    if form.is_valid():
+        plan.rainy_day_percent = form.cleaned_data["rainy_day_percent"]
+        plan.investment_percent = form.cleaned_data["investment_percent"]
+        plan.regular_percent = form.cleaned_data["regular_percent"]
+        plan.user_override_percents = True
+        plan.save(
+            update_fields=[
+                "rainy_day_percent",
+                "investment_percent",
+                "regular_percent",
+                "user_override_percents",
+                "updated_at",
+            ]
+        )
+        refresh_savings_plan(request.user, reason="allocation_edit", force=True)
+        messages.success(request, "Allocation percentages updated. Totals still use your safe-to-save amount.")
+    else:
+        messages.error(request, "Allocation percentages must add up to 100%.")
+    return redirect("savings:plan")
+
+
+@login_required
+def debt_list(request):
+    debts = DebtObligation.objects.filter(user=request.user)
+    return render(request, "savings/debts.html", {"debts": debts})
+
+
+@login_required
+def debt_add(request):
+    if request.method == "POST":
+        form = DebtObligationForm(request.POST)
+        if form.is_valid():
+            debt = form.save(commit=False)
+            debt.user = request.user
+            debt.save()
+            refresh_savings_plan(request.user, reason="debt_added", force=True)
+            messages.success(request, "Debt recorded for planning. No payment was made.")
+            return redirect("savings:debts")
+    else:
+        form = DebtObligationForm()
+    return render(request, "savings/debt_form.html", {"form": form, "mode": "add"})
+
+
+@login_required
+def debt_edit(request, pk):
+    debt = get_object_or_404(DebtObligation, pk=pk, user=request.user)
+    if request.method == "POST":
+        form = DebtObligationForm(request.POST, instance=debt)
+        if form.is_valid():
+            form.save()
+            refresh_savings_plan(request.user, reason="debt_updated", force=True)
+            messages.success(request, "Debt updated.")
+            return redirect("savings:debts")
+    else:
+        form = DebtObligationForm(instance=debt)
+    return render(request, "savings/debt_form.html", {"form": form, "mode": "edit", "debt": debt})
+
+
+@login_required
 def pools(request):
+    ensure_default_pools(request.user)
     goals = list(Goal.objects.filter(user=request.user))
     pool_rows = [
         {"goal": goal, "estimated_completion": estimate_completion_date(goal)}
@@ -129,6 +264,7 @@ def goal_add(request):
             goal = form.save(commit=False)
             goal.user = request.user
             goal.save()
+            refresh_savings_plan(request.user, reason="goal_created")
             messages.success(request, "Savings goal created.")
             return redirect("savings:pools" if return_to_pools else "savings:index")
     else:
@@ -150,6 +286,7 @@ def goal_edit(request, pk):
         form = GoalForm(request.POST, instance=goal)
         if form.is_valid():
             form.save()
+            refresh_savings_plan(request.user, reason="goal_updated")
             messages.success(request, "Goal updated.")
             return redirect("savings:pools" if return_to_pools else "savings:index")
     else:
@@ -186,6 +323,7 @@ def goal_detail(request, pk):
                 note=form.cleaned_data["note"],
                 source="manual",
             )
+            refresh_savings_plan(request.user, reason="contribution")
             if crossed and request.user.profile.notify_goal_milestones:
                 NotificationEvent.objects.create(
                     user=request.user,

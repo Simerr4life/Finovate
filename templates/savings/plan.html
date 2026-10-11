@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% load finovate %}
+{% block title %}Savings plan — Finovate{% endblock %}
+{% block crumb %}Savings plan{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">FINOVATE</div>
+    <div class="page-title">Personalized savings plan</div>
+    <div class="page-subtitle">Recommendations only — nothing here moves money or places trades.</div>
+  </div>
+  <div class="button-row">
+    <a class="button ghost" href="{% url 'savings:debts' %}">Debt inputs</a>
+    <form method="post" action="{% url 'savings:plan_refresh' %}">{% csrf_token %}
+      <button class="button" type="submit">Recalculate</button>
+    </form>
+  </div>
+</div>
+
+{% if not plan %}
+<div class="card">
+  <h3>Not enough information yet</h3>
+  <p class="muted">Add take-home income and monthly expenses (Settings → manual setup, or Budgets) so Finovate can estimate a safe-to-save amount.</p>
+  <a class="button" href="{% url 'accounts:manual_setup' %}">Enter finances</a>
+</div>
+{% else %}
+<div class="goal-overview">
+  <div><span>Safe to save / month</span><div class="money">{{ plan.safe_to_save|money }}</div></div>
+  <div><span>Monthly surplus</span><div class="money">{{ plan.monthly_surplus|money }}</div></div>
+  <div><span>Scenario</span><div class="money" style="font-size:1.1rem;">{{ plan.get_scenario_display }}</div></div>
+</div>
+
+<section class="card" style="margin-bottom:1.25rem;">
+  <div class="section-title">{{ plan.name }}</div>
+  <p>{{ plan.explanation }}</p>
+  <p class="muted">{{ plan.objective }}</p>
+  <p class="muted">Status: {{ plan.get_status_display }} · Priority: {{ plan.priority|default:"—" }} · Last calculated {{ plan.calculated_at|date:"M j, Y g:i A" }}</p>
+  <div class="button-row">
+    {% if plan.status == "active" %}
+    <form method="post" action="{% url 'savings:plan_status' %}">{% csrf_token %}
+      <input type="hidden" name="action" value="pause">
+      <button class="button ghost" type="submit">Pause recommendations</button>
+    </form>
+    {% elif plan.status == "paused" %}
+    <form method="post" action="{% url 'savings:plan_status' %}">{% csrf_token %}
+      <input type="hidden" name="action" value="resume">
+      <button class="button" type="submit">Resume</button>
+    </form>
+    {% endif %}
+    {% if plan.status != "disabled" %}
+    <form method="post" action="{% url 'savings:plan_status' %}">{% csrf_token %}
+      <input type="hidden" name="action" value="disable">
+      <button class="button ghost" type="submit">Disable</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+
+<div class="two-column">
+  <section class="card">
+    <div class="section-title">Recommended monthly contributions</div>
+    <div class="waterfall">
+      <div><span>Rainy Day</span><strong>{{ plan.rainy_day_amount|money }} <small>({{ plan.rainy_day_percent }}%)</small></strong></div>
+      <div><span>Investment</span><strong>{{ plan.investment_amount|money }} <small>({{ plan.investment_percent }}%)</small></strong></div>
+      <div><span>Regular Savings</span><strong>{{ plan.regular_amount|money }} <small>({{ plan.regular_percent }}%)</small></strong></div>
+      {% if plan.debt_extra_amount > 0 %}
+      <div><span>Extra high-interest debt</span><strong>{{ plan.debt_extra_amount|money }}</strong></div>
+      {% endif %}
+      <div class="total"><span>From safe-to-save</span><strong>{{ plan.safe_to_save|money }}</strong></div>
+    </div>
+    <div class="muted">Schedule: after payday each month, once essentials and minimum debt payments are covered. These figures are not automatic transfers.</div>
+    {% if plan.estimated_completion_date %}
+    <div class="muted">Estimated starter-reserve date: {{ plan.estimated_completion_date|date:"F Y" }}</div>
+    {% endif %}
+  </section>
+  <section class="card">
+    <div class="section-title">How we read your numbers</div>
+    <div class="waterfall">
+      <div><span>Take-home income</span><strong>{{ plan.monthly_income|money }}</strong></div>
+      <div><span>Monthly expenses</span><strong>-{{ plan.monthly_expenses|money }}</strong></div>
+      <div><span>Extra buffer</span><strong>-{{ plan.additional_buffer|money }}</strong></div>
+      <div class="total"><span>Safe to save</span><strong>{{ plan.safe_to_save|money }}</strong></div>
+    </div>
+    <div class="progress-label"><span>Emergency reserve</span><strong>{{ plan.emergency_balance|money }} / {{ plan.emergency_target|money }}</strong></div>
+    <div class="progress"><i style="width: {% if plan.emergency_target > 0 %}{% widthratio plan.emergency_balance plan.emergency_target 100 %}{% else %}0{% endif %}%;"></i></div>
+  </section>
+</div>
+
+{% if plan.warnings %}
+<section class="card" style="margin-top:1.25rem;">
+  <div class="section-title">Constraints and warnings</div>
+  <ul>
+    {% for warning in plan.warnings %}
+    <li>{{ warning }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if plan.goal_notes %}
+<section class="card" style="margin-top:1.25rem;">
+  <div class="section-title">Goal feasibility</div>
+  {% for note in plan.goal_notes %}
+  <div class="callout" style="margin-bottom:0.75rem;">
+    <strong>{{ note.name }}</strong>
+    <span>{{ note.note }}</span>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if allocation_form and plan.status == "active" %}
+<section class="card" style="margin-top:1.25rem;">
+  <div class="section-title">Adjust allocation percentages</div>
+  <p class="muted">Percents apply only to the amount actually allocated from safe-to-save. They must total 100%.</p>
+  <form method="post" action="{% url 'savings:plan_allocations' %}" class="stack-form">
+    {% csrf_token %}
+    {{ allocation_form.non_field_errors }}
+    <label>Rainy Day % {{ allocation_form.rainy_day_percent }}</label>
+    <label>Investment % {{ allocation_form.investment_percent }}</label>
+    <label>Regular Savings % {{ allocation_form.regular_percent }}</label>
+    <button class="button" type="submit">Save percentages</button>
+  </form>
+</section>
+{% endif %}
+
+{% if revisions %}
+<section class="card" style="margin-top:1.25rem;">
+  <div class="section-title">Previous recommendations</div>
+  {% for rev in revisions %}
+  <div class="muted" style="margin-bottom:0.5rem;">
+    {{ rev.created_at|date:"M j, Y" }} · {{ rev.reason|default:"update" }} · {{ rev.scenario }} · safe-to-save {{ rev.safe_to_save|money }}
+    <div>{{ rev.explanation|truncatechars:160 }}</div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}
