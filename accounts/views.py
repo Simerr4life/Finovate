@@ -1,14 +1,18 @@
+import json
 import logging
 import time
 
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from auth0_server_python.auth_types import LogoutOptions, StartInteractiveLoginOptions
 from auth0_server_python.error import ApiError
@@ -19,6 +23,7 @@ from assistant.models import MessagingLinkCode
 from budgets.services import build_budget_plan
 
 from .auth0 import apply_auth0_cookies, auth0_configured, get_auth0_client, logout_return_url
+from .auth0_backup import upsert_from_auth0_event
 from .forms import EmailLoginForm, EmailSignUpForm, ManualSetupForm, OnboardingForm, ProfileSettingsForm, RegistrationForm
 from .manual_setup import apply_manual_setup, initial_from_existing
 from .identity import (
@@ -45,9 +50,13 @@ from .supabase_auth import (
     sign_up,
     supabase_configured,
 )
-from .verification import resend_verification_email
+from .verification import apply_authoritative_verification, resend_verification_email
 
 logger = logging.getLogger(__name__)
+
+_VERIFY_STATES = frozenset(
+    {"pending", "verified", "already_verified", "expired", "invalid", "failed", "unavailable"}
+)
 
 
 _EMAIL_ERRORS = {
@@ -234,8 +243,6 @@ def auth0_callback(request):
     if not claims.get("sub"):
         return _auth_failure(request, None)
 
-    from django.conf import settings
-
     if settings.AUTH0_AUDIENCE and access_token_expiry(result, settings.AUTH0_AUDIENCE) is None:
         logger.warning("auth0 callback missing api access token")
         return _auth_failure(request, None)
@@ -246,6 +253,17 @@ def auth0_callback(request):
     except Exception:
         logger.warning("auth0 profile sync failed")
         return _auth_failure(request, None)
+
+    # Fresh ID-token claims can upgrade verification; they never prove it alone
+    # when false — Management API refresh covers the email-link return path.
+    if claims.get("email_verified") is True and not profile.email_verified:
+        from .verification import mark_verified_from_trusted_claims
+
+        mark_verified_from_trusted_claims(profile, claims)
+        profile.refresh_from_db()
+    elif not profile.email_verified:
+        apply_authoritative_verification(profile)
+        profile.refresh_from_db()
 
     login(request, profile.user)
     request.session["logged_in_via_auth0"] = True
@@ -317,17 +335,100 @@ def _rate_limited(request, action, limit, period):
 @login_required
 @require_GET
 def verification_pending(request):
+    """Show verification status and refresh from Auth0's authoritative user record.
+
+    A successful redirect alone never marks the account verified.
+    """
     profile = request.user.profile
-    if not profile.auth0_sub or profile.email_verified:
+    if not profile.auth0_sub:
         return redirect(destination_for(request.user))
+
+    state = (request.GET.get("state") or "").strip().lower()
+    if state not in _VERIFY_STATES:
+        state = ""
+
+    if profile.email_verified:
+        if state in ("", "pending"):
+            return redirect(destination_for(request.user))
+        return render(
+            request,
+            "accounts/verify.html",
+            _verify_context(profile, state="already_verified"),
+        )
+
+    # Re-read Auth0 Management API so the email-link path updates without a
+    # full re-login when management credentials are configured.
+    outcome = apply_authoritative_verification(profile)
+    profile.refresh_from_db()
+    if outcome in ("verified", "already_verified") or profile.email_verified:
+        messages.success(request, "Your email is verified. Welcome back.")
+        return redirect(destination_for(request.user))
+
+    # Query-string hints never prove verification. Only failure/pending UI
+    # states are accepted while the profile is still unverified.
+    if state in ("verified", "already_verified"):
+        state = "pending"
+    if not state:
+        if outcome == "unavailable":
+            state = "unavailable"
+        else:
+            state = "pending"
+
+    return render(request, "accounts/verify.html", _verify_context(profile, state=state))
+
+
+def verification_result(request):
+    """Public landing for Auth0 verification email resultUrl redirects.
+
+    Query params (success / message / error) are display hints only. When the
+    visitor is signed in, Auth0 Management API is the source of truth.
+    """
+    success = (request.GET.get("success") or "").lower()
+    error = (request.GET.get("error") or request.GET.get("message") or "").lower()
+    if success in {"true", "1", "yes"}:
+        hint = "verified"
+    elif "expired" in error:
+        hint = "expired"
+    elif "already" in error:
+        hint = "already_verified"
+    elif error or success in {"false", "0", "no"}:
+        hint = "invalid"
+    else:
+        hint = "pending"
+
+    if request.user.is_authenticated and getattr(request.user, "profile", None):
+        profile = request.user.profile
+        if profile.auth0_sub:
+            outcome = apply_authoritative_verification(profile)
+            profile.refresh_from_db()
+            if profile.email_verified or outcome in ("verified", "already_verified"):
+                messages.success(request, "Your email is verified.")
+                return redirect(destination_for(request.user))
+            if outcome == "unavailable" and hint == "verified":
+                # Auth0 may have verified the user but Management API is down;
+                # force a fresh login so the next ID token can upgrade status.
+                return _begin_auth0(request, max_age=0, next_url=reverse("accounts:verify"))
+        return redirect(f"{reverse('accounts:verify')}?state={hint}")
+
     return render(
         request,
         "accounts/verify.html",
         {
-            "identity_status": profile.identity_status or "verification_pending",
-            "email_verified": profile.email_verified,
+            "identity_status": hint,
+            "email_verified": False,
+            "verify_state": hint,
+            "signed_in": False,
         },
     )
+
+
+def _verify_context(profile, state="pending"):
+    return {
+        "identity_status": profile.identity_status or "verification_pending",
+        "email_verified": profile.email_verified,
+        "verify_state": state,
+        "signed_in": True,
+    }
 
 
 @login_required
@@ -335,7 +436,7 @@ def verification_pending(request):
 def verification_resend(request):
     if _rate_limited(request, f"resend:{request.user.pk}", limit=3, period=900):
         messages.error(request, "Please wait before requesting another verification email.")
-        return redirect("accounts:verify")
+        return redirect(f"{reverse('accounts:verify')}?state=pending")
     result = resend_verification_email(request.user.profile.auth0_sub)
     if result == "sent":
         messages.success(request, "Auth0 accepted a new verification email. Check your inbox.")
@@ -346,17 +447,71 @@ def verification_resend(request):
         )
     else:
         messages.error(request, "A new verification email could not be sent. Wait a few minutes and try again.")
-    return redirect("accounts:verify")
+    return redirect(f"{reverse('accounts:verify')}?state=pending")
 
 
 @login_required
 @require_POST
 def verification_refresh(request):
-    """Return to Auth0 so the next callback can read a fresh email_verified claim.
+    """Re-check Auth0, then force a fresh login when still pending.
 
     This does not mark the account verified by itself.
     """
-    return _begin_auth0(request, max_age=0)
+    profile = request.user.profile
+    outcome = apply_authoritative_verification(profile)
+    profile.refresh_from_db()
+    if outcome in ("verified", "already_verified") or profile.email_verified:
+        messages.success(request, "Your email is verified.")
+        return redirect(destination_for(request.user))
+    return _begin_auth0(request, max_age=0, next_url=reverse("accounts:verify"))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def auth0_signup_webhook(request):
+    """Trusted Auth0 Post-User-Registration Action → Supabase backup upsert.
+
+    Authenticated with AUTH0_ACTION_SECRET (Bearer or X-Finovate-Auth0-Secret).
+    Never accepts browser session cookies as privilege for this write path.
+    """
+    expected = (settings.AUTH0_ACTION_SECRET or "").strip()
+    if not expected:
+        return JsonResponse({"error": "not_configured"}, status=503)
+    provided = _action_secret(request)
+    if not provided or provided != expected:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+    if _rate_limited(request, "auth0-action", limit=120, period=60):
+        return JsonResponse({"error": "rate_limited"}, status=429)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+    if not isinstance(payload, dict):
+        return JsonResponse({"error": "invalid_payload"}, status=400)
+    try:
+        record = upsert_from_auth0_event(payload, source="auth0_action")
+    except ValueError:
+        return JsonResponse({"error": "missing_user_id"}, status=400)
+    except Exception:
+        logger.warning("auth0 signup webhook failed")
+        return JsonResponse({"error": "sync_failed"}, status=503)
+    if record is None:
+        return JsonResponse({"error": "sync_failed"}, status=503)
+    return JsonResponse(
+        {
+            "ok": True,
+            "auth0_user_id": record.auth0_user_id,
+            "sync_status": record.sync_status,
+            "email_verified": record.email_verified,
+        }
+    )
+
+
+def _action_secret(request):
+    header = request.META.get("HTTP_AUTHORIZATION", "")
+    if header.lower().startswith("bearer "):
+        return header[7:].strip()
+    return (request.META.get("HTTP_X_FINOVATE_AUTH0_SECRET") or "").strip()
 
 
 @require_POST

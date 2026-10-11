@@ -3,16 +3,44 @@
 {% block content %}
 <section class="card auth-card">
   {% include "partials/brand_logo.html" with large=True %}
-  <div class="page-title">Verification pending</div>
-  <p class="page-subtitle">Status: {{ identity_status }}. This account is not fully verified yet.</p>
-  <p>Check the verification email from Auth0, then come back and continue. Opening this page does not mark the email verified.</p>
-  <form method="post" action="{% url 'accounts:verify_refresh' %}">
-    {% csrf_token %}
-    <button type="submit" class="button" style="width:100%;margin-top:18px;">I've verified my email</button>
-  </form>
-  <form method="post" action="{% url 'accounts:verify_resend' %}">
-    {% csrf_token %}
-    <button type="submit" class="button ghost" style="width:100%;margin-top:12px;">Resend verification email</button>
-  </form>
+  {% if verify_state == "verified" or verify_state == "already_verified" %}
+    <div class="page-title">{% if verify_state == "already_verified" %}Already verified{% else %}Email verified{% endif %}</div>
+    <p class="page-subtitle">Status: {{ identity_status }}.</p>
+    <p>{% if verify_state == "already_verified" %}This email was already verified in Auth0.{% else %}Auth0 confirmed your email address.{% endif %}{% if signed_in %} Continue to Finovate.{% else %} Sign in to continue.{% endif %}</p>
+    {% if signed_in %}
+      <a class="button" style="width:100%;margin-top:18px;display:inline-block;text-align:center;" href="{% url 'dashboard' %}">Continue</a>
+    {% else %}
+      <a class="button" style="width:100%;margin-top:18px;display:inline-block;text-align:center;" href="{% url 'accounts:login' %}">Log in</a>
+    {% endif %}
+  {% elif verify_state == "expired" %}
+    <div class="page-title">Verification link expired</div>
+    <p class="page-subtitle">Status: {{ identity_status }}.</p>
+    <p>That verification link is no longer valid. Request a new email below{% if not signed_in %}, or sign in first{% endif %}.</p>
+  {% elif verify_state == "invalid" or verify_state == "failed" %}
+    <div class="page-title">Verification link invalid</div>
+    <p class="page-subtitle">Status: {{ identity_status }}.</p>
+    <p>Auth0 could not verify this link. Opening this page does not mark the email verified. Request a new email{% if not signed_in %} after signing in{% endif %}.</p>
+  {% elif verify_state == "unavailable" %}
+    <div class="page-title">Verification status unavailable</div>
+    <p class="page-subtitle">Status: {{ identity_status }}.</p>
+    <p>Finovate could not re-read your Auth0 profile just now. Use “I've verified my email” to sign in again so a fresh Auth0 claim can update your account.</p>
+  {% else %}
+    <div class="page-title">Verification pending</div>
+    <p class="page-subtitle">Status: {{ identity_status }}. This account is not fully verified yet.</p>
+    <p>Check the verification email from Auth0, then come back and continue. Opening this page does not mark the email verified.</p>
+  {% endif %}
+
+  {% if signed_in and not email_verified %}
+    <form method="post" action="{% url 'accounts:verify_refresh' %}">
+      {% csrf_token %}
+      <button type="submit" class="button" style="width:100%;margin-top:18px;">I've verified my email</button>
+    </form>
+    <form method="post" action="{% url 'accounts:verify_resend' %}">
+      {% csrf_token %}
+      <button type="submit" class="button ghost" style="width:100%;margin-top:12px;">Resend verification email</button>
+    </form>
+  {% elif not signed_in and verify_state != "verified" and verify_state != "already_verified" %}
+    <a class="button" style="width:100%;margin-top:18px;display:inline-block;text-align:center;" href="{% url 'accounts:login' %}">Log in to finish verification</a>
+  {% endif %}
 </section>
 {% endblock %}

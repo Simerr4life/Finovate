@@ -210,6 +210,9 @@ AUTH0_SECRET = os.environ.get("AUTH0_SECRET", "")
 AUTH0_AUDIENCE = os.environ.get("AUTH0_AUDIENCE", "")
 AUTH0_MGMT_CLIENT_ID = os.environ.get("AUTH0_MGMT_CLIENT_ID", "")
 AUTH0_MGMT_CLIENT_SECRET = os.environ.get("AUTH0_MGMT_CLIENT_SECRET", "")
+# Shared secret for the Auth0 Post-User-Registration Action webhook.
+# Server-side only. Empty disables /accounts/auth0/hooks/signup/.
+AUTH0_ACTION_SECRET = os.environ.get("AUTH0_ACTION_SECRET", "")
 _app_base = os.environ.get("APP_BASE_URL", "").strip()
 if not _app_base and ON_VERCEL:
     _app_base = "https://finovate.biz"
