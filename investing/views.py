@@ -3,15 +3,26 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from accounts.models import NotificationEvent
 
 from .forms import HypotheticalScenarioForm, RoundUpSettingsForm, VerifiedScenarioForm
-from .models import MarketPrice, PortfolioSnapshot, RoundUpLedgerEntry, SimulatedOrder
+from .models import (
+    DemoInvestmentSuggestion,
+    MarketPrice,
+    PortfolioSnapshot,
+    RoundUpLedgerEntry,
+    SimulatedOrder,
+)
 from .services import (
+    accept_demo_investment_suggestion,
+    available_demo_investment_budget,
     approve_order,
     compute_hypothetical_scenario,
     compute_investable_surplus,
+    decline_demo_investment_suggestion,
+    generate_demo_investment_suggestions,
     get_or_create_settings,
     investable_pools,
     pool_investment_summaries,
@@ -63,6 +74,14 @@ def index(request):
     surplus = compute_investable_surplus(request.user)
     pools = investable_pools(request.user)
     pool_summaries = pool_investment_summaries(request.user)
+    demo_suggestions = DemoInvestmentSuggestion.objects.filter(
+        user=request.user, status=DemoInvestmentSuggestion.Status.PENDING
+    ).select_related("simulated_order")[:3]
+    has_demo_market_data = MarketPrice.objects.filter(
+        asset_type=MarketPrice.AssetType.STOCK,
+        is_verified=True,
+        is_demo_sample=True,
+    ).exists()
     market_rows = []
     for row in MarketPrice.objects.all().order_by("symbol", "-date"):
         if not any(existing["symbol"] == row.symbol for existing in market_rows):
@@ -89,9 +108,101 @@ def index(request):
         "investable_pools": pools,
         "pool_summaries": pool_summaries,
         "market_rows": market_rows,
+        "demo_suggestions": demo_suggestions,
+        "reviewed_demo_suggestions": DemoInvestmentSuggestion.objects.filter(
+            user=request.user
+        ).exclude(status=DemoInvestmentSuggestion.Status.PENDING).select_related(
+            "simulated_order"
+        )[:5],
+        "has_demo_market_data": has_demo_market_data,
         "tab": request.GET.get("tab", "portfolio"),
     }
     return render(request, "investing/index.html", context)
+
+
+@login_required
+@require_POST
+def generate_demo_suggestions_view(request):
+    if not MarketPrice.objects.filter(
+        asset_type=MarketPrice.AssetType.STOCK,
+        is_verified=True,
+        is_demo_sample=True,
+    ).exists():
+        messages.info(
+            request,
+            "Load the supplied sample prices first with "
+            "`python manage.py seed_excel_demo_market`.",
+        )
+    else:
+        suggestions = generate_demo_investment_suggestions(request.user)
+        pending_count = sum(
+            suggestion.status == DemoInvestmentSuggestion.Status.PENDING
+            for suggestion in suggestions
+        )
+        if pending_count:
+            messages.success(
+                request,
+                f"{pending_count} demo recommendation(s) are ready for your review. "
+                "Nothing has been invested.",
+            )
+        elif not available_demo_investment_budget(request.user):
+            messages.info(
+                request,
+                "No recommendations generated because your current estimated "
+                "investable surplus is $0.00.",
+            )
+        elif suggestions:
+            messages.info(
+                request,
+                "You have already reviewed recommendations for this sample-data snapshot.",
+            )
+        else:
+            messages.info(
+                request,
+                "The supplied sample does not contain enough dated stock prices "
+                "to generate demo recommendations.",
+            )
+    return redirect("investing:index")
+
+
+@login_required
+@require_POST
+def accept_demo_suggestion_view(request, pk):
+    suggestion = get_object_or_404(
+        DemoInvestmentSuggestion,
+        pk=pk,
+        user=request.user,
+        status=DemoInvestmentSuggestion.Status.PENDING,
+    )
+    pool = None
+    pool_id = request.POST.get("pool")
+    if pool_id:
+        pool = get_object_or_404(investable_pools(request.user), pk=pool_id)
+    try:
+        order = accept_demo_investment_suggestion(request.user, suggestion, pool)
+    except ValueError as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(
+            request,
+            f"Accepted {order.symbol} as a simulated pending order. "
+            "Review and approve it below to record it in your demo portfolio.",
+        )
+    return redirect("investing:index")
+
+
+@login_required
+@require_POST
+def decline_demo_suggestion_view(request, pk):
+    suggestion = get_object_or_404(
+        DemoInvestmentSuggestion,
+        pk=pk,
+        user=request.user,
+        status=DemoInvestmentSuggestion.Status.PENDING,
+    )
+    decline_demo_investment_suggestion(request.user, suggestion)
+    messages.info(request, "Demo recommendation declined. No order was created.")
+    return redirect("investing:index")
 
 
 @login_required

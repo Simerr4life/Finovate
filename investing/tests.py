@@ -8,12 +8,23 @@ from savings.models import Goal
 from transactions.models import Transaction
 
 from .forms import VerifiedScenarioForm
-from .models import MarketPrice, PortfolioSnapshot, RoundUpLedgerEntry, RoundUpSettings, SimulatedOrder
+from .models import (
+    DemoInvestmentSuggestion,
+    MarketPrice,
+    PortfolioSnapshot,
+    RoundUpLedgerEntry,
+    RoundUpSettings,
+    SimulatedOrder,
+)
 from .services import (
+    accept_demo_investment_suggestion,
     approve_order,
+    available_demo_investment_budget,
     compute_hypothetical_scenario,
     compute_investable_surplus,
     create_roundup_for_transaction,
+    decline_demo_investment_suggestion,
+    generate_demo_investment_suggestions,
     investable_pools,
     pool_investment_summaries,
     propose_surplus_investment,
@@ -290,6 +301,213 @@ class MarketDataSeedTests(TestCase):
         call_command("seed_market_data")
         call_command("seed_market_data", reset=True)
         self.assertEqual(MarketPrice.objects.count(), 18)
+
+    def test_excel_demo_seed_loads_109_rows_and_is_idempotent(self):
+        from django.core.management import call_command
+
+        call_command("seed_excel_demo_market")
+        self.assertEqual(MarketPrice.objects.count(), 109)
+        call_command("seed_excel_demo_market")
+        self.assertEqual(MarketPrice.objects.count(), 109)
+        self.assertTrue(
+            MarketPrice.objects.filter(
+                symbol="GOOGL",
+                date="2026-09-30",
+                close=Decimal("344.08"),
+                is_demo_sample=True,
+            ).exists()
+        )
+
+
+class DemoAISuggestionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="demo-ai-user", password="test-password")
+        self.other_user = User.objects.create_user(username="other-demo-ai", password="test-password")
+        Transaction.objects.create(
+            user=self.user,
+            kind=Transaction.Kind.INCOME,
+            amount=Decimal("100.00"),
+            occurred_on="2026-09-01",
+        )
+        for symbol, closes, changes in (
+            ("AAA", ("100.00", "110.00", "121.00"), ("10.00", "10.00", "10.00")),
+            ("BBB", ("100.00", "105.00", "110.00"), ("5.00", "4.76", "4.76")),
+            ("CCC", ("100.00", "95.00", "90.00"), ("-5.00", "-5.26", "-5.26")),
+            ("^INDEX", ("100.00", "120.00", "130.00"), (None, None, None)),
+        ):
+            for day, close, change in zip(
+                ("2026-09-01", "2026-09-02", "2026-09-03"), closes, changes
+            ):
+                MarketPrice.objects.create(
+                    symbol=symbol,
+                    asset_type=(
+                        MarketPrice.AssetType.INDEX
+                        if symbol.startswith("^")
+                        else MarketPrice.AssetType.STOCK
+                    ),
+                    date=day,
+                    close=Decimal(close),
+                    daily_change_percent=Decimal(change) if change is not None else None,
+                    source_note="Demo test sample",
+                    is_verified=True,
+                    is_demo_sample=True,
+                )
+
+    def test_recommendations_rank_sample_stocks_and_observe_surplus_cap(self):
+        suggestions = generate_demo_investment_suggestions(self.user)
+
+        self.assertEqual(len(suggestions), 3)
+        self.assertEqual(suggestions[0].symbol, "AAA")
+        self.assertEqual(sum((item.amount for item in suggestions), Decimal("0")), Decimal("75.00"))
+        self.assertNotIn("^INDEX", [item.symbol for item in suggestions])
+        self.assertIn("does not predict future results", suggestions[0].explanation)
+
+    def test_non_demo_market_rows_do_not_influence_excel_recommendations(self):
+        MarketPrice.objects.create(
+            symbol="REAL-ROW",
+            asset_type=MarketPrice.AssetType.STOCK,
+            date="2026-09-30",
+            close=Decimal("1000.00"),
+            daily_change_percent=Decimal("50.00"),
+            source_note="Other market dataset",
+            is_verified=True,
+            is_demo_sample=False,
+        )
+        MarketPrice.objects.create(
+            symbol="REAL-ROW",
+            asset_type=MarketPrice.AssetType.STOCK,
+            date="2026-09-29",
+            close=Decimal("500.00"),
+            daily_change_percent=Decimal("50.00"),
+            source_note="Other market dataset",
+            is_verified=True,
+            is_demo_sample=False,
+        )
+
+        suggestions = generate_demo_investment_suggestions(self.user)
+
+        self.assertNotIn("REAL-ROW", [item.symbol for item in suggestions])
+
+    def test_recommendations_are_idempotent_for_the_same_data_snapshot(self):
+        first = generate_demo_investment_suggestions(self.user)
+        second = generate_demo_investment_suggestions(self.user)
+
+        self.assertEqual([item.pk for item in first], [item.pk for item in second])
+        self.assertEqual(DemoInvestmentSuggestion.objects.filter(user=self.user).count(), 3)
+
+    def test_accept_creates_a_pending_simulated_order_with_excel_price_metadata(self):
+        suggestion = generate_demo_investment_suggestions(self.user)[0]
+
+        order = accept_demo_investment_suggestion(self.user, suggestion)
+
+        self.assertEqual(order.status, SimulatedOrder.Status.PENDING)
+        self.assertEqual(order.symbol, suggestion.symbol)
+        self.assertEqual(order.demo_execution_price, suggestion.demo_execution_price)
+        self.assertEqual(order.demo_data_date, suggestion.data_date)
+        self.assertGreater(order.demo_shares, Decimal("0"))
+        self.assertFalse(PortfolioSnapshot.objects.filter(user=self.user).exists())
+        suggestion.refresh_from_db()
+        self.assertEqual(suggestion.status, DemoInvestmentSuggestion.Status.ACCEPTED)
+        self.assertEqual(suggestion.simulated_order, order)
+
+    def test_decline_creates_no_order(self):
+        suggestion = generate_demo_investment_suggestions(self.user)[0]
+
+        decline_demo_investment_suggestion(self.user, suggestion)
+
+        suggestion.refresh_from_db()
+        self.assertEqual(suggestion.status, DemoInvestmentSuggestion.Status.DECLINED)
+        self.assertFalse(SimulatedOrder.objects.filter(user=self.user).exists())
+
+    def test_accept_rejects_if_available_surplus_dropped(self):
+        suggestion = generate_demo_investment_suggestions(self.user)[0]
+        Transaction.objects.filter(user=self.user, kind=Transaction.Kind.INCOME).update(
+            amount=Decimal("10.00")
+        )
+
+        with self.assertRaisesMessage(ValueError, "current investable surplus"):
+            accept_demo_investment_suggestion(self.user, suggestion)
+
+        self.assertFalse(SimulatedOrder.objects.filter(user=self.user).exists())
+
+    def test_recommendations_never_exceed_small_surplus(self):
+        Transaction.objects.filter(user=self.user, kind=Transaction.Kind.INCOME).update(
+            amount=Decimal("0.02")
+        )
+
+        suggestions = generate_demo_investment_suggestions(self.user)
+
+        self.assertEqual(len(suggestions), 2)
+        self.assertEqual(sum((item.amount for item in suggestions), Decimal("0")), Decimal("0.02"))
+
+    def test_suggestion_is_user_scoped(self):
+        suggestion = generate_demo_investment_suggestions(self.user)[0]
+
+        with self.assertRaises(DemoInvestmentSuggestion.DoesNotExist):
+            accept_demo_investment_suggestion(self.other_user, suggestion)
+
+    def test_pending_and_filled_simulated_orders_reduce_recommendation_budget(self):
+        pending = propose_surplus_investment(self.user, Decimal("20.00"))
+        self.assertEqual(available_demo_investment_budget(self.user), Decimal("80.00"))
+        approve_order(pending)
+        self.assertEqual(available_demo_investment_budget(self.user), Decimal("80.00"))
+        pending.status = SimulatedOrder.Status.REJECTED
+        pending.save()
+        self.assertEqual(available_demo_investment_budget(self.user), Decimal("100.00"))
+
+
+class DemoAISuggestionViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="demo-ai-view", password="test-password")
+        self.client.force_login(self.user)
+        Transaction.objects.create(
+            user=self.user,
+            kind=Transaction.Kind.INCOME,
+            amount=Decimal("100.00"),
+            occurred_on="2026-09-01",
+        )
+        for symbol, close in (("AAA", "100.00"), ("BBB", "200.00")):
+            for day, price in (("2026-09-01", close), ("2026-09-02", str(Decimal(close) + 1))):
+                MarketPrice.objects.create(
+                    symbol=symbol,
+                    asset_type=MarketPrice.AssetType.STOCK,
+                    date=day,
+                    close=Decimal(price),
+                    daily_change_percent=Decimal("1.00"),
+                    source_note="Demo test sample",
+                    is_verified=True,
+                    is_demo_sample=True,
+                )
+
+    def test_index_prominently_discloses_demo_ai(self):
+        response = self.client.get("/investing/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "FINOVATE DEMO AI")
+        self.assertContains(response, "no brokerage")
+
+    def test_generate_accept_and_decline_are_explicit_post_actions(self):
+        response = self.client.post("/investing/demo-ai/generate/")
+        self.assertRedirects(response, "/investing/")
+        suggestions = list(DemoInvestmentSuggestion.objects.filter(user=self.user))
+        self.assertEqual(len(suggestions), 2)
+
+        response = self.client.post(
+            f"/investing/demo-ai/{suggestions[0].pk}/accept/",
+            {"pool": ""},
+        )
+        self.assertRedirects(response, "/investing/")
+        suggestions[0].refresh_from_db()
+        self.assertEqual(suggestions[0].status, DemoInvestmentSuggestion.Status.ACCEPTED)
+        self.assertEqual(SimulatedOrder.objects.filter(user=self.user).count(), 1)
+
+        response = self.client.post(
+            f"/investing/demo-ai/{suggestions[1].pk}/decline/"
+        )
+        self.assertRedirects(response, "/investing/")
+        suggestions[1].refresh_from_db()
+        self.assertEqual(suggestions[1].status, DemoInvestmentSuggestion.Status.DECLINED)
+        self.assertEqual(SimulatedOrder.objects.filter(user=self.user).count(), 1)
 
 
 class VerifiedScenarioFormTests(TestCase):

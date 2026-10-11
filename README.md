@@ -136,6 +136,10 @@ not label those rows. Re-running the command updates the same records by
   is connected; "sweeping" round-ups and "filling" orders are local
   database updates, not real trades. The investing page and dashboard
   both carry explicit "simulated" labels and risk disclaimers.
+  - **Sample-data demo recommendations:** load the supplied historical
+    dataset with `python manage.py seed_excel_demo_market`. The Investing
+    page then offers transparent rule-based ideas for explicit user
+    acceptance or decline; see [docs/demo-ai-investing.md](docs/demo-ai-investing.md).
 - **Identity:** Auth0 is the account provider when configured. A local
   login remains for this server.
 - **Messaging:** Photon Spectrum inbound webhooks are verified. This
