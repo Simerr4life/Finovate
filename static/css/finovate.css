@@ -183,7 +183,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .insight div { display: grid; gap: 4px; }
 .insight strong { font-size: 12px; }
 .insight span { color: var(--muted); font-size: 10px; line-height: 1.4; }
-.filter-row { display: flex; gap: 10px; padding: 18px; border-bottom: 1px solid var(--border); }
+.filter-row { display: flex; flex-wrap: wrap; gap: 10px; padding: 18px; border-bottom: 1px solid var(--border); }
 .search-box { min-width: 270px; flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
 .search-box input { width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px; }
 select, .field-label input { min-height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--ink); font-size: 12px; }
@@ -200,7 +200,7 @@ select, .field-label input { min-height: 40px; padding: 0 12px; border: 1px soli
 .surplus-ring { width: 100px; height: 100px; display: grid; place-content: center; text-align: center; border-radius: 50%; background: radial-gradient(circle, white 60%, transparent 61%), conic-gradient(var(--green) 19.6%, #e8ece8 0); }
 .surplus-ring strong { font: 700 17px "Manrope"; }
 .surplus-ring span { color: var(--muted); font-size: 9px; }
-.two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.two-column { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
 .two-column > .card { padding: 23px; }
 .waterfall { margin-top: 13px; }
 .waterfall div { display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
@@ -356,7 +356,7 @@ select, .field-label input { min-height: 40px; padding: 0 12px; border: 1px soli
 .insight-strip > div:last-child { border: 0; }
 .insight-strip strong { font-size: 12px; }
 .insight-strip span { color: var(--muted); font-size: 10px; line-height: 1.45; }
-.settings-layout { display: grid; grid-template-columns: 240px 1fr; gap: 18px; }
+.settings-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; }
 .settings-nav { padding: 8px; height: max-content; }
 .settings-nav button, .settings-nav a { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 11px; border: 0; border-radius: 8px; background: none; color: var(--muted); text-align: left; font-size: 11px; cursor: pointer; text-decoration: none; }
 .settings-nav button.active, .settings-nav a.active { color: var(--ink); background: var(--green-soft); font-weight: 600; }
@@ -421,7 +421,7 @@ select, .field-label input { min-height: 40px; padding: 0 12px; border: 1px soli
   .summary-card { padding: 15px; }
   .summary-card .money { font-size: 20px; }
   .summary-detail { font-size: 9px; }
-  .dashboard-grid, .two-column, .savings-hero, .calculator-grid, .settings-layout { grid-template-columns: 1fr; }
+  .dashboard-grid, .two-column, .savings-hero, .calculator-grid, .settings-layout { grid-template-columns: minmax(0, 1fr); }
   .balance-card, .recent-card, .insights-card { padding: 17px; }
   .range-tabs { max-width: 100%; }
   .range-tabs button { padding: 6px 7px; }
@@ -503,7 +503,7 @@ a.button { text-decoration: none; }
 .how-title { text-align: center; font: 700 28px/1.2 "Manrope", sans-serif; margin: 56px 0 8px; }
 .field { display: grid; gap: 7px; margin-top: 16px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .django-form input, .django-form select, .django-form textarea,
-input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], input[type=color], textarea {
+input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], input[type=month], input[type=time], input[type=search], input[type=tel], input[type=url], input[type=color], textarea {
   min-height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 9px; background: white; color: var(--ink); font-size: 12px; width: 100%;
 }
 textarea { min-height: 80px; padding: 10px 12px; }
@@ -848,6 +848,129 @@ body[data-theme="dark"] .market-asset-card, body[data-theme="dark"] .holding-cha
 }
 @media (max-width: 760px) {
   .marketing-grid, .feature-grid { grid-template-columns: 1fr; }
-  .page-footer { margin: 0 14px 90px; }
+  .page-footer { margin: 0 16px 24px; }
   .auth-body { padding: 28px 14px 80px; }
 }
+
+/* Form controls: checkboxes and file pickers inside field labels inherited text-input sizing. */
+.field-label input[type=checkbox], .field-label input[type=radio], .django-form input[type=checkbox], .django-form input[type=radio] { width: 20px; height: 20px; min-height: 0; padding: 0; accent-color: var(--green); }
+.field-label input[type=file], .django-form input[type=file] { width: 100%; max-width: 100%; min-height: 40px; padding: 8px 0; color: var(--muted); font-size: 12px; }
+.button, .icon-button, .text-link, .nav-item, .range-tabs a, .range-tabs button, .top-tabs a, .top-tabs button, .settings-nav a, .settings-nav button { transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .1s ease; }
+.button.secondary:hover { border-color: #c9d3cc; background: var(--surface-2); }
+.button.ghost:hover { color: var(--ink); background: var(--surface-2); }
+.button:active:not(:disabled), .icon-button:active { transform: translateY(1px); }
+a:focus-visible, .button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid rgba(47, 125, 98, .32); outline-offset: 2px; }
+.list-row > span { min-width: 0; overflow-wrap: anywhere; }
+.list-row > form { flex: 0 0 auto; }
+
+/* Phone polish: readable type, 44px touch targets, safe areas, no sideways scroll. */
+@media (max-width: 760px) {
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(70px + env(safe-area-inset-top)); scroll-padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  body { -webkit-tap-highlight-color: rgba(47, 125, 98, .12); }
+  .main { padding-top: calc(58px + env(safe-area-inset-top)); }
+  .mobile-header { height: calc(58px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
+  .mobile-header .brand { font-size: 20px; }
+  .mobile-header .brand-logo { height: 32px; }
+  .mobile-header .icon-button { width: 44px; height: 44px; }
+  .mobile-menu { top: calc(58px + env(safe-area-inset-top)); max-height: calc(100vh - 58px - 66px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); max-height: calc(100dvh - 58px - 66px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; padding: 12px max(12px, env(safe-area-inset-right)) 14px max(12px, env(safe-area-inset-left)); border-radius: 0 0 16px 16px; }
+  .mobile-menu a, .mobile-menu button { min-height: 48px; font-size: 14px; font-weight: 500; }
+  .mobile-menu a:active { background: rgba(255,255,255,.08); }
+  .bottom-nav { padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .bottom-nav a, .bottom-nav button { min-width: 0; gap: 4px; font-size: 10px; font-weight: 500; cursor: pointer; }
+  .bottom-nav a span, .bottom-nav button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bottom-nav svg { width: 22px; height: 22px; }
+  .bottom-nav button[aria-expanded="true"] { color: #69b693; }
+
+  .content { padding: 20px 16px 32px; }
+  body.guest .content { padding-top: 28px; }
+  .auth-top { height: auto; min-height: 64px; padding: 10px 16px; gap: 10px; }
+  .auth-top .brand { padding: 0; font-size: 19px; }
+  .auth-top .brand-logo { height: 32px; }
+  .auth-top .button-row { flex-wrap: nowrap; gap: 4px; }
+  .page-title { font-size: 24px; line-height: 1.2; overflow-wrap: anywhere; }
+  .page-heading > .button-row { width: 100%; }
+  .page-heading > .button-row > .button { flex: 1 1 auto; }
+  .content > .flex.justify-between { flex-wrap: wrap; gap: 12px; }
+
+  /* Readable small text (was 8–10px). */
+  .eyebrow, .label { font-size: 11px; letter-spacing: 1px; }
+  .summary-detail { font-size: 11px; line-height: 1.35; }
+  .muted, .help-text, .field-label, .field { font-size: 12px; }
+  .transaction-name strong, .insight strong, .amount { font-size: 13px; }
+  .transaction-name small, .etf-row small, .insight span, .date-cell { font-size: 11px; }
+  .callout, .disclosure, .estimate-note, .demo-ai-disclaimer, .demo-ai-explanation, .goal-nudge span, .goal-milestone small, .goal-footer, .goal-distance-labels, .goal-plan-balance span, .goal-pace-options span, .goal-pace-heading span, .insight-strip span, .market-buy-note, .market-buy-heading span, .market-chart-help, .market-chart-range, .market-chart-legend { font-size: 11px; }
+  .chart-y, .chart-x, .bar-group span { font-size: 10px; }
+
+  /* Touch targets ~44px and 16px inputs so iOS doesn't zoom on focus. */
+  .button { min-height: 44px; padding: 0 16px; font-size: 13px; }
+  .icon-button { width: 44px; height: 44px; }
+  select, .field-label input, .django-form input, .django-form select, textarea,
+  input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], input[type=month], input[type=time], input[type=search], input[type=tel], input[type=url] { min-height: 44px; font-size: 16px; }
+  .field-label input[type=checkbox], .field-label input[type=radio], .django-form input[type=checkbox], .django-form input[type=radio], input[type=color] { min-height: 0; font-size: inherit; }
+  input[type=color] { min-height: 44px; }
+  .search-box { min-height: 44px; }
+  .search-box input { font-size: 16px; }
+  .text-link { min-height: 40px; padding: 4px 0; font-size: 13px; }
+  .danger-link { min-height: 40px; padding: 0 4px; font-size: 13px; }
+  .range-tabs button, .range-tabs a { min-height: 32px; padding: 6px 9px; font-size: 11px; }
+  .top-tabs { max-width: 100%; overflow-x: auto; }
+  .top-tabs a, .top-tabs button { min-height: 36px; display: inline-flex; align-items: center; white-space: nowrap; }
+  .settings-nav { padding: 6px; scrollbar-width: none; }
+  .settings-nav::-webkit-scrollbar { display: none; }
+  .settings-nav a, .settings-nav button { min-height: 40px; padding: 10px 14px; font-size: 13px; }
+  .goal-menu { width: 44px; height: 44px; right: 8px; top: 8px; }
+  .market-view-button { min-height: 36px; font-size: 12px; }
+  .check-row { min-height: 44px; }
+  .toggle-row { gap: 14px; }
+  .toggle-row input { flex: 0 0 auto; width: 22px; height: 22px; }
+  details > summary { min-height: 36px; display: flex; align-items: center; }
+  .list-row { flex-wrap: wrap; padding: 10px 12px; }
+
+  /* Layout fixes. */
+  .card-header { flex-wrap: wrap; }
+  .card-header > :first-child { min-width: 0; }
+  .filter-row { gap: 8px; }
+  .filter-row > input, .filter-row > select { flex: 1 1 140px; min-width: 0; }
+  .filter-row > .button { flex: 1 1 100%; }
+  .goal-coaching > div:nth-child(2) { min-width: calc(100% - 52px); }
+  .goal-count { margin-left: 52px; }
+  .inline-fields { gap: 0 12px; }
+  .inline-fields > .field-label { flex: 1 1 140px; min-width: 0; }
+  .inline-fields > .button { margin-top: 12px; }
+  .p-6, .p-8 { padding: 18px; }
+  .card.padded, .settings-panel, .two-column > .card, .calculator-grid .card, .savings-total, .surplus-card, .goal-card, .recommendation { padding: 18px; }
+  .auth-card, .form-card { padding: 22px 18px; }
+  .data-table th, .data-table td { white-space: nowrap; }
+  .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+  .how-title { font-size: 24px; margin-top: 40px; }
+
+  /* Review dialog becomes a bottom sheet that never exceeds the screen. */
+  .modal-backdrop { align-items: end; padding: 0; }
+  .modal { width: 100%; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; }
+  .modal-actions { flex-wrap: wrap-reverse; }
+  .modal-actions .button { flex: 1 1 140px; }
+  .review-amount .money { font-size: 24px; }
+}
+
+@media (max-width: 380px) {
+  .content { padding-left: 12px; padding-right: 12px; }
+  .summary-card { padding: 13px; }
+  .summary-card .money { font-size: 18px; }
+  .range-tabs button, .range-tabs a { padding: 6px 7px; }
+  .goal-pace-options { grid-template-columns: 1fr; }
+  .auth-top .button { padding: 0 12px; }
+  .page-footer { margin-left: 12px; margin-right: 12px; }
+  .bottom-nav a, .bottom-nav button { font-size: 9px; letter-spacing: -.1px; }
+}
+
+@media (hover: none) {
+  .transaction-row:hover { background: transparent; }
+}
+
+/* Let single-column stacks and donut legends shrink instead of overflowing narrow columns. */
+.stack { grid-template-columns: minmax(0, 1fr); }
+.donut-wrap { flex-wrap: wrap; }
+.donut-wrap > .allocation-list { flex: 1 1 160px; min-width: 0; }
+.field-label > select, .field-label > input:not([type=checkbox]):not([type=radio]) { min-width: 0; max-width: 100%; }
+.inline-fields select { width: 100%; }
+.filter-row > input { width: auto; }

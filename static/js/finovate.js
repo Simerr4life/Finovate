@@ -1,10 +1,30 @@
 (function () {
   const mobileMenu = document.querySelector("[data-mobile-menu]");
-  document.querySelectorAll("[data-menu-toggle]").forEach(function (menuBtn) {
+  const menuToggles = document.querySelectorAll("[data-menu-toggle]");
+  function setMenuOpen(open) {
+    if (!mobileMenu) return;
+    mobileMenu.classList.toggle("hidden", !open);
+    menuToggles.forEach(function (btn) { btn.setAttribute("aria-expanded", open ? "true" : "false"); });
+  }
+  menuToggles.forEach(function (menuBtn) {
+    menuBtn.setAttribute("aria-expanded", "false");
     menuBtn.addEventListener("click", function () {
-      if (mobileMenu) mobileMenu.classList.toggle("hidden");
+      if (mobileMenu) setMenuOpen(mobileMenu.classList.contains("hidden"));
     });
   });
+  if (mobileMenu) {
+    mobileMenu.addEventListener("click", function (event) {
+      if (event.target.closest("a")) setMenuOpen(false);
+    });
+    document.addEventListener("click", function (event) {
+      if (mobileMenu.classList.contains("hidden")) return;
+      if (mobileMenu.contains(event.target) || event.target.closest("[data-menu-toggle]")) return;
+      setMenuOpen(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !mobileMenu.classList.contains("hidden")) setMenuOpen(false);
+    });
+  }
 
   document.querySelectorAll("[data-open-review]").forEach(function (btn) {
     btn.addEventListener("click", function () {

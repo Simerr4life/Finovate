@@ -3,15 +3,18 @@
 <html lang="en" data-theme="{% if user.is_authenticated %}{{ user.profile.theme }}{% else %}light{% endif %}">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#112b2b">
   <title>{% block title %}Finovate{% endblock %}</title>
-  <link rel="icon" href="{% static 'brand/favicon.ico' %}" sizes="32x32">
-  <link rel="icon" href="{% static 'brand/Finovate_Logo.svg' %}" type="image/svg+xml">
-  <link rel="icon" href="{% static 'brand/favicon-32.png' %}" type="image/png" sizes="32x32">
-  <link rel="apple-touch-icon" href="{% static 'brand/apple-touch-icon.png' %}">
+  <link rel="icon" href="{% static 'brand/favicon.ico' %}?v=3" sizes="16x16 32x32 48x48">
+  <link rel="icon" href="{% static 'brand/favicon.svg' %}?v=3" type="image/svg+xml">
+  <link rel="icon" href="{% static 'brand/favicon-32.png' %}?v=3" type="image/png" sizes="32x32">
+  <link rel="icon" href="{% static 'brand/favicon-16.png' %}?v=3" type="image/png" sizes="16x16">
+  <link rel="icon" href="{% static 'brand/icon-192.png' %}?v=3" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="{% static 'brand/apple-touch-icon.png' %}?v=3" sizes="180x180">
   <meta name="application-name" content="Finovate">
   <meta name="apple-mobile-web-app-title" content="Finovate">
-  <link rel="stylesheet" href="{% static 'css/finovate.css' %}">
+  <link rel="stylesheet" href="{% static 'css/finovate.css' %}?v=3">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% if not user.is_authenticated %}guest{% endif %}" data-theme="{% if user.is_authenticated %}{{ user.profile.theme }}{% else %}light{% endif %}">
@@ -73,9 +76,9 @@
         {% include "partials/brand_logo.html" %}
         <span>finovate</span>
       </a>
-      <button class="icon-button" type="button" data-menu-toggle aria-label="Open menu">{% include "partials/icon.html" with name="menu" %}</button>
+      <button class="icon-button" type="button" data-menu-toggle aria-label="Open menu" aria-controls="mobile-menu">{% include "partials/icon.html" with name="menu" %}</button>
     </header>
-    <div class="mobile-menu hidden" data-mobile-menu>
+    <nav class="mobile-menu hidden" id="mobile-menu" data-mobile-menu aria-label="All sections">
       <a class="{% if nav_active == 'overview' %}active{% endif %}" href="{% url 'dashboard' %}">{% include "partials/icon.html" with name="grid" %} Overview</a>
       <a class="{% if nav_active == 'transactions' %}active{% endif %}" href="{% url 'budgets:transaction_list' %}">{% include "partials/icon.html" with name="card" %} Transactions</a>
       <a class="{% if nav_active == 'savings' %}active{% endif %}" href="{% url 'savings:index' %}">{% include "partials/icon.html" with name="vault" %} Savings</a>
@@ -84,7 +87,7 @@
       <a class="{% if nav_active == 'goals' %}active{% endif %}" href="{% url 'savings:goals' %}">{% include "partials/icon.html" with name="target" %} Financial Goals</a>
       <a class="{% if nav_active == 'insights' %}active{% endif %}" href="{% url 'insights' %}">{% include "partials/icon.html" with name="chart" %} Insights</a>
       <a class="{% if nav_active == 'settings' %}active{% endif %}" href="{% url 'accounts:settings' %}">{% include "partials/icon.html" with name="settings" %} Settings</a>
-    </div>
+    </nav>
 
     <main class="main" id="main-content">
       <div class="desktop-topbar">
@@ -120,12 +123,12 @@
       <a class="{% if nav_active == 'savings' %}active{% endif %}" href="{% url 'savings:index' %}">{% include "partials/icon.html" with name="vault" %}<span>Savings</span></a>
       <a class="{% if nav_active == 'pools' %}active{% endif %}" href="{% url 'savings:pools' %}">{% include "partials/icon.html" with name="target" %}<span>Pools</span></a>
       <a class="{% if nav_active == 'investments' %}active{% endif %}" href="{% url 'investing:index' %}">{% include "partials/icon.html" with name="trend" %}<span>Investments</span></a>
-      <button type="button" data-menu-toggle>{% include "partials/icon.html" with name="menu" %}<span>More</span></button>
+      <button type="button" data-menu-toggle aria-controls="mobile-menu">{% include "partials/icon.html" with name="menu" %}<span>More</span></button>
     </nav>
   </div>
 
   {% include "partials/review_modal.html" %}
-  <script src="{% static 'js/finovate.js' %}?v=2"></script>
+  <script src="{% static 'js/finovate.js' %}?v=3"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>
