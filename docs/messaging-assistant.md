@@ -25,8 +25,10 @@ builds on that explicit, conscious override — not a default assumption.
   loop against the real assistant logic. This is the recommended way to
   demo the feature; it has zero dependency on Photon actually working.
 - `/assistant/photon-webhook/` — verifies Spectrum signatures and runs
-  the assistant. `delivered` is false because this process does not send
-  iMessage. Tested with signed fixtures, never a live Photon call.
+  the assistant. `delivered` is false on this path. Tested with signed
+  fixtures, never a live Photon call.
+- `/assistant/bridge/` + `spectrum/` — Node Spectrum adapter asks Django
+  for a reply and sends it over iMessage (or the terminal provider).
 
 **Photon Spectrum transport (verified against Stable docs):**
 
@@ -51,18 +53,29 @@ when that secret is missing. Only text content with `direction` inbound
 is passed to the assistant. Other content types are acknowledged and
 ignored.
 
-**Not implemented, because Photon does not document a Python send API:**
-this process does not call `postMessage` or `thread.post`. The JSON
-field `delivered` is always `false`. A reply in the response body is the
-text the assistant computed; it is not an iMessage delivery receipt.
-Sending that text over iMessage still requires the Node
-`chat-adapter-imessage` client (`IMESSAGE_PROJECT_ID` and
-`IMESSAGE_PROJECT_SECRET` for Spectrum Cloud). Do not treat `reply` as
-proof the user received a message.
+**Outbound iMessage is sent by the Node Spectrum adapter** in
+`spectrum/`, not by Django. That adapter calls
+`POST /assistant/bridge/` with `X-Finovate-Bridge-Secret`, runs the same
+assistant brain as the webhook, then `message.reply(...)` over Spectrum.
+Webhook responses still set `delivered: false` because the webhook path
+does not send. Do not treat a webhook `reply` field as proof the user
+received a message — only the Node adapter confirms delivery.
 
 Link a chat by storing Spectrum `space.id` (or the legacy `chatId`) on
 `Profile.photon_chat_id`. Tests sign requests locally and never call
 Photon.
+
+**Node adapter config** (`spectrum/.env`):
+
+| Variable | Purpose |
+|---|---|
+| `PROJECT_ID` / `PROJECT_SECRET` | Spectrum Cloud credentials |
+| `FINOVATE_URL` | Django origin, e.g. `http://127.0.0.1:8000` |
+| `ASSISTANT_BRIDGE_SECRET` | Same value as Django `ASSISTANT_BRIDGE_SECRET` (falls back to `PROJECT_SECRET`) |
+| `SPECTRUM_PROVIDERS` | `imessage`, `terminal`, or both |
+
+Local TUI without Photon: `SPECTRUM_PROVIDERS=terminal bun start` with
+Django running and (in DEBUG) no bridge secret required.
 
 ## Linking a Finovate account to a chat
 

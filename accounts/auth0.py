@@ -8,7 +8,7 @@ from django.conf import settings
 
 from auth0_server_python.auth_server.server_client import ServerClient
 from auth0_server_python.auth_types import StateData, TransactionData
-from auth0_server_python.store.abstract import AbstractDataStore
+from auth0_server_python.store import StateStore, TransactionStore
 
 
 def auth0_configured() -> bool:
@@ -28,17 +28,21 @@ def logout_return_url() -> str:
     return settings.APP_BASE_URL.rstrip("/") + "/"
 
 
-class DjangoCookieStore(AbstractDataStore):
-    """Encrypted-cookie store the Auth0 SDK uses for the login transaction
-    and the Auth0 session. Pending writes are applied to the Django
-    response by apply_auth0_cookies().
-    """
+def _pending(request):
+    pending = getattr(request, "_auth0_cookies", None)
+    if pending is None:
+        pending = {}
+        request._auth0_cookies = pending
+    return pending
 
-    def __init__(self, secret, cookie_name, max_age, model):
+
+class DjangoTransactionStore(TransactionStore):
+    """Short-lived Auth0 login transaction in an encrypted cookie."""
+
+    def __init__(self, secret, cookie_name="_a0_tx", max_age=300):
         super().__init__({"secret": secret})
         self.cookie_name = cookie_name
         self.max_age = max_age
-        self.model = model
 
     async def set(self, identifier, state, remove_if_expires=False, options=None):
         request = (options or {})["request"]
@@ -54,7 +58,7 @@ class DjangoCookieStore(AbstractDataStore):
         if not encrypted:
             return None
         try:
-            return self.model.model_validate(self.decrypt(identifier, encrypted))
+            return TransactionData.model_validate(self.decrypt(identifier, encrypted))
         except Exception:
             return None
 
@@ -63,12 +67,43 @@ class DjangoCookieStore(AbstractDataStore):
         _pending(request)[self.cookie_name] = None
 
 
-def _pending(request):
-    pending = getattr(request, "_auth0_cookies", None)
-    if pending is None:
-        pending = {}
-        request._auth0_cookies = pending
-    return pending
+class DjangoStateStore(StateStore):
+    """Auth0 session in an encrypted cookie.
+
+    Back-channel logout cannot revoke a cookie the browser still holds, so
+    delete_by_logout_token is a deliberate no-op (Auth0 SDK guidance for
+    stateless cookie stores).
+    """
+
+    def __init__(self, secret, cookie_name="_a0_session", max_age=259200):
+        super().__init__({"secret": secret})
+        self.cookie_name = cookie_name
+        self.max_age = max_age
+
+    async def set(self, identifier, state, remove_if_expires=False, options=None):
+        request = (options or {})["request"]
+        data = state.model_dump() if hasattr(state, "model_dump") else state
+        _pending(request)[self.cookie_name] = {
+            "value": self.encrypt(identifier, data),
+            "max_age": self.max_age,
+        }
+
+    async def get(self, identifier, options=None):
+        request = (options or {})["request"]
+        encrypted = request.COOKIES.get(self.cookie_name)
+        if not encrypted:
+            return None
+        try:
+            return StateData.model_validate(self.decrypt(identifier, encrypted))
+        except Exception:
+            return None
+
+    async def delete(self, identifier, options=None):
+        request = (options or {})["request"]
+        _pending(request)[self.cookie_name] = None
+
+    async def delete_by_logout_token(self, claims, options=None):
+        return None
 
 
 def apply_auth0_cookies(request, response):
@@ -117,8 +152,8 @@ def get_auth0_client():
             redirect_uri=callback_url(),
             authorization_params=authorization_params,
             secret=secret,
-            state_store=DjangoCookieStore(secret, "_a0_session", 259200, StateData),
-            transaction_store=DjangoCookieStore(secret, "_a0_tx", 300, TransactionData),
+            state_store=DjangoStateStore(secret),
+            transaction_store=DjangoTransactionStore(secret),
         )
         _client_key = key
     return _client

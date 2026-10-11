@@ -112,7 +112,7 @@
 
     <section class="card settings-panel" id="messaging">
       <div class="section-title">Messaging</div>
-      <p class="muted">Linking requires this signed-in session and a one-time code sent from the chat itself. Entering a phone number does not link an account. This server verifies inbound Spectrum messages and does not send iMessage.</p>
+      <p class="muted">Linking requires this signed-in session and a one-time code sent from the chat itself. Entering a phone number does not link an account. Replies are delivered by the Spectrum adapter when it is running.</p>
       {% if user.profile.photon_chat_id %}
       <p>A chat is linked{% if user.profile.messaging_linked_at %} as of {{ user.profile.messaging_linked_at }}{% endif %}.</p>
       <form method="post" action="{% url 'accounts:messaging_unlink' %}">

@@ -1,25 +1,35 @@
 # spectrum
 
-A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: imessage.
+Finovate's [Spectrum](https://photon.codes/docs/spectrum-ts) transport for iMessage.
+This process receives messages, asks Django's assistant brain for a reply, and
+delivers that reply over Spectrum. Django itself never sends iMessage.
 
-## Environment
-
-Before running, open `.env` and fill in the values:
+## Setup
 
 From your project Settings on the [Photon dashboard](https://app.photon.codes):
 
-- `PROJECT_ID`
-- `PROJECT_SECRET`
+1. Copy `.env.example` to `.env`
+2. Set `PROJECT_ID` and `PROJECT_SECRET`
+3. Point `FINOVATE_URL` at a running Finovate server
+4. Set the same bridge secret on both sides:
+   - here: `ASSISTANT_BRIDGE_SECRET` (or reuse `PROJECT_SECRET`)
+   - Django: `ASSISTANT_BRIDGE_SECRET` or `IMESSAGE_PROJECT_SECRET`
 
-## Run
-
-```sh
+```bash
 bun install
 bun start
 ```
 
-## Where to go next
+For a local TUI without Photon credentials:
+
+```bash
+SPECTRUM_PROVIDERS=terminal FINOVATE_URL=http://127.0.0.1:8000 bun start
+```
+
+Link a chat from Finovate Settings (one-time code), then text that code from
+the Spectrum conversation.
+
+## See also
 
 - [Spectrum docs](https://photon.codes/docs/spectrum-ts)
-- Edit `src/index.ts` to replace the echo loop with real agent logic.
-- Add more providers from `spectrum-ts/providers/*`.
+- Finovate messaging writeup: [`../docs/messaging-assistant.md`](../docs/messaging-assistant.md)

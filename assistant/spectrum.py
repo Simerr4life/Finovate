@@ -2,8 +2,8 @@
 
 The provider is Photon Spectrum (iMessage), documented at
 https://photon.codes/docs/webhooks/verifying-signatures (Stable).
-This module does not send iMessage. Spectrum's documented send path is
-the Node adapter's postMessage / thread.post, which is not a Python API.
+Outbound sends are handled by the Node adapter in `spectrum/`, which
+calls `/assistant/bridge/` and delivers with Spectrum's reply APIs.
 """
 
 import hashlib
