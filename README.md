@@ -1,197 +1,156 @@
+<p align="center"><img src="static/brand/Finovate_Logo.svg" alt="Finovate logo" width="72"></p>
+
 # Finovate
 
-Finovate is a personal finance app: track spending, plan a budget, work
-toward savings goals, and preview a simulated round-up/ETF investing
-experience — all running locally with no external accounts required.
+**Make your money move — and always know why.**
+A Python personal-finance assistant for budgeting, savings goals, round-ups, and clearly labeled simulated investing, with a confirmation-gated iMessage-compatible chat interface.
 
-This is a working local prototype, not a finished product. Read "Known
-limitations" before relying on it for anything real.
+| | |
+|---|---|
+| **Hackathon** | Hacklanta 2026 |
+| **Team** | Turn It Off and On Again |
+| **Main track** | Finance |
+| **Side tracks** | Auth0 · GoDaddy · Photon (see [sponsor evidence](docs/THIRD_PARTY_SERVICES.md) — GoDaddy use is **unverified**) |
+| **Submission package** | [docs/SUBMISSION.md](docs/SUBMISSION.md) |
 
-## Stack and why
+> **Status legend used across the docs:** ✅ verified · 🟡 implemented, not fully tested · 🟠 partial · 🧪 simulated / sample data · 📝 planned · ⛔ blocked on credentials or configuration.
 
-- **Backend/framework:** Django 6.1 (Python). Chosen over FastAPI because
-  this app is mostly CRUD + forms + per-user data + an admin UI for a
-  learning-stage project — Django's built-in ORM, migrations, auth system,
-  and admin give a lot of structure for free, and avoid needing a separate
-  frontend build toolchain.
-- **Frontend:** Django templates + Tailwind (via CDN, no Node build step)
-  + Chart.js for the dashboard chart. Kept deliberately simple — no SPA
-  framework, no bundler — so there's one moving part (`manage.py
-  runserver`) to run locally.
-- **Database:** SQLite for local development, accessed only through the
-  Django ORM/migrations, so moving to Postgres later is a `DATABASES`
-  setting change, not a rewrite.
-- **Money:** every amount is a Python `Decimal` / Django `DecimalField`.
-  Floats are never used for currency math — see `core/services.py`.
+---
 
-## Running locally
+## The problem
+
+Budgets live in one app, savings goals in a spreadsheet, and investing in a brokerage that never talks to either. People end up guessing how much is actually "spare," and automated money tools rarely explain what they did or ask before they do it.
+
+## What Finovate does
+
+Finovate gives every dollar a labeled purpose and keeps the user in control:
+
+- **Budget from real numbers** — enter transactions by hand or import a bank CSV (with duplicate detection), set income, bills, and category limits, and see live progress. ✅
+- **A savings plan that explains itself** — a rule-based engine picks one of five scenarios (stabilization → strong capacity), splits a *safe-to-save* amount across Rainy Day, Investment, and Regular Savings pools, and shows every assumption. ✅
+- **Goals with milestones** — targets, deadlines, 25/50/75/100% milestones, required pace, and projected completion. ✅
+- **Round-ups, honestly** — a $4.35 purchase rounds up $0.65 into a *pending* ledger entry; nothing is "invested" until a simulated sweep respects your cash reserve and cap. ✅ 🧪
+- **Simulated investing with guardrails** — proposals require explicit approval, cash vs. invested principal vs. market value are never merged, and every screen says "simulated." 🧪
+- **Chat that asks before it acts** — "I got paid $500" → *"Record $500 as income today?"* → "yes". Money-changing intents always require confirmation; withdrawals are refused. ✅ (in-process) · 🟡 live iMessage delivery not verified
+
+**What's not real:** no bank feed, no brokerage, no money movement. Investing is simulated; live market data needs a Twelve Data key. Full list: [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+
+## Who it's for
+
+Students and early-career earners with irregular income who want one place to see cash, plan savings, and learn investing without risking real money — and anyone who wants automation they can audit.
+
+## What makes it different
+
+1. **Separated money categories.** Cash balance, goal allocations, pending round-ups, invested principal, and market value are separate numbers everywhere (dashboard, investing, chat replies).
+2. **Explainable engine, no black box.** The savings plan, surplus estimate, and demo investment ideas are deterministic rules with their assumptions printed on the page.
+3. **Consent before change.** Website orders need an Approve click; chat changes need a "yes"; a paused plan stays paused.
+4. **One brain, two interfaces.** The chat assistant calls the same service functions as the website, so both always agree.
+
+## Screenshots
+
+| Dashboard | Savings plan | Investing (simulated) |
+|---|---|---|
+| ![Dashboard](docs/assets/screenshots/submission/05-dashboard.png) | ![Savings plan](docs/assets/screenshots/submission/13-savings-plan.png) | ![Investing](docs/assets/screenshots/submission/16-investing-portfolio.png) |
+
+All screenshots are real captures of this codebase running locally with seeded **sample data**. Catalog: [docs/SCREENSHOT_CATALOG.md](docs/SCREENSHOT_CATALOG.md).
+
+## Technology (verified from the code)
+
+| Layer | What's used |
+|---|---|
+| Language / framework | Python 3.13, Django 6.1 (server-rendered templates, no SPA) |
+| Data | SQLite locally; PostgreSQL (e.g. Supabase) via `DATABASE_URL` / `SUPABASE_DB_URL`; all money in `Decimal` |
+| Identity | Auth0 via `auth0-server-python` (Universal Login, encrypted cookie session, API token validation with Authlib); optional Supabase email/password sign-in |
+| Messaging | Photon Spectrum: signed webhook endpoint in Django + a Bun/TypeScript adapter (`spectrum/`, `spectrum-ts`) |
+| Market data | Twelve Data REST API (optional, server-side, quota-limited cache) |
+| Front end | Hand-written CSS (`static/css/finovate.css`, Google Fonts), vanilla JS; light/dark themes |
+| Deployment config | `vercel.json` (Django on Vercel). A Vercel project named `finovate` exists; the live URL is **not verified** here. |
+
+Architecture: [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md).
+
+```mermaid
+flowchart LR
+  Browser -->|HTML forms, session cookie| Django
+  Django --> DB[(SQLite / Postgres)]
+  Django -->|OIDC| Auth0
+  Spectrum[spectrum/ Bun adapter] -->|POST /assistant/bridge/| Django
+  Photon[Photon Spectrum / iMessage] <--> Spectrum
+  Django -.->|optional| TwelveData[Twelve Data API]
+```
+
+## Run it locally
 
 ```bash
-cd Finovate
-python -m venv .venv
-# Windows (Git Bash): source .venv/Scripts/activate
-# macOS/Linux:        source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
 python manage.py migrate
-python manage.py seed_demo          # creates user "demo" / password "demo-pass-1234"
+python manage.py seed_demo                 # sample user "demo" with labeled demo data
+python manage.py seed_peachtree_demo       # optional: fictional statement with reconciliation
 python manage.py runserver
 ```
 
-Visit `http://127.0.0.1:8000/`. New accounts register through Auth0.
-Until `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and
-`AUTH0_SECRET` are set, the login and signup pages stay unavailable and
-do not create a local password user. `seed_demo` still inserts a fixture
-user for management commands such as `chat_demo`; that fixture is not a
-website login.
+Open `http://127.0.0.1:8000/`.
 
-To create an admin user for `/admin/`: `python manage.py createsuperuser`.
+**Signing in:** website login requires Auth0 (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`) or Supabase email sign-in (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`). With neither set, the login page says *"Sign-in isn't configured on this server."* — this is deliberate; there is no local password login. For a local walkthrough without providers, see the judge options in [docs/USER_GUIDE.md](docs/USER_GUIDE.md#1-getting-access).
 
-### Configuration
-
-Copy `.env.example` to `.env` to override any setting. **The app runs
-with no `.env` file at all** — nothing is required to get started.
-`python manage.py seed_demo` creates a local fixture user named `demo`
-(password `demo-pass-1234` while `DEBUG` is true). That password is
-refused when `DEBUG` is false unless `DEMO_ACCOUNT_PASSWORD` is set.
-The website does not offer that password as a login. Auth0 is the
-identity provider for accounts created from the site.
-
-### Optional: Auth0 login and Supabase/Postgres database
-
-Both are off by default — the app runs fully on local demo auth + SQLite
-with no configuration. To turn either on, add to `.env`:
+**Try the assistant without Photon:**
 
 ```bash
-# Auth0 — required for website signup and login. Credentials live in
-# .env.local (written by Auth0 onboarding). The app callback is
-# <APP_BASE_URL>/callback. Run the server on that same origin, for example:
-#   python manage.py runserver localhost:5000
-AUTH0_DOMAIN=your-tenant.us.auth0.com
-AUTH0_CLIENT_ID=...
-AUTH0_CLIENT_SECRET=...
-AUTH0_SECRET=...
-AUTH0_AUDIENCE=https://finovate.biz/api
-APP_BASE_URL=http://localhost:5000
-
-# Supabase/Postgres — switches off SQLite. Use the pooled connection
-# string from Project Settings -> Database in your Supabase project.
-DATABASE_URL=postgresql://...
+python manage.py chat_demo --username demo
 ```
 
-See [docs/architecture-auth0-supabase.md](docs/architecture-auth0-supabase.md)
-for how identity mapping and database connectivity work, and
-[docs/auth0-verification-supabase-backup.md](docs/auth0-verification-supabase-backup.md)
-for email verification refresh and the Auth0 signup backup table.
+### Environment variables (names only)
 
-## Testing
+Nothing is required to start. Copy `.env.example` to `.env` to enable features.
 
-```bash
-python manage.py test
-```
-
-35 tests cover: round-up math (including the exact $4.35 → $0.65 example
-from the spec), idempotent transaction imports (duplicate `external_id`
-never double-counts), budget progress/plan calculations and
-recalculation when inputs change, savings goal milestone crossing and
-completion estimates, round-up sweep behavior (cash reserve and
-contribution cap enforcement), and per-user data isolation on views.
-
-## Architecture overview
-
-Six Django apps, each owning one slice of the domain:
-
-| App | Owns |
+| Purpose | Variables |
 |---|---|
-| `core` | Landing page, dashboard, shared `Decimal` money helpers |
-| `accounts` | User `Profile` preferences, demo auth views, notification/audit events, connected-account placeholders |
-| `transactions` | `Category`, `Transaction`, idempotent-import helper |
-| `budgets` | `BudgetPeriod`, `Budget`, `IncomeSource`, `RecurringExpense`, the budget-plan calculator |
-| `savings` | `Goal` (incl. Rainy Day / Investment / Regular pools), `Contribution`, personalized `SavingsPlan` engine — see [docs/savings-plan-engine.md](docs/savings-plan-engine.md) |
-| `investing` | Simulated `RoundUpSettings`, `RoundUpLedgerEntry`, `PortfolioSnapshot`, `SimulatedOrder` |
-| `imports` | CSV bank-statement upload → review → commit pipeline, `ImportBatch` tracking. See [docs/bank-statement-import.md](docs/bank-statement-import.md) |
+| Core | `FINOVATE_SECRET_KEY`, `FINOVATE_DEBUG`, `FINOVATE_ALLOWED_HOSTS`, `FINOVATE_DB_PATH`, `FINOVATE_LOG_LEVEL`, `DEMO_ACCOUNT_PASSWORD` |
+| Auth0 | `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `AUTH0_AUDIENCE`, `AUTH0_MGMT_CLIENT_ID`, `AUTH0_MGMT_CLIENT_SECRET`, `AUTH0_ACTION_SECRET`, `APP_BASE_URL` |
+| Database / Supabase | `DATABASE_URL`, `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` |
+| Photon Spectrum | `IMESSAGE_PROJECT_ID`, `IMESSAGE_PROJECT_SECRET`, `IMESSAGE_WEBHOOK_SECRET`, `PHOTON_WEBHOOK_SECRET` (legacy), `ASSISTANT_BRIDGE_SECRET` |
+| Market data | `TWELVE_DATA_API_KEY` |
+| Reserved, unused | `BANK_PROVIDER_API_KEY`, `BROKERAGE_PROVIDER_API_KEY`, `MESSAGING_PROVIDER_API_KEY` |
 
-Each app's `services.py` holds pure business logic (no HTTP, no
-templates) so it's independently testable and so a future messaging
-integration could call the same functions the website calls, without
-duplicating logic. Views stay thin: fetch data, call a service, render a
-template.
+The adapter in `spectrum/` reads `PROJECT_ID`, `PROJECT_SECRET`, `FINOVATE_URL`, `ASSISTANT_BRIDGE_SECRET`, `SPECTRUM_PROVIDERS`.
 
-**Per-user ownership:** every query that touches user data filters by
-`user=request.user` (or goes through a `ForeignKey`/`get_object_or_404`
-that includes it), so one user can never read or edit another's records.
-See the isolation tests in `budgets/tests.py`.
+### Database
 
-## Demo mode and sample data
+`python manage.py migrate` creates the schema on SQLite or Postgres (31 app models across 8 Django apps). Migrations also load a 109-row bundled market-data sample; no current page displays it, because Explore, holdings, demo ideas, and the price-based scenario read Twelve Data rows only (the manual "what if" calculator works without any market data). On Vercel, `finovate/wsgi.py` runs `migrate` at boot and seeds the demo user only if `DEMO_ACCOUNT_PASSWORD` is set.
 
-`python manage.py seed_demo` creates a local user named `demo` with
-transactions, categories, a budget period with limits, income/recurring
-expenses, two savings goals with contribution history, and pre-populated
-round-up ledger entries (including one already swept into a simulated
-portfolio snapshot). Seeded rows keep `source="demo"` / `is_demo=True` so
-the data stays isolated from records a person enters. The interface does
-not label those rows. Re-running the command updates the same records by
-`external_id` and does not wipe them on startup.
+## Tests
 
-## What's simulated vs. real
+```bash
+python manage.py test        # 381 tests, all passing on 2026-10-11 (≈97 s)
+```
 
-- **Real:** everything you enter yourself — transactions, categories,
-  budgets, goals, contributions — persists in SQLite and survives
-  restarts. Budget-plan math and round-up math run for real on your data.
-  CSV bank-statement import is also real: it creates ordinary
-  `Transaction` rows after a review step, with duplicate detection and no
-  fabricated data. See [docs/bank-statement-import.md](docs/bank-statement-import.md)
-  for supported formats and limitations.
-- **Simulated, clearly labeled:** the entire Investing page. No brokerage
-  is connected; "sweeping" round-ups and "filling" orders are local
-  database updates, not real trades. The investing page and dashboard
-  both carry explicit "simulated" labels and risk disclaimers.
-  - **Sample-data explorer and demo recommendations:** database migrations
-    load the supplied 109-row historical sample. Users can browse each
-    stock/index history and create budget-limited simulated orders from the
-    Explore page; the Investing page also offers transparent rule-based
-    ideas for explicit user acceptance or decline. Refresh sample rows with
-    `python manage.py seed_excel_demo_market`; see
-    [docs/demo-ai-investing.md](docs/demo-ai-investing.md).
-- **Identity:** Auth0 is the account provider when configured. A local
-  login remains for this server.
-- **Messaging:** Photon Spectrum inbound webhooks are verified. Outbound
-  iMessage is sent by the Node adapter in `spectrum/`. See
-  `docs/messaging-assistant.md`.
-- **Not connected:** bank feeds and brokerages. See
-  `docs/integration-readiness.md`.
+Coverage includes the $4.35 → $0.65 round-up, Decimal precision, idempotent imports and duplicate detection, budget/plan recalculation, goal milestones and locking, order double-approval, Auth0 callback/verification/webhook handling, Spectrum signature checks, chat confirmations, and cross-user isolation. Details and manual validation: [docs/TESTING_AND_VALIDATION.md](docs/TESTING_AND_VALIDATION.md).
 
-## Known limitations
+## Documentation map
 
-- Tailwind and Chart.js are loaded from public CDNs without Subresource
-  Integrity hashes — fine for local development, but should be
-  self-hosted or pinned with SRI before any real deployment.
-- No pagination on the transaction list or ledger views yet; fine for
-  demo-scale data, would need adding for a real account with years of
-  history.
-- The budget-plan "suggested savings" target is a simple heuristic
-  (remaining goal amount ÷ 12 months), not a solver that balances
-  multiple competing goals.
-- Notification events are recorded (`accounts.NotificationEvent`) but
-  nothing delivers them yet — there's no email/push/SMS sender wired up,
-  by design (see integration-readiness guide).
-- No CSS/JS build pipeline means no minification/tree-shaking; acceptable
-  for a local prototype, not for production traffic.
-- Browser-based UI testing was done by inspecting templates and running
-  the Django test client against views, not a full headless-browser
-  click-through of every page.
+| Document | For |
+|---|---|
+| [SUBMISSION.md](docs/SUBMISSION.md) | Copy-ready submission text |
+| [HACKATHON_REQUIREMENTS.md](docs/HACKATHON_REQUIREMENTS.md) | Rules compliance checklist (official guide not yet accessible — see file) |
+| [JUDGE_READINESS.md](docs/JUDGE_READINESS.md) | Criteria mapping, likely questions |
+| [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) · [DEMO_CHECKLIST.md](docs/DEMO_CHECKLIST.md) | Presenting |
+| [USER_GUIDE.md](docs/USER_GUIDE.md) | Judges and first-time users |
+| [PRODUCT_SPECIFICATION.md](docs/PRODUCT_SPECIFICATION.md) | Intended vs. implemented product |
+| [TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md) · [FEATURE_REFERENCE.md](docs/FEATURE_REFERENCE.md) | Engineers |
+| [SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) | Security posture and gaps |
+| [TESTING_AND_VALIDATION.md](docs/TESTING_AND_VALIDATION.md) | Evidence |
+| [THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md) | Auth0, GoDaddy, Photon, others |
+| [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Gaps and blockers |
+| [SCREENSHOT_CATALOG.md](docs/SCREENSHOT_CATALOG.md) | Image index |
+| [glossary.md](docs/glossary.md) · [docs/README.md](docs/README.md) | Earlier reference documentation |
 
-## Next steps
+## Known limitations (short)
 
-- Add a `BudgetPeriod` auto-rollover (new month → new period) instead of
-  requiring manual creation.
-- Pagination for transactions/ledger history.
-- Wire `NotificationEvent` creation up to an actual delivery channel once
-  one is configured (see integration-readiness guide).
-- Decide on and implement the first real integration (most likely the
-  identity provider, since it touches every page) when credentials are
-  available.
+No bank or brokerage connection; investing and order fills are simulated. Live prices, the Explore tab, and demo investment ideas need `TWELVE_DATA_API_KEY`. Notifications are recorded in-app but not delivered by email/SMS. Website sign-in needs Auth0 or Supabase credentials. Live iMessage delivery and the production deployment were not verified during documentation. See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
-## Full documentation
+## Team and attribution
 
-Comprehensive product, developer, and visual documentation (including DOCX and PPTX deliverables) lives in [`docs/README.md`](docs/README.md).
+Built by team **Turn It Off and On Again** for Hacklanta 2026. Individual member names and roles: *to be confirmed by the team* (not present in the repository). Third-party libraries and services are listed in [docs/THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md). Development used AI coding assistants; see [SUBMISSION.md](docs/SUBMISSION.md#responsible-ai-and-financial-safety).
+
+## Financial disclaimer
+
+Finovate is a hackathon prototype for education and demonstration. It is not financial, investment, tax, or legal advice. Budget and savings figures are estimates. All investing features are simulated: no brokerage is connected, no securities are bought or sold, and no money moves. Investments can lose value, and past performance does not predict future results.

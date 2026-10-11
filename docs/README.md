@@ -6,6 +6,8 @@
 
 Finovate is a personal-finance web application for tracking spending, planning budgets, working toward savings goals, reviewing a personalized savings plan, and previewing **simulated** round-up / ETF investing. Identity is provided by Auth0 and/or Supabase Auth when configured. This documentation describes **verified implementation behavior** from the source code in this repository.
 
+> **Hacklanta 2026 submission package:** start with [SUBMISSION.md](SUBMISSION.md), [JUDGE_READINESS.md](JUDGE_READINESS.md), and [HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md). Also: [USER_GUIDE.md](USER_GUIDE.md) · [DEMO_SCRIPT.md](DEMO_SCRIPT.md) · [DEMO_CHECKLIST.md](DEMO_CHECKLIST.md) · [PRODUCT_SPECIFICATION.md](PRODUCT_SPECIFICATION.md) · [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md) · [FEATURE_REFERENCE.md](FEATURE_REFERENCE.md) · [SECURITY_AND_PRIVACY.md](SECURITY_AND_PRIVACY.md) · [TESTING_AND_VALIDATION.md](TESTING_AND_VALIDATION.md) · [THIRD_PARTY_SERVICES.md](THIRD_PARTY_SERVICES.md) · [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md) · [SCREENSHOT_CATALOG.md](SCREENSHOT_CATALOG.md). Where older pages in this folder disagree with that package (for example test counts), the package reflects the code as of 2026-10-11.
+
 ## How to use this documentation
 
 | Role | Start here |
