@@ -1,20 +1,23 @@
 {% extends "base.html" %}
 {% load static finovate %}
-{% block title %}Explore sample market — Finovate{% endblock %}
-{% block crumb %}Explore sample market{% endblock %}
+{% block title %}Explore market data — Finovate{% endblock %}
+{% block crumb %}Explore market data{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
     <div class="eyebrow">INVESTING EXPLORER</div>
-    <h1 class="page-title">Explore sample market data</h1>
-    <p class="page-subtitle">Browse the supplied September 2026 stock and index prices, then choose what to try in your simulated portfolio.</p>
+    <h1 class="page-title">Explore market data</h1>
+    <p class="page-subtitle">Browse Twelve Data historical prices and current quotes for supported US stocks, then choose what to try in your simulated portfolio.</p>
   </div>
   <a class="button secondary" href="{% url 'investing:index' %}?tab=explore">Back to Explore</a>
 </div>
 
 <div class="notice market-demo-notice">
-  <strong>Demo data only.</strong> These historical sample prices are not live quotes, predictions, or financial advice. Orders are simulated and require your separate approval; no brokerage is connected and no money moves.
+  <strong>Market data provided by Twelve Data.</strong> Daily history refreshes at most every 12 hours; current prices refresh every five minutes during US market hours when available. The page currently supports AAPL, AMZN, GOOGL, MSFT, and NVDA; bundled sample rows and unsupported indexes are not shown. Orders are simulated and require your separate approval; no brokerage is connected and no money moves.
 </div>
+{% if live_market_quotes_enabled %}
+<p class="live-quotes-status" data-market-live-status data-quotes-url="{% url 'investing:live_market_quotes' %}" role="status">Checking Twelve Data quote availability…</p>
+{% endif %}
 
 {% if stock_assets or index_assets %}
 <section class="market-budget-banner">
@@ -26,8 +29,8 @@
 {% if stock_assets %}
 <section class="market-assets-section">
   <div class="market-section-heading">
-    <div><h2>Stocks</h2><p>Browse each company's supplied sample prices and choose an amount to simulate.</p></div>
-    <span>{{ stock_assets|length }} sample stocks</span>
+    <div><h2>Stocks</h2><p>Browse each company's provider-sourced daily prices and choose an amount to simulate.</p></div>
+    <span>{{ stock_assets|length }} Twelve Data stocks</span>
   </div>
   <div class="market-asset-grid">
     {% for asset in stock_assets %}
@@ -37,27 +40,13 @@
 </section>
 {% endif %}
 
-{% if index_assets %}
-<section class="market-assets-section">
-  <div class="market-section-heading">
-    <div><h2>Market indexes</h2><p>Index orders are illustrative only; they do not represent an index fund or tradable security.</p></div>
-    <span>{{ index_assets|length }} sample indexes</span>
-  </div>
-  <div class="market-asset-grid">
-    {% for asset in index_assets %}
-      {% include "investing/market_asset_card.html" with asset=asset chart_default=True %}
-    {% endfor %}
-  </div>
-</section>
-{% endif %}
 {% else %}
 <section class="card market-no-data">
-  <h2>Sample prices are not available yet</h2>
-  <p>The bundled September dataset will appear here after the database migrations have been applied.</p>
-  <p>For an existing installation, run <code>python manage.py migrate</code>. You can refresh the sample rows at any time with <code>python manage.py seed_excel_demo_market</code>.</p>
+  <h2>Twelve Data history is not available yet</h2>
+  <p>Check that <code>TWELVE_DATA_API_KEY</code> is configured on the server and that the account can access the supported US stock symbols. This page never falls back to the bundled Excel sample prices.</p>
 </section>
 {% endif %}
 
-<div class="disclosure market-data-footnote">The change shown for each asset compares only its earliest and latest dates included in this sample. Missing dates are not estimated or filled in.</div>
+<div class="disclosure market-data-footnote">The period change compares the earliest and latest provider bars currently cached. Missing dates are not estimated or filled in. Verify that your Twelve Data subscription permits displaying data to your intended users.</div>
 {% endblock %}
-{% block extra_js %}<script src="{% static 'js/market-charts.js' %}?v=1" defer></script>{% endblock %}
+{% block extra_js %}<script src="{% static 'js/market-charts.js' %}?v=2" defer></script>{% if live_market_quotes_enabled %}<script src="{% static 'js/live-market-quotes.js' %}?v=1" defer></script>{% endif %}{% endblock %}

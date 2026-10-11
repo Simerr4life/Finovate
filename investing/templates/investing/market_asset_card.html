@@ -1,19 +1,19 @@
 {% load finovate %}
-<article class="market-asset-card {% if chart_default %}market-asset-card-wide{% endif %}" id="asset-{{ asset.anchor }}" data-series-id="{{ asset.chart_id }}" data-default-view="{% if chart_default %}chart{% else %}table{% endif %}">
+<article class="market-asset-card {% if chart_default %}market-asset-card-wide{% endif %}" id="asset-{{ asset.anchor }}" data-series-id="{{ asset.chart_id }}" data-live-symbol="{{ asset.symbol }}" data-default-view="{% if chart_default %}chart{% else %}table{% endif %}">
   <header class="market-asset-heading">
     <div>
-      <span class="market-type-chip">{{ asset.asset_type_label }} · demo sample</span>
+      <span class="market-type-chip">{{ asset.asset_type_label }} · Twelve Data</span>
       <h3>{{ asset.name }}</h3>
       <span class="market-symbol">{{ asset.symbol }}</span>
     </div>
     <div class="market-current-price">
-      <small>Latest sample close · {{ asset.latest.date }}</small>
-      <strong>${{ asset.latest.close }}</strong>
+      <small data-market-quote-caption>Twelve Data daily close · {{ asset.latest.date }}</small>
+      <strong data-market-quote-price>${{ asset.latest.close }}</strong>
     </div>
   </header>
 
   <div class="market-asset-stats">
-    <div><small>Recorded sample days</small><strong>{{ asset.history|length }}</strong></div>
+    <div><small>Recorded trading days</small><strong>{{ asset.history|length }}</strong></div>
     <div>
       <small>Change across shown dates</small>
       <strong class="{% if asset.period_change > 0 %}positive{% elif asset.period_change < 0 %}negative{% endif %}">
@@ -27,31 +27,31 @@
     <button class="market-view-button {% if chart_default %}active{% endif %}" type="button" data-market-view="chart" aria-pressed="{{ chart_default|yesno:'true,false' }}">Graph</button>
     <button class="market-view-button {% if not chart_default %}active{% endif %}" type="button" data-market-view="table" aria-pressed="{{ chart_default|yesno:'false,true' }}">Price table</button>
   </div>
-  <section class="market-chart-panel" data-market-chart {% if not chart_default %}hidden{% endif %} aria-label="{{ asset.name }} sample price graph">
+  <section class="market-chart-panel" data-market-chart {% if not chart_default %}hidden{% endif %} aria-label="{{ asset.name }} Twelve Data price graph">
     <div class="market-chart-reading" aria-live="polite">
       <span data-chart-date>{{ asset.latest.date }}</span>
       <strong data-chart-price>${{ asset.latest.close }}</strong>
-      <span data-chart-change>Sample price</span>
+      <span data-chart-change>Twelve Data price</span>
     </div>
     <div class="market-chart-scroll">
       <svg class="market-price-chart" viewBox="0 0 720 260" role="img" aria-label="Interactive historical sample closing prices for {{ asset.name }}">
-        <title>{{ asset.name }} sample closing prices. Move over the graph or use the slider below to inspect each date.</title>
+        <title>{{ asset.name }} historical Twelve Data closing prices. Move over the graph or use the slider below to inspect each date.</title>
       </svg>
     </div>
     <label class="market-chart-slider-label">
-      <span>Move through sample dates</span>
+      <span>Move through trading dates</span>
       <input type="range" min="0" max="{{ asset.history|length|add:'-1' }}" value="{{ asset.history|length|add:'-1' }}" step="1" data-chart-slider aria-label="Choose a sample date for {{ asset.name }}">
     </label>
-    <div class="market-chart-range"><span>{{ asset.first_date }}</span><span>{{ asset.latest.date }}</span></div>
+    <div class="market-chart-range"><span>{{ asset.first_date }}</span><span data-chart-end>{{ asset.latest.date }}</span></div>
     <div class="market-chart-legend" aria-label="Graph colors">
-      <span><i class="up"></i> Up from prior sample date</span>
-      <span><i class="down"></i> Down from prior sample date</span>
+      <span><i class="up"></i> Up from prior trading date</span>
+      <span><i class="down"></i> Down from prior trading date</span>
     </div>
-    <p class="market-chart-help">Hover over the graph or drag the slider to see the sample close for each recorded date.</p>
+    <p class="market-chart-help">Hover over the graph or drag the slider to see the provider's daily close for each recorded date. Live quotes are appended when available.</p>
   </section>
 
   <details class="market-history" data-market-table {% if chart_default %}hidden{% endif %}>
-    <summary>View all {{ asset.history|length }} sample price days</summary>
+    <summary>View all {{ asset.history|length }} Twelve Data trading days</summary>
     <div class="market-history-scroll">
       <table class="data-table">
         <thead>
@@ -95,6 +95,6 @@
       </label>
       <button class="button" type="submit" {% if demo_budget <= 0 %}disabled{% endif %}>Create demo order</button>
     </div>
-    <p class="market-buy-note">Uses the latest sample close to estimate fractional shares. The order stays pending until you approve it on Investments. No real trade or money movement occurs.</p>
+    <p class="market-buy-note">Uses the latest available Twelve Data quote (or its daily close) to estimate fractional shares. The order stays pending until you approve it on Investments. No real trade or money movement occurs.</p>
   </form>
 </article>

@@ -7,7 +7,7 @@
       <p>{{ subtitle }}</p>
     </div>
     <div class="holding-chart-current">
-      <small data-live-value-caption>Latest sample valuation{% if latest_date %} · {{ latest_date }}{% endif %}</small>
+      <small data-live-value-caption>Latest Twelve Data valuation{% if latest_date %} · {{ latest_date }}{% endif %}</small>
       <strong data-live-value>{{ latest_value|money }}</strong>
       {% if holding %}<span>{{ holding.shares }} simulated shares · cost {{ holding.cost_basis|money }}</span>{% endif %}
     </div>
@@ -19,12 +19,12 @@
       <span data-chart-change></span>
     </div>
     <div class="market-chart-scroll">
-      <svg class="market-price-chart" viewBox="0 0 1000 360" role="img" aria-label="{{ title }} estimated sample value over time">
-        <title>{{ title }} estimated value based on supplied sample prices. Move over the graph or use the slider to inspect each date.</title>
+      <svg class="market-price-chart" viewBox="0 0 1000 360" role="img" aria-label="{{ title }} estimated value over time based on Twelve Data">
+        <title>{{ title }} estimated value based on Twelve Data daily prices. Move over the graph or use the slider to inspect each date.</title>
       </svg>
     </div>
     <label class="market-chart-slider-label">
-      <span>Move through sample dates</span>
+      <span>Move through trading dates</span>
       <input type="range" min="0" max="{{ chart_data|length|add:'-1' }}" value="{{ chart_data|length|add:'-1' }}" step="1" data-chart-slider aria-label="Choose a sample date for {{ title }}">
     </label>
     <div class="market-chart-range"><span>{{ chart_data.0.date }}</span><span data-chart-end>{{ latest_date }}</span></div>
@@ -32,7 +32,7 @@
       <span><i class="up"></i> Up from prior point</span>
       <span><i class="down"></i> Down from prior point</span>
     </div>
-    <p class="market-chart-help">Older points use supplied sample prices. The latest available Twelve Data quote is fetched when you open this page, then refreshed every five minutes during US market hours. Demo orders remain simulated.</p>
+    <p class="market-chart-help">Historical points use Twelve Data daily bars. The latest available quote is fetched when you open this page, then refreshed every five minutes during US market hours. Demo orders remain simulated.</p>
   </div>
   {{ chart_data|json_script:chart_id }}
 </article>

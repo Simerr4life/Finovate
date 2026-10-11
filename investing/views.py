@@ -4,8 +4,9 @@ from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
 from django.contrib import messages
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -17,7 +18,11 @@ from django.views.decorators.http import require_GET, require_POST
 from accounts.models import NotificationEvent
 
 from .forms import HypotheticalScenarioForm, RoundUpSettingsForm, VerifiedScenarioForm
-from .live_quotes import refresh_live_market_quotes
+from .live_quotes import (
+    MARKET_STOCKS,
+    refresh_live_market_quotes,
+    refresh_twelve_data_history,
+)
 from .models import (
     DemoInvestmentSuggestion,
     DemoInvestmentFunding,
@@ -48,7 +53,7 @@ from .services import (
 def _demo_market_assets():
     rows = MarketPrice.objects.filter(
         is_verified=True,
-        is_demo_sample=True,
+        is_twelve_data=True,
     ).order_by("symbol", "date")
     grouped_rows = defaultdict(list)
     for row in rows:
@@ -90,6 +95,7 @@ def _user_demo_holdings(user):
             status=SimulatedOrder.Status.FILLED,
             demo_shares__isnull=False,
             demo_data_date__isnull=False,
+            demo_price_source=SimulatedOrder.PriceSource.TWELVE_DATA,
         ).order_by("demo_data_date", "created_at")
     )
     orders_by_symbol = defaultdict(list)
@@ -103,7 +109,7 @@ def _user_demo_holdings(user):
             MarketPrice.objects.filter(
                 symbol=symbol,
                 is_verified=True,
-                is_demo_sample=True,
+                is_twelve_data=True,
             ).order_by("date")
         )
         if not history:
@@ -182,7 +188,9 @@ def _user_demo_holdings(user):
             user=user,
             status=SimulatedOrder.Status.FILLED,
             order_type=SimulatedOrder.OrderType.BUY,
-            demo_shares__isnull=True,
+        ).filter(
+            Q(demo_shares__isnull=True)
+            | ~Q(demo_price_source=SimulatedOrder.PriceSource.TWELVE_DATA)
         ).aggregate(total=Sum("amount"))["total"]
         or Decimal("0")
     )
@@ -259,20 +267,24 @@ def index(request):
     pools = investable_pools(request.user)
     pool_summaries = pool_investment_summaries(request.user)
     demo_suggestions = DemoInvestmentSuggestion.objects.filter(
-        user=request.user, status=DemoInvestmentSuggestion.Status.PENDING
+        user=request.user,
+        status=DemoInvestmentSuggestion.Status.PENDING,
+        data_source=DemoInvestmentSuggestion.DataSource.TWELVE_DATA,
     ).select_related("simulated_order")[:3]
+    tab = request.GET.get("tab", "portfolio")
+    if tab not in {"portfolio", "explore", "holdings", "calculator"}:
+        tab = "portfolio"
+    if tab in {"portfolio", "explore"}:
+        refresh_twelve_data_history()
+
     has_demo_market_data = MarketPrice.objects.filter(
         asset_type=MarketPrice.AssetType.STOCK,
         is_verified=True,
-        is_demo_sample=True,
+        is_twelve_data=True,
     ).exists()
     market_assets = _demo_market_assets()
     holdings = _user_demo_holdings(request.user)
     portfolio_chart_id = "simulated-portfolio-series"
-    tab = request.GET.get("tab", "portfolio")
-    if tab not in {"portfolio", "explore", "holdings", "calculator"}:
-        tab = "portfolio"
-
     context = {
         "form": form,
         "roundup_settings": rs,
@@ -299,7 +311,7 @@ def index(request):
         "demo_stock_count": MarketPrice.objects.filter(
             asset_type=MarketPrice.AssetType.STOCK,
             is_verified=True,
-            is_demo_sample=True,
+            is_twelve_data=True,
         ).values("symbol").distinct().count(),
         "market_assets": market_assets,
         "market_stocks": [
@@ -325,11 +337,13 @@ def index(request):
         "pending_market_orders": holdings["pending_market_orders"],
         "demo_suggestions": demo_suggestions,
         "reviewed_demo_suggestions": DemoInvestmentSuggestion.objects.filter(
-            user=request.user
+            user=request.user,
+            data_source=DemoInvestmentSuggestion.DataSource.TWELVE_DATA,
         ).exclude(status=DemoInvestmentSuggestion.Status.PENDING).select_related(
             "simulated_order"
         )[:5],
         "has_demo_market_data": has_demo_market_data,
+        "live_market_quotes_enabled": bool(settings.TWELVE_DATA_API_KEY),
         "tab": tab,
     }
     return render(request, "investing/index.html", context)
@@ -399,17 +413,51 @@ def live_demo_quotes(request):
 
 
 @login_required
+@require_GET
+@never_cache
+def live_market_quotes(request):
+    market_open = _is_us_regular_session(timezone.now())
+    quotes, errors = refresh_live_market_quotes(
+        MARKET_STOCKS,
+        allow_refresh=market_open,
+    )
+    if errors.get("configuration") == "missing-api-key":
+        return JsonResponse(
+            {
+                "error": "Live prices are not configured. Set TWELVE_DATA_API_KEY on the server.",
+                "market_open": market_open,
+            },
+            status=503,
+        )
+    return JsonResponse(
+        {
+            "quotes": {
+                symbol: {
+                    "market_value": str(quote.price),
+                    "fetched_at": quote.fetched_at.isoformat(),
+                }
+                for symbol, quote in quotes.items()
+            },
+            "market_open": market_open,
+            "errors": errors,
+            "refresh_seconds": 300,
+        }
+    )
+
+
+@login_required
 @require_POST
 def generate_demo_suggestions_view(request):
+    refresh_twelve_data_history()
     if not MarketPrice.objects.filter(
         asset_type=MarketPrice.AssetType.STOCK,
         is_verified=True,
-        is_demo_sample=True,
+        is_twelve_data=True,
     ).exists():
         messages.info(
             request,
-            "Load the supplied sample prices first with "
-            "`python manage.py seed_excel_demo_market`.",
+            "Twelve Data history is not available yet. Check the server's "
+            "TWELVE_DATA_API_KEY and provider access, then try again.",
         )
     else:
         suggestions = generate_demo_investment_suggestions(request.user)
@@ -432,12 +480,12 @@ def generate_demo_suggestions_view(request):
         elif suggestions:
             messages.info(
                 request,
-                "You have already reviewed recommendations for this sample-data snapshot.",
+                "You have already reviewed recommendations for this Twelve Data snapshot.",
             )
         else:
             messages.info(
                 request,
-                "The supplied sample does not contain enough dated stock prices "
+                "Twelve Data history does not contain enough dated stock prices "
                 "to generate demo recommendations.",
             )
     return redirect("investing:index")
@@ -451,6 +499,7 @@ def accept_demo_suggestion_view(request, pk):
         pk=pk,
         user=request.user,
         status=DemoInvestmentSuggestion.Status.PENDING,
+        data_source=DemoInvestmentSuggestion.DataSource.TWELVE_DATA,
     )
     pool = None
     pool_id = request.POST.get("pool")
@@ -512,8 +561,12 @@ def propose_surplus(request):
 def approve_order_view(request, pk):
     order = get_object_or_404(SimulatedOrder, pk=pk, user=request.user, status=SimulatedOrder.Status.PENDING)
     if request.method == "POST":
-        approve_order(order)
-        messages.success(request, f"Approved: simulated purchase of ${order.amount} recorded.")
+        try:
+            approve_order(order)
+        except ValueError as error:
+            messages.error(request, str(error))
+        else:
+            messages.success(request, f"Approved: simulated purchase of ${order.amount} recorded.")
     return redirect("investing:index")
 
 
@@ -536,6 +589,7 @@ def historical_demo(request):
     - form (manual): prices are typed in by the user for any
       symbol/date Finovate has no verified data for.
     """
+    refresh_twelve_data_history()
     scenario = None
     verified_form = VerifiedScenarioForm()
     form = HypotheticalScenarioForm()
@@ -577,6 +631,7 @@ def historical_demo(request):
 
 @login_required
 def market_data(request):
+    refresh_twelve_data_history()
     assets = _demo_market_assets()
 
     return render(

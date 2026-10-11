@@ -3,18 +3,17 @@
 {% block content %}
 <div class="flex justify-between items-center mb-2">
   <h1 class="text-2xl font-bold">Hypothetical market scenario</h1>
-  <a href="{% url 'investing:market_data' %}" class="text-sm font-medium text-brand-700 hover:underline">View verified market data →</a>
+  <a href="{% url 'investing:market_data' %}" class="text-sm font-medium text-brand-700 hover:underline">View Twelve Data prices →</a>
 </div>
 <div class="bg-coral-500/10 border border-coral-500/30 rounded-xl p-4 text-sm text-coral-700 mb-6">
-  <strong>No real purchase happened on any date shown here.</strong> This is entirely separate from the September
-  bank statement activity. The "verified" calculator below uses real, source-cited historical prices (see Market
-  Data), but applying them to a hypothetical investment is still illustrative, not a record of an actual trade.
+  <strong>No real purchase happened on any date shown here.</strong> The calculator below uses Twelve Data
+  historical prices; applying them to a hypothetical investment is still illustrative, not a record of an actual trade.
 </div>
 
 <div class="grid lg:grid-cols-2 gap-6 mb-6">
   <section class="bg-white rounded-2xl border border-slate-200 p-6">
-    <h2 class="font-semibold text-lg mb-1">Verified prices</h2>
-    <p class="text-xs text-slate-400 mb-4">Prices come from the Market Data page's source-cited rows.</p>
+    <h2 class="font-semibold text-lg mb-1">Twelve Data prices</h2>
+    <p class="text-xs text-slate-400 mb-4">Prices come from Twelve Data daily bars for supported stocks.</p>
     <form method="post" class="space-y-4" novalidate>
       {% csrf_token %}
       <input type="hidden" name="mode" value="verified">
@@ -27,7 +26,7 @@
       </div>
       {% endfor %}
       {% for error in verified_form.non_field_errors %}<p class="text-xs text-coral-600">{{ error }}</p>{% endfor %}
-      <button type="submit" class="bg-mint-500 text-white font-medium px-5 py-2 rounded-lg hover:bg-mint-600 focus-ring">Calculate with verified prices</button>
+      <button type="submit" class="bg-mint-500 text-white font-medium px-5 py-2 rounded-lg hover:bg-mint-600 focus-ring">Calculate with Twelve Data prices</button>
     </form>
   </section>
 

@@ -23,7 +23,7 @@
   <div>
     <span class="eyebrow">SIMULATED ONLY</span>
     <h2>Demo investing budget</h2>
-    <p>Available to use on sample-stock orders and recommendations: <strong>{{ demo_budget|money }}</strong></p>
+    <p>Available to use on supported-stock demo orders and recommendations: <strong>{{ demo_budget|money }}</strong></p>
     <small>Includes {{ demo_pool_funds|money }} in investable savings pools and {{ demo_funded_total|money }} in virtual funds, plus estimated cash surplus. Demo orders reserve their amounts; no real money is moved.</small>
   </div>
   <form method="post" action="{% url 'investing:add_demo_investment_funds' %}" class="demo-budget-form">
@@ -38,24 +38,24 @@
 {% if tab == 'explore' %}
 <section class="market-explore-heading">
   <div>
-    <div class="eyebrow">SAMPLE MARKET</div>
+    <div class="eyebrow">TWELVE DATA MARKET</div>
     <h2>Explore price movement</h2>
-    <p>Large interactive charts from the supplied historical sample. Hover or drag the slider to inspect each recorded date.</p>
+    <p>Provider-sourced daily history and current quotes for supported US stocks. Hover or drag the slider to inspect each trading date.</p>
   </div>
-  <span class="demo-only-pill">HISTORICAL DATA · SIMULATED</span>
+  <span class="demo-only-pill">PROVIDER DATA · SIMULATED TRADES</span>
 </section>
+{% if live_market_quotes_enabled %}
+<p class="live-quotes-status" data-market-live-status data-quotes-url="{% url 'investing:live_market_quotes' %}" role="status">Checking Twelve Data quote availability…</p>
+{% endif %}
 {% if market_stocks or market_indexes %}
 <div class="market-explore-list">
   {% for asset in market_stocks %}
     {% include "investing/market_asset_card.html" with asset=asset chart_default=True %}
   {% endfor %}
-  {% for asset in market_indexes %}
-    {% include "investing/market_asset_card.html" with asset=asset chart_default=True %}
-  {% endfor %}
 </div>
-<p class="disclosure market-data-footnote">These charts use only supplied sample prices. They are not live quotes or predictions. Any order remains simulated and requires your approval.</p>
+<p class="disclosure market-data-footnote">Daily history refreshes at most every 12 hours; quotes refresh every five minutes during US market hours when available. Unsupported indexes and bundled sample rows are omitted. Verify your Twelve Data plan permits displaying prices to your intended users.</p>
 {% else %}
-<section class="card"><p class="empty">Sample market prices will appear after the database migrations are applied.</p></section>
+<section class="card"><p class="empty">Twelve Data history is not available. Check the server's <code>TWELVE_DATA_API_KEY</code> and account access. This page does not fall back to bundled Excel sample prices.</p></section>
 {% endif %}
 
 {% elif tab == 'holdings' %}
@@ -63,19 +63,19 @@
   <div>
     <div class="eyebrow">YOUR SIMULATED PORTFOLIO</div>
     <h2>My investments</h2>
-    <p>See your approved demo holdings. Historical points use sample prices; the latest available Twelve Data quote loads when you open this page and refreshes every five minutes during US market hours. Pending orders are not counted as invested yet.</p>
+    <p>See your approved demo holdings. Historical points use Twelve Data daily bars; the latest available quote loads when you open this page and refreshes every five minutes during US market hours. Pending orders are not counted as invested yet.</p>
     {% if holdings %}<p class="live-quotes-status" data-live-quotes-status data-quotes-url="{% url 'investing:live_demo_quotes' %}" role="status">Checking live quote availability…</p>{% endif %}
   </div>
-  <a class="button secondary" href="?tab=explore">Explore sample assets</a>
+  <a class="button secondary" href="?tab=explore">Explore supported stocks</a>
 </section>
 <div class="summary-grid compact holdings-summary">
-  <section class="card summary-card"><div class="label">Portfolio value</div><div class="money" data-live-portfolio-value>{{ holdings_market_value|money }}</div><div class="summary-detail" data-live-portfolio-caption>Latest supplied sample closes</div></section>
+  <section class="card summary-card"><div class="label">Portfolio value</div><div class="money" data-live-portfolio-value>{{ holdings_market_value|money }}</div><div class="summary-detail" data-live-portfolio-caption>Latest available Twelve Data daily closes</div></section>
   <section class="card summary-card"><div class="label">Amount invested</div><div class="money">{{ holdings_cost_basis|money }}</div><div class="summary-detail">Cost basis of tracked demo holdings</div></section>
-  <section class="card summary-card"><div class="label">Change in value</div><div class="money {% if holdings_gain_loss >= 0 %}positive{% else %}negative{% endif %}" data-live-portfolio-change>{{ holdings_gain_loss|money }}</div><div class="summary-detail" data-live-change-caption>Illustrative only, based on sample data</div></section>
+  <section class="card summary-card"><div class="label">Change in value</div><div class="money {% if holdings_gain_loss >= 0 %}positive{% else %}negative{% endif %}" data-live-portfolio-change>{{ holdings_gain_loss|money }}</div><div class="summary-detail" data-live-change-caption>Illustrative only, based on Twelve Data</div></section>
 </div>
 {% if holdings %}
 {% if portfolio_series|length > 1 %}
-  {% include "investing/holdings_chart.html" with chart_id=portfolio_chart_id chart_data=portfolio_series title="Total holdings value" subtitle="Combined estimated value across the sample dates" latest_value=holdings_market_value latest_date=portfolio_latest_date chart_color="portfolio" live_portfolio=True %}
+  {% include "investing/holdings_chart.html" with chart_id=portfolio_chart_id chart_data=portfolio_series title="Total holdings value" subtitle="Combined estimated value across the available Twelve Data dates" latest_value=holdings_market_value latest_date=portfolio_latest_date chart_color="portfolio" live_portfolio=True %}
 {% endif %}
 <div class="holding-chart-list">
   {% for holding in holdings %}
@@ -85,14 +85,14 @@
 {% else %}
 <section class="card holdings-empty">
   <div class="demo-ai-mark">{% include "partials/icon.html" with name="trend" size=23 %}</div>
-  <h2>No approved sample holdings yet</h2>
-  <p>When you approve a simulated order for a sample asset, its shares and sample-price history will show up here.</p>
-  <a class="button" href="?tab=explore">Explore sample assets</a>
+  <h2>No approved demo holdings yet</h2>
+  <p>When you approve a simulated order for a supported stock, its shares and Twelve Data price history will show up here.</p>
+  <a class="button" href="?tab=explore">Explore supported stocks</a>
 </section>
 {% endif %}
 {% if unpriced_filled_total > 0 %}
 <section class="card unpriced-holdings">
-  <div><strong>Other simulated contributions</strong><p>These approved simulated orders do not have a sample price history, so they are not included in the graphs.</p></div>
+  <div><strong>Other simulated contributions</strong><p>These approved orders use bundled sample prices or have no share data, so they are not included in the Twelve Data holdings graphs.</p></div>
   <strong>{{ unpriced_filled_total|money }}</strong>
 </section>
 {% endif %}
@@ -101,7 +101,7 @@
   <div class="section-title">Waiting for your approval</div>
   <p class="muted">These are not part of your holdings yet.</p>
   {% for order in pending_market_orders %}
-  <div class="list-row"><span><strong>{{ order.symbol }}</strong> · {{ order.demo_shares }} simulated shares at ${{ order.demo_execution_price }} sample close</span><strong>{{ order.amount|money }}</strong></div>
+  <div class="list-row"><span><strong>{{ order.symbol }}</strong> · {{ order.demo_shares }} simulated shares at ${{ order.demo_execution_price }} {% if order.demo_price_source == "twelve-data" %}Twelve Data price{% else %}legacy bundled sample price{% endif %}</span><strong>{{ order.amount|money }}</strong></div>
   {% endfor %}
   <a class="text-link" href="?tab=portfolio">Review pending orders</a>
 </section>
@@ -133,18 +133,18 @@
     <div class="demo-ai-mark">{% include "partials/icon.html" with name="trend" size=23 %}</div>
     <div class="demo-ai-title">
       <span class="eyebrow">FINOVATE DEMO AI</span>
-      <h2>Sample-data investment ideas</h2>
-      <p>Reviews all {{ demo_stock_count }} bundled sample stocks, then ranks the top three by sample-period return minus observed volatility.</p>
+      <h2>Investment ideas</h2>
+      <p>Reviews {{ demo_stock_count }} supported stocks, then ranks the top three using Twelve Data historical return and observed volatility.</p>
     </div>
     <span class="demo-only-pill">SIMULATED ONLY</span>
   </div>
   <div class="demo-ai-disclaimer">
-    These are educational, rule-based suggestions from the supplied sample data, not predictions or financial advice. Accepting one creates a simulated pending order; it does not contact a brokerage or move money.
+    These are educational, rule-based suggestions from Twelve Data history, not predictions or financial advice. Accepting one creates a simulated pending order; it does not contact a brokerage or move money.
   </div>
   {% if not has_demo_market_data %}
   <div class="demo-ai-empty">
-    <strong>Sample market data is not loaded yet.</strong>
-    <span>Run <code>python manage.py seed_excel_demo_market</code> to load the included September 2026 dataset.</span>
+    <strong>Twelve Data history is not available yet.</strong>
+    <span>Check the server API key and provider access. Bundled sample prices are not used for recommendations.</span>
   </div>
   {% elif demo_suggestions %}
   <div class="demo-ai-suggestions">
@@ -155,12 +155,12 @@
         <span class="demo-score">Demo score <strong>{{ idea.score }}</strong></span>
       </div>
       <div class="demo-ai-metrics">
-        <div><span>Sample-period move</span><strong>{% if idea.historical_return_percent > 0 %}+{% endif %}{{ idea.historical_return_percent }}%</strong></div>
+        <div><span>Historical move</span><strong>{% if idea.historical_return_percent > 0 %}+{% endif %}{{ idea.historical_return_percent }}%</strong></div>
         <div><span>Observed volatility</span><strong>{{ idea.volatility_percent }}%</strong></div>
         <div><span>Suggested amount</span><strong>{{ idea.amount|money }}</strong></div>
       </div>
       <p class="demo-ai-explanation">{{ idea.explanation }}</p>
-      <div class="demo-execution-note">Simulated reference close: ${{ idea.demo_execution_price }} · {{ idea.data_date }}</div>
+      <div class="demo-execution-note">Twelve Data reference price: ${{ idea.demo_execution_price }} · {{ idea.data_date }}</div>
       <div class="demo-ai-actions">
         <form method="post" action="{% url 'investing:accept_demo_suggestion' idea.pk %}">
           {% csrf_token %}
@@ -183,11 +183,11 @@
   {% else %}
   <div class="demo-ai-empty">
     {% if demo_budget <= 0 %}
-    <strong>Add virtual demo funds to start reviewing sample-stock ideas.</strong>
+    <strong>Add virtual demo funds to start reviewing stock ideas.</strong>
     <span>Your simulated investing budget is $0.00. Add virtual funds above or add cash to an investable savings pool; no real money moves through demo trades.</span>
     {% else %}
     <strong>Ready to explore a demo recommendation?</strong>
-    <span>Suggestions use only the included sample prices and are limited to $75 total per review.</span>
+    <span>Suggestions use only Twelve Data prices and are limited to $75 total per review.</span>
     <form method="post" action="{% url 'investing:generate_demo_suggestions' %}">
       {% csrf_token %}
       <button class="button" type="submit">Generate demo ideas</button>
@@ -241,7 +241,7 @@
       {% for o in orders %}
       <div class="transaction-row" style="cursor:default;">
         <span class="merchant-mark">{{ o.get_order_type_display|merchant_mark }}</span>
-        <span class="transaction-name"><strong>{{ o.get_order_type_display }}{% if o.demo_execution_price %} {{ o.symbol }}{% endif %} · {{ o.pool.name|default:"General" }}</strong><small>{{ o.created_at|date:"M j, Y" }} · {{ o.get_status_display }}{% if o.demo_shares %} · {{ o.demo_shares }} simulated shares @ ${{ o.demo_execution_price }} · sample price {{ o.demo_data_date }}{% endif %}</small></span>
+        <span class="transaction-name"><strong>{{ o.get_order_type_display }}{% if o.demo_execution_price %} {{ o.symbol }}{% endif %} · {{ o.pool.name|default:"General" }}</strong><small>{{ o.created_at|date:"M j, Y" }} · {{ o.get_status_display }}{% if o.demo_shares %} · {{ o.demo_shares }} simulated shares @ ${{ o.demo_execution_price }} · {% if o.demo_price_source == "twelve-data" %}Twelve Data price{% else %}legacy bundled sample price{% endif %} {{ o.demo_data_date }}{% endif %}</small></span>
         <span class="amount">{{ o.amount|money }}</span>
       </div>
       {% endfor %}
@@ -279,9 +279,9 @@
   <div class="section-title">Pending your approval</div>
   {% for o in pending_orders %}
   <div class="list-row" style="margin-top:12px;">
-    <span>Proposed {{ o.get_order_type_display|lower }}{% if o.demo_execution_price %} {{ o.symbol }}{% endif %} of {{ o.amount|money }} into {% if o.pool %}{{ o.pool.name }}{% else %}the general bucket{% endif %}{% if o.demo_shares %}<small class="muted"> · {{ o.demo_shares }} simulated shares @ ${{ o.demo_execution_price }} · sample price {{ o.demo_data_date }}</small>{% endif %}</span>
+    <span>Proposed {{ o.get_order_type_display|lower }}{% if o.demo_execution_price %} {{ o.symbol }}{% endif %} of {{ o.amount|money }} into {% if o.pool %}{{ o.pool.name }}{% else %}the general bucket{% endif %}{% if o.demo_shares %}<small class="muted"> · {{ o.demo_shares }} simulated shares @ ${{ o.demo_execution_price }} · {% if o.demo_price_source == "twelve-data" %}Twelve Data price{% else %}legacy bundled sample price; this order cannot be approved{% endif %} {{ o.demo_data_date }}</small>{% endif %}</span>
     <span class="button-row">
-      <form method="post" action="{% url 'investing:approve_order' o.pk %}">{% csrf_token %}<button class="button" type="submit">Approve</button></form>
+      {% if not o.demo_execution_price or o.demo_price_source == "twelve-data" %}<form method="post" action="{% url 'investing:approve_order' o.pk %}">{% csrf_token %}<button class="button" type="submit">Approve</button></form>{% endif %}
       <form method="post" action="{% url 'investing:reject_order' o.pk %}">{% csrf_token %}<button class="button secondary" type="submit">Reject</button></form>
     </span>
   </div>
@@ -343,6 +343,9 @@
 
 {% block extra_js %}
 <script src="{% static 'js/market-charts.js' %}?v=2" defer></script>
+{% if tab == 'explore' and live_market_quotes_enabled %}
+<script src="{% static 'js/live-market-quotes.js' %}?v=1" defer></script>
+{% endif %}
 {% if tab == 'holdings' and holdings %}
 <script src="{% static 'js/live-holdings.js' %}?v=1" defer></script>
 {% endif %}
