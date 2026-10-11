@@ -545,6 +545,12 @@ class DemoMarketExplorerTests(TestCase):
         self.assertContains(response, "View all 18 sample price days")
         self.assertContains(response, "Available demo budget")
         self.assertContains(response, "Create demo order")
+        self.assertContains(response, "data-market-view=\"chart\"")
+        self.assertContains(response, "data-market-view=\"table\"")
+        self.assertContains(response, "data-chart-slider")
+        self.assertContains(response, "Up from prior sample date")
+        self.assertContains(response, "Down from prior sample date")
+        self.assertContains(response, "market-charts.js")
 
     def test_user_can_create_pending_order_from_a_selected_sample_asset(self):
         pool = Goal.objects.create(
