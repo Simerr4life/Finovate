@@ -19,7 +19,8 @@ def _get_batch(request, pk):
 
 def _parsed_rows(batch):
     text = pipeline.decode_text(bytes(batch.raw_file))
-    rows = pipeline.parse_rows(text, batch.column_mapping, account_id=batch.account_id)
+    parse_text = pipeline.text_for_parsing(text, batch.column_mapping)
+    rows = pipeline.parse_rows(parse_text, batch.column_mapping, account_id=batch.account_id)
     pipeline.detect_duplicates(rows, batch.account)
     return rows
 
@@ -49,18 +50,17 @@ def upload(request):
             except pipeline.ImportValidationError as exc:
                 return _unreadable_response(request, [str(exc)], from_onboarding=from_onboarding)
 
-            headers = pipeline.read_headers(text)
-            mapping = pipeline.detect_columns(headers)
-            rows = pipeline.parse_rows(text, mapping)
-            readable, problems = pipeline.assess_readability(mapping, rows)
-            if not readable:
-                return _unreadable_response(request, problems, from_onboarding=from_onboarding)
+            prepared = pipeline.prepare_statement(text)
+            if not prepared.readable:
+                return _unreadable_response(
+                    request, prepared.problems, from_onboarding=from_onboarding
+                )
 
             batch = ImportBatch.objects.create(
                 user=request.user,
                 original_filename=upload_file.name[:255],
                 raw_file=content,
-                column_mapping=mapping,
+                column_mapping=prepared.mapping,
                 started_from_onboarding=from_onboarding,
             )
             return redirect("imports:choose_account", pk=batch.pk)

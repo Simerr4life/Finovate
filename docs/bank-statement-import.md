@@ -20,6 +20,30 @@ are ordinary `Transaction` rows with `source="imported"`.
   `Is_Income` are recognized as optional metadata and simply ignored --
   never required, never guessed at.
 
+### Classic vs enhanced CSV readers
+
+The **classic** reader in `imports/pipeline.py` is unchanged and still
+handles the simple first-row-header, comma-separated exports above.
+
+An **enhanced** reader in `imports/csv_enhanced.py` runs only when classic
+cannot read the file reliably (or when a DR/CR `Type` column would be
+misread as unsigned amounts). It does **not** replace the classic format:
+it normalizes messier exports into the same shape classic already
+understands, then reuses classic column detection and row parsing.
+
+Enhanced additions (additive):
+
+- Skip preamble rows (account metadata above the real header)
+- Semicolon / tab / pipe delimiters
+- European decimals (`4,35` / `1.234,56`) and `dd.mm.yyyy` dates
+- `Amount` + `Type` (DR/CR) → signed amounts
+- Join `Description` + `Memo` into one description
+
+When enhanced is used, `ImportBatch.column_mapping` stores a reserved
+`_reader` metadata object beside the role→header map so preview/commit
+can rematerialize from the original upload bytes. Classic imports have
+no `_reader` key.
+
 **When more than one amount-like column is present** (e.g. both
 `Amount_USD` and `Net_Amount_USD`, or debit/credit alongside a signed
 amount), they are never added together. Each is treated as a candidate
@@ -54,16 +78,17 @@ mirroring `transactions/services.py`:
 1. `validate_file` — content-based (decodes as text, sniffs as CSV,
    checks size/shape), not filename-based. A renamed non-CSV file fails
    here regardless of its extension.
-2. `read_headers` / `detect_columns` — fully automatic mapping by header
-   alias. This is the *only* mapping step; there is no screen asking a
-   human to confirm or correct it.
+2. `prepare_statement` — classic-first preparation. Uses
+   `read_headers` / `detect_columns` / `parse_rows` / `assess_readability`
+   on the raw text; if that is not readable (or a DR/CR type column is
+   present), tries `csv_enhanced.prepare` and re-runs classic detection
+   on the normalized CSV.
 3. `parse_rows` — typed, Decimal-only parsing, including `_resolve_amount`'s
    candidate-reconciliation logic (see above) for files with more than
    one amount-like column. A single bad row is recorded in that row's
    `errors` and flagged for review; it never raises and never blocks the
-   rest of the file.
-4. `assess_readability` — run once, right after upload, on the detected
-   mapping and parsed rows: enough of a recognizable shape to import from
+   rest of the file. Reserved mapping keys starting with `_` are ignored.
+4. `assess_readability` — enough of a recognizable shape to import from
    at all? If not, the user goes straight to the unreadable-file page
    instead of into a wizard for a file that was never going to work.
 5. `detect_duplicates` — see below.
@@ -209,7 +234,7 @@ No new environment variables. Migrations: `imports/migrations/0001_initial.py`,
 
 ## Tests run
 
-`python manage.py test imports` — 41 tests covering file validation
+`python manage.py test imports` — 57 tests covering file validation
 (empty, oversized, binary-content-despite-.csv-extension, no
 recognizable columns), automatic column detection including the
 `Money_In_USD`/`Money_Out_USD`/`Amount_USD`/`Net_Amount_USD`/
