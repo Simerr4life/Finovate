@@ -6,6 +6,11 @@ app_name = "investing"
 
 urlpatterns = [
     path("", views.index, name="index"),
+    path(
+        "demo-budget/add/",
+        views.add_demo_investment_funds_view,
+        name="add_demo_investment_funds",
+    ),
     path("demo-ai/generate/", views.generate_demo_suggestions_view, name="generate_demo_suggestions"),
     path("demo-ai/<int:pk>/accept/", views.accept_demo_suggestion_view, name="accept_demo_suggestion"),
     path("demo-ai/<int:pk>/decline/", views.decline_demo_suggestion_view, name="decline_demo_suggestion"),

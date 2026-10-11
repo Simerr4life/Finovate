@@ -390,16 +390,16 @@ select, .field-label input { min-height: 40px; padding: 0 12px; border: 1px soli
 
 @media (max-width: 760px) {
   .sidebar, .desktop-topbar { display: none; }
-  .main { margin: 0; padding: 58px 0 74px; }
+  .main { margin: 0; padding: 58px 0 calc(74px + env(safe-area-inset-bottom)); }
   .mobile-header { position: fixed; inset: 0 0 auto; z-index: 40; height: 58px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; background: var(--navy); }
   .mobile-header .brand { padding: 0; }
   .mobile-header .icon-button { color: white; border-color: rgba(255,255,255,.2); background: transparent; }
   .mobile-menu { position: fixed; z-index: 35; inset: 58px 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 12px; background: var(--navy); box-shadow: 0 12px 30px rgba(0,0,0,.2); }
   .mobile-menu a, .mobile-menu button { display: flex; align-items: center; gap: 10px; padding: 12px; border: 0; border-radius: 9px; background: transparent; color: #b8c8c3; font-size: 12px; text-align: left; }
   .mobile-menu a.active, .mobile-menu button.active { color: white; background: rgba(255,255,255,.08); }
-  .bottom-nav { position: fixed; z-index: 50; inset: auto 0 0; height: 66px; padding-bottom: env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid var(--border); background: rgba(255,255,255,.96); backdrop-filter: blur(12px); }
-  .bottom-nav a, .bottom-nav button { display: grid; place-content: center; justify-items: center; gap: 3px; border: 0; background: none; color: #84918e; font-size: 8px; text-decoration: none; }
-  .bottom-nav a.active, .bottom-nav button.active { color: var(--green); }
+  .bottom-nav { position: fixed; z-index: 50; inset: auto 0 0; height: calc(66px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid rgba(255,255,255,.12); background: var(--navy); backdrop-filter: blur(12px); }
+  .bottom-nav a, .bottom-nav button { display: grid; place-content: center; justify-items: center; gap: 3px; border: 0; background: none; color: #b8c8c3; font-size: 8px; text-decoration: none; }
+  .bottom-nav a.active, .bottom-nav button.active { color: #69b693; }
   .bottom-nav svg { width: 19px; }
   .content { padding: 22px 14px 40px; }
   .overview-heading, .page-heading { align-items: flex-start; margin-bottom: 19px; }
@@ -671,6 +671,14 @@ body.has-market-chart-js .market-view-controls { display: flex; }
 .market-chart-legend .up { background: #21865b; }
 .market-chart-legend .down { background: #d14d4d; }
 .market-chart-help { margin: 7px 0 0; color: var(--muted); font-size: 10px; }
+.demo-budget-card { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 19px 22px; margin: 0 0 20px; }
+.demo-budget-card h2 { margin: 0; font: 700 17px "Manrope", sans-serif; }
+.demo-budget-card p { margin: 6px 0 3px; color: var(--muted); font-size: 12px; }
+.demo-budget-card p strong { color: var(--ink); }
+.demo-budget-card small { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.demo-budget-form { display: flex; align-items: end; gap: 10px; min-width: min(430px, 48%); }
+.demo-budget-form .field-label { flex: 1; margin: 0; }
+.demo-budget-form .button { min-height: 40px; }
 .market-explore-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin: 8px 0 18px; padding: 22px 24px; border: 1px solid var(--border); border-radius: 15px; background: var(--surface); }
 .market-explore-heading h2 { margin: 0; font: 700 21px "Manrope", sans-serif; }
 .market-explore-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
@@ -804,6 +812,9 @@ body[data-theme="dark"] .market-asset-card, body[data-theme="dark"] .holding-cha
   .holding-chart-card { padding: 15px; }
   .holding-chart-current { text-align: left; }
   .unpriced-holdings { align-items: start; flex-direction: column; padding: 15px; }
+  .demo-budget-card, .demo-budget-form { align-items: stretch; flex-direction: column; }
+  .demo-budget-card { padding: 16px; }
+  .demo-budget-form { min-width: 0; width: 100%; }
 }
 @media (min-width: 640px) {
   .sm\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }

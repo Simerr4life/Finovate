@@ -19,6 +19,22 @@
   <a href="?tab=calculator" class="{% if tab == 'calculator' %}active{% endif %}">Calculator</a>
 </div>
 
+<section class="card demo-budget-card" id="demo-budget">
+  <div>
+    <span class="eyebrow">SIMULATED ONLY</span>
+    <h2>Demo investing budget</h2>
+    <p>Available to use on sample-stock orders and recommendations: <strong>{{ demo_budget|money }}</strong></p>
+    <small>{{ demo_funded_total|money }} in virtual funds added so far. This only changes the demo balance; it does not add to your real cash or move money.</small>
+  </div>
+  <form method="post" action="{% url 'investing:add_demo_investment_funds' %}" class="demo-budget-form">
+    {% csrf_token %}
+    <label class="field-label">Add virtual funds
+      <input type="number" name="amount" min="0.01" max="9999999999.99" step="0.01" placeholder="e.g. 250.00" required>
+    </label>
+    <button class="button" type="submit">Add demo funds</button>
+  </form>
+</section>
+
 {% if tab == 'explore' %}
 <section class="market-explore-heading">
   <div>
@@ -117,12 +133,12 @@
     <div class="demo-ai-title">
       <span class="eyebrow">FINOVATE DEMO AI</span>
       <h2>Sample-data investment ideas</h2>
-      <p>Transparent rules rank the supplied historical stock data by sample-period return minus observed volatility.</p>
+      <p>Reviews all {{ demo_stock_count }} bundled sample stocks, then ranks the top three by sample-period return minus observed volatility.</p>
     </div>
     <span class="demo-only-pill">SIMULATED ONLY</span>
   </div>
   <div class="demo-ai-disclaimer">
-    These are educational, rule-based suggestions, not predictions or financial advice. Accepting one creates a simulated pending order; it does not contact a brokerage or move money.
+    These are educational, rule-based suggestions from the supplied sample data, not predictions or financial advice. Accepting one creates a simulated pending order; it does not contact a brokerage or move money.
   </div>
   {% if not has_demo_market_data %}
   <div class="demo-ai-empty">
@@ -165,9 +181,9 @@
   </div>
   {% else %}
   <div class="demo-ai-empty">
-    {% if surplus.investable_surplus <= 0 %}
-    <strong>No demo recommendations yet - your estimated investable surplus is $0.00.</strong>
-    <span>Suggestions are limited to your estimated surplus after reserves, savings goals, and recurring bills.</span>
+    {% if demo_budget <= 0 %}
+    <strong>Add virtual demo funds to start reviewing sample-stock ideas.</strong>
+    <span>Your simulated investing budget is $0.00. Add virtual funds above; they do not change your real account balance.</span>
     {% else %}
     <strong>Ready to explore a demo recommendation?</strong>
     <span>Suggestions use only the included sample prices and are limited to $75 total per review.</span>
