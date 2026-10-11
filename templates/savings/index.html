@@ -9,7 +9,7 @@
     <div class="page-title">Savings Center</div>
     <div class="page-subtitle">Build a plan around what is recorded as safe to consider.</div>
   </div>
-  <button class="button" type="button" data-open-review {% if surplus.investable_surplus <= 0 %}disabled{% endif %}>Review savings plan</button>
+  <a class="button" href="{% url 'savings:plan' %}">Open savings plan</a>
 </div>
 
 <div class="savings-hero">
@@ -28,16 +28,34 @@
   </section>
   <section class="card surplus-card">
     <div>
-      <div class="label">POTENTIAL SURPLUS</div>
-      <div class="money">{{ surplus.investable_surplus|money }}</div>
-      <div class="muted">Estimated, not yet saved</div>
+      <div class="label">{% if plan %}SAFE TO SAVE{% else %}POTENTIAL SURPLUS{% endif %}</div>
+      <div class="money">{% if plan %}{{ plan.safe_to_save|money }}{% else %}{{ surplus.investable_surplus|money }}{% endif %}</div>
+      <div class="muted">{% if plan %}Monthly recommendation basis{% else %}Estimated, not yet saved{% endif %}</div>
     </div>
     <div class="surplus-ring" style="background: radial-gradient(circle, white 60%, transparent 61%), conic-gradient(var(--green) 0 100%, #e8ece8 0);">
-      <strong>{{ surplus.investable_surplus|money }}</strong>
+      <strong>{% if plan %}{{ plan.safe_to_save|money }}{% else %}{{ surplus.investable_surplus|money }}{% endif %}</strong>
       <span>available</span>
     </div>
   </section>
 </div>
+
+{% if plan %}
+<section class="card" style="margin-bottom:1.25rem;">
+  <div class="section-title">{{ plan.name }}</div>
+  <p>{{ plan.explanation }}</p>
+  <div class="allocation-bar">
+    <i style="width: {{ plan.rainy_day_percent }}%; background: #2F6F4E;"></i>
+    <i style="width: {{ plan.investment_percent }}%; background: #1F3A5F;"></i>
+    <i style="width: {{ plan.regular_percent }}%; background: #C4A35A;"></i>
+  </div>
+  <div class="allocation-list">
+    <label><span><i class="dot green"></i>Rainy Day</span><strong>{{ plan.rainy_day_amount|money }}</strong></label>
+    <label><span><i class="dot navy"></i>Investment</span><strong>{{ plan.investment_amount|money }}</strong></label>
+    <label><span><i class="dot gold"></i>Regular Savings</span><strong>{{ plan.regular_amount|money }}</strong></label>
+  </div>
+  <div class="muted">Recommendations only. <a class="text-link" href="{% url 'savings:plan' %}">See full plan and history</a></div>
+</section>
+{% endif %}
 
 <div class="two-column">
   <section class="card">
@@ -52,15 +70,9 @@
     <div class="callout">{% include "partials/icon.html" with name="shield" %}<span>Your {{ surplus.minimum_cash_reserve|money }} minimum cash reserve is protected in this estimate.</span></div>
   </section>
   <section class="card">
-    <div class="section-title">Proposed allocation</div>
-    <div class="allocation-bar"><i id="alloc-bar-emergency" style="width: 60%"></i><i></i><i></i></div>
-    <div class="allocation-list">
-      <label><span><i class="dot green"></i>Emergency savings</span><strong id="alloc-emergency">$0</strong></label>
-      <input id="emergency-alloc" type="range" min="30" max="80" value="60" data-surplus="{{ surplus.investable_surplus }}" aria-label="Emergency savings allocation">
-      <label><span><i class="dot gold"></i>Short-term goals</span><strong id="alloc-short">$0</strong></label>
-      <label><span><i class="dot navy"></i>Long-term investing</span><strong id="alloc-long">$0</strong></label>
-    </div>
-    <div class="muted">Adjusting this preview does not move money.</div>
+    <div class="section-title">Default pools</div>
+    <p class="muted">Rainy Day, Investment, and Regular Savings are created automatically when missing. Balances are never reset.</p>
+    <a class="text-link" href="{% url 'savings:pools' %}">Open pools {% include "partials/icon.html" with name="arrow" size=15 %}</a>
   </section>
 </div>
 
@@ -72,6 +84,15 @@
   <a class="text-link" href="{% url 'savings:goals' %}">Financial goals {% include "partials/icon.html" with name="arrow" size=15 %}</a>
 </div>
 <div class="recommendation-grid">
+  {% if plan and plan.warnings %}
+  <section class="card recommendation">
+    <span class="pill">Plan</span>
+    <div class="recommend-title">{{ plan.get_scenario_display }}</div>
+    <div class="money small">{{ plan.safe_to_save|money }}</div>
+    <p>{{ plan.warnings.0 }}</p>
+    <a class="text-link" href="{% url 'savings:plan' %}">Review plan {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+  </section>
+  {% endif %}
   {% if surplus.upcoming_bills_buffer > 0 %}
   <section class="card recommendation">
     <span class="pill">Bills</span>
@@ -88,15 +109,6 @@
     <div class="money small">{{ surplus.investable_surplus|money }}</div>
     <p>This amount is still cash. Saving a proposal does not move it until you approve a simulated order.</p>
     <button class="text-link" type="button" data-open-review>Explore idea {% include "partials/icon.html" with name="arrow" size=15 %}</button>
-  </section>
-  {% endif %}
-  {% if not goals %}
-  <section class="card recommendation">
-    <span class="pill">Goals</span>
-    <div class="recommend-title">Name a savings goal</div>
-    <div class="money small">$0.00</div>
-    <p>Goal cash is tracked separately from this surplus estimate.</p>
-    <a class="text-link" href="{% url 'savings:goal_add' %}">Create a goal {% include "partials/icon.html" with name="arrow" size=15 %}</a>
   </section>
   {% endif %}
 </div>

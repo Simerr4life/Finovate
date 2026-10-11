@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "add" %}Add debt{% else %}Edit debt{% endif %} — Finovate{% endblock %}
+{% block crumb %}{% if mode == "add" %}Add debt{% else %}Edit debt{% endif %}{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">FINOVATE</div>
+    <div class="page-title">{% if mode == "add" %}Add debt{% else %}Edit debt{% endif %}</div>
+    <div class="page-subtitle">Used only for planning priorities. No payment is created.</div>
+  </div>
+</div>
+<section class="card">
+  <form method="post" class="stack-form">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="button-row">
+      <button class="button" type="submit">Save</button>
+      <a class="button ghost" href="{% url 'savings:debts' %}">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

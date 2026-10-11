@@ -33,8 +33,13 @@ class PoolsViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["nav_active"], "pools")
-        self.assertEqual([row["goal"] for row in response.context["pool_rows"]], [goal])
+        pool_goals = [row["goal"] for row in response.context["pool_rows"]]
+        self.assertIn(goal, pool_goals)
+        self.assertTrue(all(g.user_id == self.user.id for g in pool_goals))
+        self.assertNotIn("Private goal", [g.name for g in pool_goals])
+        # Default Rainy Day / Investment / Regular pools are auto-created at $0.
         self.assertEqual(response.context["saved_total"], Decimal("250.00"))
+        self.assertGreaterEqual(len(pool_goals), 4)
 
     def test_creating_a_pool_uses_the_shared_savings_goal_and_returns_to_pools(self):
         response = self.client.post(

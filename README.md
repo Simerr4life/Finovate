@@ -106,7 +106,7 @@ Six Django apps, each owning one slice of the domain:
 | `accounts` | User `Profile` preferences, demo auth views, notification/audit events, connected-account placeholders |
 | `transactions` | `Category`, `Transaction`, idempotent-import helper |
 | `budgets` | `BudgetPeriod`, `Budget`, `IncomeSource`, `RecurringExpense`, the budget-plan calculator |
-| `savings` | `Goal`, `Contribution`, milestone + completion-estimate logic |
+| `savings` | `Goal` (incl. Rainy Day / Investment / Regular pools), `Contribution`, personalized `SavingsPlan` engine — see [docs/savings-plan-engine.md](docs/savings-plan-engine.md) |
 | `investing` | Simulated `RoundUpSettings`, `RoundUpLedgerEntry`, `PortfolioSnapshot`, `SimulatedOrder` |
 | `imports` | CSV bank-statement upload → review → commit pipeline, `ImportBatch` tracking. See [docs/bank-statement-import.md](docs/bank-statement-import.md) |
 
