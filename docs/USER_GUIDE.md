@@ -8,7 +8,7 @@ For judges and first-time users. Labels below match the app's actual buttons and
 
 | Option | When to use | Steps |
 |---|---|---|
-| **A. Deployed site** | The team has shared a working URL with Auth0 enabled | Open the URL → **Get started** → **Continue with Auth0 (recommended)** → create the account on Auth0's page → confirm your email → you land on onboarding. *The production URL and its sign-in were not verified while these docs were written; ask the team for the link.* |
+| **A. Live site (recommended)** | Anytime | Open **https://finovate.biz** → **Get started** → **Continue with Auth0 (recommended)** → create the account on Auth0's page → confirm your email → you land on onboarding |
 | **B. Local with Auth0 or Supabase** | You have tenant/project credentials | Set the variables listed in the [README](../README.md#environment-variables-names-only), run the server on the origin in `APP_BASE_URL`, then sign up as in A. With only Supabase set, use the email-and-password form |
 | **C. Local walkthrough with sample data (no providers)** | Reviewing the code on your own machine | See below |
 

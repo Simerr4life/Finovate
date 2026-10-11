@@ -8,11 +8,11 @@
 |---|---|---|
 | Project title and description | ✅ | Below |
 | Problem and who it serves | ✅ | Write-up → Inspiration / Who it's for |
-| Team roster (max 4) | ❗ Team to fill in | — |
+| Team roster (max 4) | ✅ Harold Aghedo (captain), Micheal White | — |
 | Main track (one) | ✅ **Fintech** | — |
-| Side challenges (max 3) | ✅ **MLH: Best Use of Auth0**, **Photon: Agents in iMessage**, **MLH: Best Domain Name from GoDaddy Registry** (GoDaddy only if `finovate.biz` is registered; see below) | — |
-| Public GitHub repo with useful README | ❗ Make repo **public**; merge this branch | `https://github.com/Simerr4life/Finovate` |
-| Working demo link **or** clear run instructions | ✅ run instructions (README); demo link ❗ only if verified | README → Run it locally |
+| Side challenges (max 3) | ✅ **MLH: Best Use of Auth0**, **Photon: Agents in iMessage**, **MLH: Best Domain Name from GoDaddy Registry** (our live domain `finovate.biz` is a GoDaddy Registry `.biz` domain) | — |
+| Public GitHub repo with useful README | ✅ Public | https://github.com/Simerr4life/Finovate |
+| Working demo link **or** clear run instructions | ✅ Both | https://finovate.biz · README → Run it locally |
 | Demo video, 2–3 min, **public** | ❗ Record and upload | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) |
 | Technologies, APIs, datasets, sponsor tools | ✅ | "Built with" below |
 | Disclosure of anything made before Hacklanta | ✅ | "Disclosure" below |
@@ -23,7 +23,8 @@
 |---|---|
 | **Project title** | Finovate |
 | **Team** | Turn It Off and On Again |
-| **Members** | *Fill in (max 4).* Commit authors: GitHub `Simerr4life`, `Bigmike0814` |
+| **Members** | Harold Aghedo (captain), Micheal White |
+| **Live demo** | https://finovate.biz |
 | **Main track** | Fintech |
 | **Side challenges** | MLH: Best Use of Auth0 · Photon: Agents in iMessage · MLH: Best Domain Name from GoDaddy Registry |
 | **Repository** | https://github.com/Simerr4life/Finovate |
@@ -70,6 +71,7 @@ Read-only bank connections with explicit consent, notification delivery and week
 - AI coding assistants (Cursor, Claude Code) helped write and review code. The team designed, reviewed, and integrated everything during the event. All 49 commits are dated October 10–11, 2026.
 
 ### Instructions for judges
+- **Live site:** https://finovate.biz (sign up with Auth0).
 - **Run locally:** `pip install -r requirements.txt && python manage.py migrate && python manage.py seed_demo && python manage.py runserver`. Website sign-in uses Auth0. Without Auth0 credentials, see `docs/USER_GUIDE.md` (section 1, option C) for a local walkthrough with sample data.
 - **Try the iMessage agent without Photon:** `python manage.py chat_demo --username demo`.
 - **Simulated:** no bank or brokerage is connected and no money moves. Live prices need a `TWELVE_DATA_API_KEY`.
@@ -129,6 +131,8 @@ Trust in a finance tool comes from transparency and consent more than from featu
 
 Read-only bank connections with explicit consent, notification delivery and weekly summaries, auto-categorization, and a brokerage partner behind the approval flow we already built.
 
+**Try it:** https://finovate.biz · **Code:** https://github.com/Simerr4life/Finovate
+
 **Disclaimer:** Finovate is a prototype and not financial advice. Investing features are simulated; no money moves.
 <!-- extended-end -->
 
@@ -151,11 +155,11 @@ Architecture: [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md). Feature ev
 |---|---|---|---|
 | **MLH: Best Use of Auth0** | Universal Login sign-up/login/logout via `auth0-server-python`; sub-based identity; email-verification gate with Management API refresh and resend; Post-User-Registration Action webhook; RS256 access-token validation for `/api/me/` | `accounts/` code; mocked tests pass | Record a live login against the tenant |
 | **Photon: Agents in iMessage** | Spectrum adapter (`spectrum-ts`, iMessage provider) relaying to a secret-protected bridge; HMAC-verified webhook; confirmation-gated assistant; one-time-code chat linking; duplicate protection | `assistant/`, `spectrum/`; 43 tests; in-process transcript | Record a live iMessage exchange |
-| **MLH: Best Domain Name from GoDaddy Registry** | The app is configured for **finovate.biz** (`.biz` is a GoDaddy Registry TLD) | Domain in `finovate/settings.py`; registration not verified from our build environment | Confirm `finovate.biz` is registered and resolves before selecting this challenge |
+| **MLH: Best Domain Name from GoDaddy Registry** | **finovate.biz** (`.biz` is a GoDaddy Registry TLD) serves the live app. *Finovate* = finance + innovate | Live at https://finovate.biz; host configured in `finovate/settings.py` | — |
 
 ## Known limitations
 
-No bank or brokerage connection; investing is simulated. Live market data needs a Twelve Data key. Notifications are recorded, not delivered. Live Auth0, Photon, and production deployment were not verified during documentation. Full list: [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
+No bank or brokerage connection; investing is simulated. Live market data needs a Twelve Data key. Notifications are recorded, not delivered. Live iMessage delivery was not verified during documentation. Full list: [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
 
 ## Responsible AI and financial safety
 

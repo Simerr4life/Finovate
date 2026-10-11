@@ -30,7 +30,7 @@ Finovate handles personal finance data (transactions, balances, goals) but **can
 
 | ID | Severity | Finding | Impact | Recommendation |
 |---|---|---|---|---|
-| S1 | **High** if unset | If `FINOVATE_SECRET_KEY` is missing in production, Django falls back to a published development key | Session and CSRF tokens could be forged | Confirm it is set in Vercel; consider refusing to start on Vercel without it |
+| S1 | Low (mitigated) | `FINOVATE_SECRET_KEY` is set on Vercel (team-confirmed); the code would still fall back to a development key if it were removed | Forged sessions only if the variable were removed | Consider refusing to start on Vercel without it |
 | S2 | Medium | No `SECURE_HSTS_SECONDS`, `SECURE_SSL_REDIRECT`, or Content-Security-Policy | Weaker transport and XSS defense in depth | Enable HSTS/redirect on the HTTPS domain; add a CSP (fonts come from Google) |
 | S3 | Medium | Rate limits and token caches use a per-process memory cache | On serverless, limits are per instance (best-effort) | Use a shared cache (Redis or the database) |
 | S4 | Medium | Raw uploaded statement files are stored in the database (`ImportBatch.raw_file`, ≤ 2 MB) until the user deletes the source file | Retained bank-statement data | Default auto-deletion after commit; document retention |

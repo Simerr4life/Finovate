@@ -13,10 +13,10 @@ Status legend: ✅ verified · 🟡 implemented, not live-tested · 🟠 partial
 |---|---|---|---|---|
 | **Auth0** | Primary identity provider for the website and API | Deep (login, callback, logout, verification, Management API, Action webhook, API token validation) | ⛔ No tenant credentials in this environment; covered by mocked tests | 🟠 Strong code; needs one live login on record |
 | **Photon Spectrum** | iMessage transport for the chat assistant | Signed webhook + bridge in Django; `spectrum-ts` adapter in `spectrum/` | ✅ Bridge and assistant exercised in-process; ⛔ no live iMessage round-trip | 🟠 Strong code; needs one live iMessage exchange on record |
-| **GoDaddy Registry** | Domain `finovate.biz` (`.biz` is a GoDaddy Registry TLD) for the "Best Domain Name" challenge | Domain configured in settings (no API needed for this challenge) | ⛔ Registration and DNS not verifiable from this environment | 🟠 Confirm the domain is registered before selecting |
+| **GoDaddy Registry** | Domain `finovate.biz` (`.biz` is a GoDaddy Registry TLD) for the "Best Domain Name" challenge | Domain configured in settings; serves the live app | Live per the team; DNS not reachable from the docs build environment | ✅ Ready |
 | Supabase | Optional Postgres host and optional email/password sign-in | `DATABASE_URL` parsing; Supabase Auth REST calls | Mocked tests only | n/a |
 | Twelve Data | Optional live quotes and daily history | REST calls with shared quota and cache | ⛔ No API key here | n/a |
-| Vercel | Hosting configuration | `vercel.json`, Vercel-specific settings branch, boot-time migrate | Project `finovate` exists in the team account; deployments/domains not readable (403) | n/a |
+| Vercel | Hosting (live at https://finovate.biz) | `vercel.json`, Vercel-specific settings branch, boot-time migrate | Live per the team; `FINOVATE_SECRET_KEY` set (team-confirmed) | n/a |
 | Google Fonts | DM Sans / Manrope web fonts | CSS `@import` | Loaded in local browser tests | n/a |
 | Figma Make | Source of the UI layout | Exported layout under `.figma-make-inspect/` (not served) | n/a | n/a |
 
@@ -84,12 +84,9 @@ Status legend: ✅ verified · 🟡 implemented, not live-tested · 🟠 partial
 
 **What the repository shows:** the production host names `finovate.biz` and `www.finovate.biz` are configured in `finovate/settings.py` (`ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, default `APP_BASE_URL = https://finovate.biz`), and `AUTH0_AUDIENCE` uses `https://finovate.biz/api` (`.env.example`). `.biz` is a top-level domain operated by GoDaddy Registry.
 
-**What could not be verified:** whether `finovate.biz` is actually registered to the team and resolves. DNS was blocked from the build environment, and Vercel domain settings returned 403.
+**Status:** ✅ **Live.** Per the team, `finovate.biz` is registered and serves the deployed app on Vercel (https://finovate.biz). DNS was not reachable from the docs build environment, so this was not independently checked here.
 
-**Status:** 🟠 Fits the challenge if the domain is registered. **Before selecting the challenge, confirm:**
-1. `finovate.biz` is registered (through MLH's GoDaddy Registry offer or a registrar). Keep proof (a registrar screenshot with personal data redacted).
-2. Ideally it points to the deployed app over HTTPS, so judges can open `https://finovate.biz`.
-3. In the Devpost write-up, explain the name: *Finovate* = finance + innovate, and `.biz` fits a money-management product.
+**Why the name:** *Finovate* = finance + innovate; `.biz` fits a money-management product. This is the domain judged in the challenge.
 
 ## 4. Supabase
 

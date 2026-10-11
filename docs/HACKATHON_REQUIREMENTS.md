@@ -21,7 +21,7 @@ Guide: *"Teams may submit to only **ONE** main track and a **MAXIMUM of 3** side
 | **Main track** | **Fintech** — "rethink how money moves: payments, budgeting, investing, and the tools that make finances easier to manage." | Budgeting, savings planning, round-ups, simulated investing | ✅ Strong fit |
 | Side challenge 1 | **MLH: Best Use of Auth0** | Universal Login, verification gate, Management API, Action webhook, API token validation | 🟠 Implemented and tested with mocks; show a live login in the demo |
 | Side challenge 2 | **Photon: Agents in iMessage** — "Build an agent that lives in iMessage using Photon. Projects must integrate Spectrum, Photon's open source SDK." | `spectrum/` adapter built on `spectrum-ts` with the iMessage provider; confirmation-gated assistant | 🟠 Meets "integrate Spectrum"; live iMessage not verified here. The linked "Photon Guidelines" page was not in the export |
-| Side challenge 3 | **MLH: Best Domain Name from GoDaddy Registry** | App configured for **finovate.biz** (`.biz` is a GoDaddy Registry TLD) | ⚠️ Registration not verifiable from the build environment; confirm the domain is registered |
+| Side challenge 3 | **MLH: Best Domain Name from GoDaddy Registry** | **finovate.biz** (`.biz` is a GoDaddy Registry TLD) serves the live app | ✅ Live per the team (DNS not reachable from the docs build environment) |
 | Not eligible | Shock Tracker: Zero Data ("no accounts, tracking, profiles, or stored personal info") | Finovate requires accounts | ✗ Do not select |
 
 ## Requirements matrix
@@ -45,10 +45,10 @@ Status: **Pass** (evidence meets the rule) · **Partial** · **Fail** (not done 
 | S1 | Submit through **Devpost** (hacklanta.devpost.com) by 9:00 AM | Yes | — | **Fail (not yet)** | Submit now | **P0** |
 | S2 | Project title and description; **write-up outlining ideation and development process**, on the Devpost page | Yes | [SUBMISSION.md → Devpost write-up](SUBMISSION.md#devpost-write-up-paste-into-the-description-covers-ideation-and-development-process) | Pass (text ready) | Paste | **P0** |
 | S3 | The problem and who it serves | Yes | Write-up *Inspiration*, *Who it's for* | Pass | — | — |
-| S4 | Team roster (**max 4**) | Yes | Two GitHub handles in history | **Team** | Enter all members | **P0** |
+| S4 | Team roster (**max 4**) | Yes | Harold Aghedo (captain), Micheal White | Pass | Enter on Devpost | P0 |
 | S5 | Main track and any side challenges | Yes | Table above | Pass | Select on Devpost | **P0** |
-| S6 | **Public** GitHub repo with all the code and a useful README | Yes | README rewritten; repo `Simerr4life/Finovate` | Partial | **Make the repo public.** Merge `claude/codebase-audit-fixes` into the default branch so the README and fixes are what judges see | **P0** |
-| S7 | Working demo link **or** clear run instructions | Yes (either) | README *Run it locally*; [USER_GUIDE.md §1](USER_GUIDE.md#1-getting-access) | Pass (instructions) | Add the live link only if verified | P0 |
+| S6 | **Public** GitHub repo with all the code and a useful README | Yes | https://github.com/Simerr4life/Finovate is public; README and fixes on `main` | Pass | — | — |
+| S7 | Working demo link **or** clear run instructions | Yes (either) | https://finovate.biz plus README *Run it locally* | Pass | — | — |
 | S8 | **2–3 minute** demo video, **public** (YouTube/Google Drive, etc.) | Yes | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) (video version) | **Fail (not recorded)** | Record, upload as Public/Anyone-with-link, paste the URL | **P0** |
 | S9 | Technologies, APIs, datasets, sponsor tools used | Yes | "Built with" + disclosure in SUBMISSION | Pass | Paste | P0 |
 | S10 | Disclosure of anything made before Hacklanta | Yes | See R3 | Pass | Paste | P0 |
@@ -82,4 +82,4 @@ Status: **Pass** (evidence meets the rule) · **Partial** · **Fail** (not done 
 
 ## Sponsor-challenge evidence
 
-Details: [THIRD_PARTY_SERVICES.md](THIRD_PARTY_SERVICES.md). For GoDaddy, the MLH challenge judges the domain name. Confirm `finovate.biz` is registered (GoDaddy Registry operates `.biz`) and, ideally, that it points to the deployed app.
+Details: [THIRD_PARTY_SERVICES.md](THIRD_PARTY_SERVICES.md). For GoDaddy, the MLH challenge judges the domain name: `finovate.biz` (GoDaddy Registry operates `.biz`) serves the live app.

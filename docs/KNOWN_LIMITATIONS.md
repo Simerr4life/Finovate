@@ -8,9 +8,9 @@
 |---|---|---|---|---|---|---|---|---|
 | K1 | Hackathon deadline | Guide reviewed: everything is due on Devpost by **9:00 AM EDT, Sunday October 11**, plus the Google Form | On-time submission | Ineligible if late | Critical | Team | Submit now ([HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md)) | Submission |
 | K2 | Demo video | Not recorded | Uploaded video link | Probably required | Critical | Team | Record using [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | Submission |
-| K3 | Judge access | Website sign-in needs Auth0 or Supabase credentials; with neither, login says "Sign-in isn't configured." There is no local password login by design | Judges can sign in | Judges may not get past the landing page | Critical | Configured deployment or credentials | Provide a working deployed URL with Auth0 enabled, plus a judge test account or open sign-up; or demo from a presenter laptop | Demo |
-| K4 | Live deployment | Vercel project exists; URL, health, and env not verifiable here | A known-good URL | No live link to submit | Critical | Vercel access | Open the production URL, sign in, and run [DEMO_CHECKLIST.md](DEMO_CHECKLIST.md) | Submission (if required) |
-| K5 | GoDaddy Registry challenge | The challenge is "Best Domain Name from GoDaddy Registry". The app is configured for `finovate.biz` (`.biz` is a GoDaddy Registry TLD), but registration couldn't be verified from the build environment | A registered domain, ideally serving the app | Challenge entry unsupported if unregistered | Critical *for that challenge* | Registrar access | Confirm registration ([THIRD_PARTY_SERVICES.md §3](THIRD_PARTY_SERVICES.md#3-godaddy-registry-domain)) | Challenge eligibility |
+| K3 | Judge access | Judges can sign up on https://finovate.biz via Auth0. Running locally still needs Auth0/Supabase credentials or the local walkthrough | Judges can sign in | Low on the live site | Medium | Auth0 tenant | Keep the live site up through judging; have a pre-verified account for the pitch | No |
+| K4 | Live deployment | ✅ Resolved: live at https://finovate.biz per the team (not reachable from the docs build environment) | — | — | — | — | Run [DEMO_CHECKLIST.md](DEMO_CHECKLIST.md) on the live site before judging | No |
+| K5 | GoDaddy Registry challenge | ✅ Resolved: `finovate.biz` (a GoDaddy Registry `.biz` domain) serves the live app, per the team | — | — | — | — | — | No |
 
 ## High
 
@@ -33,7 +33,7 @@
 | K15 | Categorization | Imported transactions are saved **uncategorized**; a CSV "Category" column is recognized but ignored. No automatic categorization or recurring-payment detection | Suggested categories, recurring detection | Medium | Map hints to user categories; detect repeats | No |
 | K16 | Refund/reversal linking | `Transaction.reverses` exists and round-ups skip reversals, but nothing in the UI or importer sets it | Refunds linked to purchases | Medium | Expose in edit form/import | No |
 | K17 | Round-up eligibility | Every new expense transaction is eligible; there is no posted/pending distinction and transfers are not distinguished from purchases | Only posted purchases | Medium | Add a status/type to transactions | No |
-| K18 | Production secret key | If `FINOVATE_SECRET_KEY` is missing in production, settings fall back to a published development key | Fail closed | Medium (High if unset in prod) | Confirm it is set; optionally refuse to boot on Vercel without it | No |
+| K18 | Production secret key | ✅ Set on Vercel (team-confirmed). The code still falls back to a development key if it is ever unset | Fail closed | Low | Optionally refuse to boot on Vercel without it | No |
 | K19 | Vercel persistence | Without `DATABASE_URL`, Vercel uses `/tmp` SQLite, which resets on cold start | Persistent DB | Medium | Set a Postgres URL | Possibly the demo |
 | K20 | Account lifecycle | No self-service account deletion or full data export (transactions CSV export exists); no password reset in-app (handled by Auth0/Supabase hosted flows) | Delete/export | Medium | Add a deletion flow | No |
 | K21 | Goals | No pause/archive for goals; default pools (Rainy Day, Investment, Regular Savings) cannot be deleted (by design, since they're engine-managed) | Pause/archive | Medium | Add an archived flag | No |

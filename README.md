@@ -8,9 +8,11 @@ A Python personal-finance assistant for budgeting, savings goals, round-ups, and
 | | |
 |---|---|
 | **Hackathon** | Hacklanta 2026 |
-| **Team** | Turn It Off and On Again |
+| **Team** | Turn It Off and On Again: Harold Aghedo (captain), Micheal White |
+| **Live site** | https://finovate.biz |
+| **Repository** | https://github.com/Simerr4life/Finovate |
 | **Main track** | Fintech |
-| **Side challenges** | MLH: Best Use of Auth0 · Photon: Agents in iMessage · MLH: Best Domain Name from GoDaddy Registry (`finovate.biz`; registration to be confirmed). Evidence: [THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md) |
+| **Side challenges** | MLH: Best Use of Auth0 · Photon: Agents in iMessage · MLH: Best Domain Name from GoDaddy Registry (`finovate.biz`). Evidence: [THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md) |
 | **Submission package** | [docs/SUBMISSION.md](docs/SUBMISSION.md) |
 
 > **Status legend used across the docs:** ✅ verified · 🟡 implemented, not fully tested · 🟠 partial · 🧪 simulated / sample data · 📝 planned · ⛔ blocked on credentials or configuration.
@@ -63,7 +65,7 @@ All screenshots are real captures of this codebase running locally with seeded *
 | Messaging | Photon Spectrum: signed webhook endpoint in Django + a Bun/TypeScript adapter (`spectrum/`, `spectrum-ts`) |
 | Market data | Twelve Data REST API (optional, server-side, quota-limited cache) |
 | Front end | Hand-written CSS (`static/css/finovate.css`, Google Fonts), vanilla JS; light/dark themes |
-| Deployment config | `vercel.json` (Django on Vercel). A Vercel project named `finovate` exists; the live URL is **not verified** here. |
+| Deployment | Vercel (`vercel.json`), live at **https://finovate.biz** (`.biz` domain from GoDaddy Registry) |
 
 Architecture: [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md).
 
@@ -88,7 +90,7 @@ python manage.py seed_peachtree_demo       # optional: fictional statement with 
 python manage.py runserver
 ```
 
-Open `http://127.0.0.1:8000/`.
+Open `http://127.0.0.1:8000/`, or use the live site at https://finovate.biz.
 
 **Signing in:** website login requires Auth0 (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`) or Supabase email sign-in (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`). With neither set, the login page says *"Sign-in isn't configured on this server."* — this is deliberate; there is no local password login. For a local walkthrough without providers, see the judge options in [docs/USER_GUIDE.md](docs/USER_GUIDE.md#1-getting-access).
 
@@ -145,7 +147,7 @@ Coverage includes the $4.35 → $0.65 round-up, Decimal precision, idempotent im
 
 ## Known limitations (short)
 
-No bank or brokerage connection; investing and order fills are simulated. Live prices, the Explore tab, and demo investment ideas need `TWELVE_DATA_API_KEY`. Notifications are recorded in-app but not delivered by email/SMS. Website sign-in needs Auth0 or Supabase credentials. Live iMessage delivery and the production deployment were not verified during documentation. See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+No bank or brokerage connection; investing and order fills are simulated. Live prices, the Explore tab, and demo investment ideas need `TWELVE_DATA_API_KEY`. Notifications are recorded in-app but not delivered by email/SMS. Local website sign-in needs Auth0 or Supabase credentials (the live site at finovate.biz is configured). Live iMessage delivery was not verified during documentation. See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Disclosure (per the Hacker Guide)
 
@@ -153,7 +155,7 @@ Built during Hacklanta 2026 (all commits dated October 10–11, 2026). Existing 
 
 ## Team and attribution
 
-Built by team **Turn It Off and On Again** for Hacklanta 2026. Individual member names and roles: *to be confirmed by the team* (not present in the repository). Third-party libraries and services are listed in [docs/THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md). Development used AI coding assistants; see [SUBMISSION.md](docs/SUBMISSION.md#responsible-ai-and-financial-safety).
+Built by team **Turn It Off and On Again** for Hacklanta 2026: **Harold Aghedo** (captain) and **Micheal White**. Third-party libraries and services are listed in [docs/THIRD_PARTY_SERVICES.md](docs/THIRD_PARTY_SERVICES.md). Development used AI coding assistants; see [SUBMISSION.md](docs/SUBMISSION.md#responsible-ai-and-financial-safety).
 
 ## Financial disclaimer
 

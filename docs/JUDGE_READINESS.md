@@ -19,7 +19,7 @@ The guide lists these as the questions judges ask themselves:
 |---|---|---|---|
 | MLH: Best Use of Auth0 | Universal Login, sub-based identity, verification gate with Management API refresh, Post-Registration Action webhook, RS256 API audience validation | Not shown live in docs prep | "Auth0 isn't just a login button here: it gates verification and protects our API." |
 | Photon: Agents in iMessage (must integrate Spectrum) | Bun adapter on `spectrum-ts` (iMessage provider) → secret-protected bridge; confirmation-gated agent; one-time-code linking; duplicate protection | Live iMessage not verified in docs prep | "Text your budget; the agent asks before it changes anything and can never move money." |
-| MLH: Best Domain Name from GoDaddy Registry | `finovate.biz` (`.biz` = GoDaddy Registry): Finovate = finance + innovate | Confirm the domain is registered | "finovate.biz: finance plus innovate, on a business domain." |
+| MLH: Best Domain Name from GoDaddy Registry | `finovate.biz` (`.biz` = GoDaddy Registry) serves the live app; Finovate = finance + innovate | — | "finovate.biz: finance plus innovate, on a business domain." |
 
 ## Defensible differentiators
 
@@ -67,11 +67,11 @@ It addresses budgeting, emergency savings, debt prioritization, and investing li
 ## Prioritized final checklist
 
 1. **P0** Submit on Devpost **before 9:00 AM EDT**, then the Google Form (one member).
-2. **P0** Confirm every member is registered/accepted.
+2. **P0** Team on Devpost: Harold Aghedo (captain), Micheal White.
 3. **P0** Record and upload a **2–3 minute public** demo video (3-minute script).
-4. **P0** Verify the live URL and sign-in, or choose the local demo.
-5. **P0** Select Fintech + up to 3 challenges (Auth0, Photon, GoDaddy Registry only if the domain is registered); make the repo **public**.
+4. ✅ Live at https://finovate.biz; repo public.
+5. **P0** Select Fintech + 3 challenges: Auth0, Photon, GoDaddy Registry.
 6. **P1** Set `TWELVE_DATA_API_KEY` and `DATABASE_URL` on the demo server; confirm `FINOVATE_SECRET_KEY`.
-7. **P1** Merge the audit and docs branch to the default branch so judges see the current code.
-8. **P1** Fill in team member names in README and SUBMISSION.
+7. ✅ Docs and fixes merged to `main`.
+8. ✅ Team names in README and SUBMISSION.
 9. **P2** Add a LICENSE if required.

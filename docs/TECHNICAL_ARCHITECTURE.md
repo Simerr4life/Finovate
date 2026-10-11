@@ -183,7 +183,7 @@ The alternative `/assistant/photon-webhook/` path verifies Spectrum HMAC signatu
 | Boot | — | `migrate`; seed `demo` if `DEMO_ACCOUNT_PASSWORD` set |
 | Static | `runserver` serves `static/` | Vercel Django preset (not verified here) |
 
-Production health could not be verified from this environment (see [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)). Environment variables are listed in the [README](../README.md#environment-variables-names-only).
+Production runs at https://finovate.biz (team-confirmed; not reachable from the docs build environment). Environment variables are listed in the [README](../README.md#environment-variables-names-only).
 
 ## 10. Security boundaries
 
