@@ -20,7 +20,7 @@ OUT = EXPORT / "finovate_product_demo.mp4"
 SEGMENTS = [
     "finovate_demo_segment1_landing_dashboard.mp4",
     "finovate_demo_segment2_savings_goals.mp4",
-    "finovate_demo_segment3_investing_mobile.mp4",
+    "finovate_demo_segment3_investing_insights.mp4",
 ]
 
 
