@@ -213,7 +213,7 @@
           const percent = previousClose ? (difference / previousClose) * 100 : 0;
           const direction = difference > 0 ? "Up" : difference < 0 ? "Down" : "Unchanged";
           const sign = difference > 0 ? "+" : "";
-          changeOutput.textContent = `${direction} ${sign}${formatMoney(difference)} (${sign}${percent.toFixed(2)}%) vs previous sample date`;
+          changeOutput.textContent = `${direction} ${sign}${formatMoney(difference)} (${sign}${percent.toFixed(2)}%) vs previous point`;
           changeOutput.className = difference > 0 ? "market-chart-up" : difference < 0 ? "market-chart-down" : "";
         }
       }
@@ -281,6 +281,8 @@
       if (latestPoints[latestPoints.length - 1].date === point.date) return;
       latestPoints.push(point);
       dataElement.textContent = JSON.stringify(latestPoints);
+      const rangeEnd = chart.querySelector("[data-chart-end]");
+      if (rangeEnd) rangeEnd.textContent = point.date;
 
       const currentSvg = card.querySelector(".market-price-chart");
       const replacementSvg = currentSvg.cloneNode(false);

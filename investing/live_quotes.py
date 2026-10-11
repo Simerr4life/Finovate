@@ -115,7 +115,7 @@ def refresh_live_market_quotes(symbols, allow_refresh=True):
             quote = LiveMarketQuote.objects.filter(symbol=symbol).first()
             if quote and quote.price is not None and quote.fetched_at is not None:
                 quotes[symbol] = quote
-            continue
+                continue
         now = timezone.now()
         quote, should_fetch, quota_error = _claim_quote_refresh(symbol, now)
         if quota_error:

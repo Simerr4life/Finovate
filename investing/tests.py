@@ -668,6 +668,7 @@ class DemoMarketExplorerTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "My investments")
+        self.assertContains(response, "latest available Twelve Data quote")
         self.assertContains(response, "AAPL")
         self.assertContains(response, "MSFT")
         self.assertContains(response, "These are not part of your holdings yet.")
@@ -855,6 +856,35 @@ class LiveMarketQuoteTests(TestCase):
         fetch_price.assert_not_called()
         self.assertEqual(TwelveDataUsageWindow.objects.count(), 0)
         self.assertIn("no-store", response["Cache-Control"])
+
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.views._is_us_regular_session", return_value=False)
+    @patch("investing.live_quotes._fetch_twelve_data_price")
+    def test_market_closed_fetches_a_missing_quote_on_first_page_visit(
+        self, fetch_price, _market_open
+    ):
+        fetch_price.return_value = Decimal("300.00")
+        order = create_demo_market_order(self.user, "AAPL", Decimal("20.00"))
+        approve_order(order)
+
+        response = self.client.get("/investing/live-quotes/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["market_open"])
+        self.assertEqual(
+            Decimal(payload["quotes"]["AAPL"]["price"]),
+            Decimal("300.00"),
+        )
+        self.assertEqual(
+            Decimal(payload["portfolio_value"]),
+            order.demo_shares * Decimal("300.00"),
+        )
+        fetch_price.assert_called_once_with("AAPL")
+        self.assertEqual(
+            TwelveDataUsageWindow.objects.get(provider="twelve-data").daily_credits,
+            1,
+        )
 
 
 class VerifiedScenarioFormTests(TestCase):

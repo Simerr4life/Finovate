@@ -63,7 +63,7 @@
   <div>
     <div class="eyebrow">YOUR SIMULATED PORTFOLIO</div>
     <h2>My investments</h2>
-    <p>See your approved demo holdings. Historical points use sample prices; the latest values can refresh every five minutes during US market hours. Pending orders are not counted as invested yet.</p>
+    <p>See your approved demo holdings. Historical points use sample prices; the latest available Twelve Data quote loads when you open this page and refreshes every five minutes during US market hours. Pending orders are not counted as invested yet.</p>
     {% if holdings %}<p class="live-quotes-status" data-live-quotes-status data-quotes-url="{% url 'investing:live_demo_quotes' %}" role="status">Checking live quote availability…</p>{% endif %}
   </div>
   <a class="button secondary" href="?tab=explore">Explore sample assets</a>
