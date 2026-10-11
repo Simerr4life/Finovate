@@ -140,14 +140,14 @@ than a REST webhook Django can receive directly. Full writeup:
   `investing.services` functions the website uses, with a
   `PendingConfirmation` gate in front of every state-changing intent),
   and `python manage.py chat_demo` for testing it today without Photon.
-- **What's unverified:** `/assistant/photon-webhook/` is built against a
-  `NativeWebhookPayload` shape (`guid`/`text`/`sender`/`chatId`) mentioned
-  in Photon's published docs as an "optional self-hosted webhook," but no
-  example JSON or auth header was published alongside it, and the
-  *primary* documented integration path is a Node SDK
-  (`startGatewayListener()`/`postMessage()`), not a webhook at all. This
-  may need a small Node.js sidecar once tested against a real line — see
-  the doc above for exactly what to check first.
+- **Inbound Spectrum Cloud webhooks are verified** using the Stable
+  `X-Spectrum-Signature` HMAC (`v0=` + SHA-256 over
+  `v0:{timestamp}:{raw body}`), a 5-minute timestamp window, and dedupe
+  on `X-Spectrum-Webhook-Id` + `message.id`. See
+  [docs/messaging-assistant.md](messaging-assistant.md).
+- **Outbound iMessage is not sent from Django.** Photon documents send
+  as the Node adapter's `postMessage` / `thread.post`. The webhook's
+  `delivered` field stays false until that client confirms a send.
 - **Interface:** a thin handler parses an inbound message, maps it to one
   of a fixed set of intents, calls the relevant service function, and
   formats a reply — no duplicated budget/goal/round-up logic.

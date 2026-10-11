@@ -2,9 +2,9 @@
 {% block title %}Log in — Finovate{% endblock %}
 {% block content %}
 <section class="card auth-card">
-  <div class="eyebrow">FINOVATE</div>
+  {% include "partials/brand_logo.html" with large=True %}
   <div class="page-title">Log in</div>
-  <p class="page-subtitle">Local account login for this prototype.</p>
+  <p class="page-subtitle">Use your Finovate account to see your own records.</p>
   {% if AUTH0_ENABLED %}
   <a class="button" style="width:100%;display:block;text-align:center;margin-bottom:14px;" href="{% url 'accounts:auth0_login' %}">Log in with Auth0</a>
   <p class="muted" style="text-align:center;margin:10px 0;">or use a local account</p>

@@ -1,4 +1,7 @@
+import hashlib
+import hmac
 import json
+import time
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -158,6 +161,7 @@ class PhotonWebhookTests(TestCase):
         self.client = Client()
         self.url = reverse("assistant:photon_webhook")
 
+    @override_settings(DEBUG=True)
     def test_valid_payload_routes_to_the_right_user_and_replies(self):
         response = self.client.post(
             self.url, data=json.dumps({"guid": "g1", "text": "help", "chatId": "chat-abc"}),
@@ -166,6 +170,7 @@ class PhotonWebhookTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("reply", response.json())
 
+    @override_settings(DEBUG=True)
     def test_unknown_chat_id_does_not_error_or_leak_info(self):
         response = self.client.post(
             self.url, data=json.dumps({"guid": "g1", "text": "help", "chatId": "no-such-chat"}),
@@ -174,15 +179,26 @@ class PhotonWebhookTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("isn't linked", response.json()["reply"])
 
+    @override_settings(DEBUG=True)
     def test_missing_fields_returns_400(self):
         response = self.client.post(
             self.url, data=json.dumps({"chatId": "chat-abc"}), content_type="application/json",
         )
         self.assertEqual(response.status_code, 400)
 
+    @override_settings(DEBUG=True)
     def test_malformed_json_returns_400(self):
         response = self.client.post(self.url, data=b"not json", content_type="application/json")
         self.assertEqual(response.status_code, 400)
+
+    @override_settings(DEBUG=False, IMESSAGE_WEBHOOK_SECRET="", PHOTON_WEBHOOK_SECRET="")
+    def test_unsigned_request_is_rejected_when_debug_is_off(self):
+        response = self.client.post(
+            self.url, data=json.dumps({"text": "help", "chatId": "chat-abc"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("help", response.content.decode().lower())
 
     def test_get_is_not_allowed(self):
         response = self.client.get(self.url)
@@ -203,3 +219,69 @@ class PhotonWebhookTests(TestCase):
             content_type="application/json", HTTP_X_PHOTON_WEBHOOK_SECRET="s3cret",
         )
         self.assertEqual(response.status_code, 200)
+
+    def _signed(self, body: str, secret: str = "whsec_test", timestamp: str | None = None):
+        timestamp = timestamp or str(int(time.time()))
+        digest = hmac.new(secret.encode(), f"v0:{timestamp}:{body}".encode(), hashlib.sha256).hexdigest()
+        return timestamp, "v0=" + digest
+
+    @override_settings(IMESSAGE_WEBHOOK_SECRET="whsec_test", DEBUG=False)
+    def test_spectrum_messages_event_is_verified_and_not_marked_delivered(self):
+        body = json.dumps({
+            "event": "messages",
+            "space": {"id": "chat-abc", "platform": "iMessage", "type": "dm"},
+            "message": {
+                "id": "spc-msg-1",
+                "direction": "inbound",
+                "sender": {"id": "+15550100", "platform": "iMessage"},
+                "content": {"type": "text", "text": "help"},
+            },
+        })
+        timestamp, signature = self._signed(body)
+        response = self.client.post(
+            self.url,
+            data=body,
+            content_type="application/json",
+            HTTP_X_SPECTRUM_SIGNATURE=signature,
+            HTTP_X_SPECTRUM_TIMESTAMP=timestamp,
+            HTTP_X_SPECTRUM_WEBHOOK_ID="wh-1",
+            HTTP_X_SPECTRUM_EVENT="messages",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("budget", payload["reply"].lower())
+        self.assertFalse(payload["delivered"])
+
+        again = self.client.post(
+            self.url,
+            data=body,
+            content_type="application/json",
+            HTTP_X_SPECTRUM_SIGNATURE=signature,
+            HTTP_X_SPECTRUM_TIMESTAMP=timestamp,
+            HTTP_X_SPECTRUM_WEBHOOK_ID="wh-1",
+            HTTP_X_SPECTRUM_EVENT="messages",
+        )
+        self.assertEqual(again.status_code, 200)
+        self.assertTrue(again.json()["duplicate"])
+        self.assertEqual(ConversationMessage.objects.filter(user=self.user, direction="inbound").count(), 1)
+
+    @override_settings(IMESSAGE_WEBHOOK_SECRET="whsec_test", DEBUG=False)
+    def test_stale_spectrum_timestamp_is_rejected(self):
+        body = json.dumps({"event": "messages", "space": {"id": "chat-abc"}, "message": {"id": "m", "direction": "inbound", "content": {"type": "text", "text": "help"}}})
+        timestamp, signature = self._signed(body, timestamp=str(int(time.time()) - 3600))
+        response = self.client.post(
+            self.url, data=body, content_type="application/json",
+            HTTP_X_SPECTRUM_SIGNATURE=signature, HTTP_X_SPECTRUM_TIMESTAMP=timestamp,
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @override_settings(IMESSAGE_WEBHOOK_SECRET="whsec_test", DEBUG=False)
+    def test_bad_spectrum_signature_is_rejected(self):
+        body = json.dumps({"event": "messages", "space": {"id": "chat-abc"}, "message": {"id": "m2", "direction": "inbound", "content": {"type": "text", "text": "help"}}})
+        timestamp, _signature = self._signed(body)
+        response = self.client.post(
+            self.url, data=body, content_type="application/json",
+            HTTP_X_SPECTRUM_SIGNATURE="v0=" + ("ab" * 32), HTTP_X_SPECTRUM_TIMESTAMP=timestamp,
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(ConversationMessage.objects.count(), 0)

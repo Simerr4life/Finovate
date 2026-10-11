@@ -30,7 +30,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .app-shell { min-height: 100vh; }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; width: 248px; padding: 30px 18px 20px; display: flex; flex-direction: column; background: var(--navy); color: #dce9e5; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px; color: white; font: 700 21px "Manrope", sans-serif; letter-spacing: -.5px; }
-.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px 10px 10px 3px; background: var(--green-2); color: white; font-size: 17px; }
+.brand-logo { height: 36px; width: auto; display: block; object-fit: contain; background: transparent; flex: 0 0 auto; }
+.brand-logo-lg { height: 84px; margin: 0 auto 10px; }
 .side-nav { margin-top: 42px; display: grid; gap: 6px; }
 .nav-item { width: 100%; display: flex; align-items: center; gap: 13px; padding: 12px 13px; border: 0; border-radius: 10px; background: transparent; color: #aebfba; cursor: pointer; text-align: left; font-weight: 500; }
 .nav-item:hover { background: rgba(255,255,255,.05); color: white; }
@@ -338,7 +339,6 @@ a.button { text-decoration: none; }
 .nav-item { text-decoration: none; }
 .skip-link { position: absolute; left: -999px; top: 8px; }
 .skip-link:focus { left: 8px; z-index: 80; background: white; padding: 8px 12px; border-radius: 8px; }
-.demo-banner { background: var(--gold); color: var(--navy); text-align: center; font-size: 12px; font-weight: 600; padding: 8px 16px; }
 .messages { display: grid; gap: 8px; margin-bottom: 20px; }
 .message { border-radius: 10px; padding: 12px 14px; font-size: 13px; font-weight: 600; background: var(--green-soft); color: #23684f; }
 .message.error { background: #f8e8e8; color: var(--danger); }

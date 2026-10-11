@@ -24,51 +24,50 @@ builds on that explicit, conscious override — not a default assumption.
 - `python manage.py chat_demo --username demo` — an interactive terminal
   loop against the real assistant logic. This is the recommended way to
   demo the feature; it has zero dependency on Photon actually working.
-- `/assistant/photon-webhook/` — a Django view that accepts a JSON POST
-  and returns `{"reply": "..."}`. Tested with the Django test client
-  (valid payload, unknown sender, missing fields, bad JSON, wrong secret).
+- `/assistant/photon-webhook/` — verifies Spectrum signatures and runs
+  the assistant. `delivered` is false because this process does not send
+  iMessage. Tested with signed fixtures, never a live Photon call.
 
-**Unverified — the one real assumption in this feature:**
-Photon's own published docs for the iMessage adapter
-(`chat-adapter-imessage` skill) state plainly: *"This method is not
-supported. The adapter does not use traditional webhooks for message
-ingestion."* The primary integration path is a **Node.js SDK**
-(`startGatewayListener()` / `adapter.postMessage(threadId, message)`),
-not a REST webhook a Django view can receive directly.
+**Photon Spectrum transport (verified against Stable docs):**
 
-The docs do mention an **optional self-hosted webhook** with a
-`NativeWebhookPayload` shape (`guid`, `text`, `sender`, `chatId`, plus
-other Basic Kit Message fields) — that's what `/assistant/photon-webhook/`
-is built against. But no example request/response JSON or auth header
-name was published alongside it, so three things are unverified until you
-have a real Spectrum line to test against:
+The provider is [Photon Spectrum](https://photon.codes/docs/integrations/chat-sdk),
+not Proton Mail. Stable webhook docs:
+[verifying signatures](https://photon.codes/docs/webhooks/verifying-signatures)
+and [events](https://photon.codes/docs/webhooks/events).
 
-1. **Exact field names** in the incoming JSON (I used `chatId`/`text`;
-   real payloads may differ or include more fields).
-2. **Auth header/scheme** — the view checks a configurable
-   `X-Photon-Webhook-Secret` header against `PHOTON_WEBHOOK_SECRET`, but
-   Photon's actual signing scheme (if any) is undocumented here.
-3. **Whether a webhook response is even how replies get sent.** If
-   Spectrum requires the Node SDK's `postMessage()` for outbound
-   messages, `/assistant/photon-webhook/`'s `{"reply": ...}` response body
-   won't actually reach the user — you'd need a small Node.js sidecar
-   that calls `startGatewayListener()`, forwards incoming text to this
-   Django endpoint, and calls `postMessage()` with whatever this endpoint
-   returns. That sidecar does not exist yet; it's the next piece if the
-   webhook assumption turns out wrong.
+`/assistant/photon-webhook/` accepts:
 
-**When you have a real Spectrum line:** send it one test message, check
-what actually hits `/assistant/photon-webhook/` (or wherever Photon
-actually sends to), and adjust `assistant/views.py::photon_webhook`
-accordingly. The intent logic in `services.py` needs no changes either
-way — only the transport adapter does.
+- Spectrum Cloud `messages` events (`event`, `space`, `message`), signed
+  with `X-Spectrum-Signature` (`v0=` + HMAC-SHA256 of
+  `v0:{timestamp}:{raw body}`), `X-Spectrum-Timestamp` (rejected when
+  older than 5 minutes, HTTP 400), and deduped on
+  `X-Spectrum-Webhook-Id` + `message.id`.
+- The self-hosted `NativeWebhookPayload` fields `guid`, `text`,
+  `sender`, and `chatId` from the chat-adapter-imessage skill.
+
+The signing secret is `IMESSAGE_WEBHOOK_SECRET` (fallback
+`PHOTON_WEBHOOK_SECRET`). Outside `DEBUG`, the endpoint rejects requests
+when that secret is missing. Only text content with `direction` inbound
+is passed to the assistant. Other content types are acknowledged and
+ignored.
+
+**Not implemented, because Photon does not document a Python send API:**
+this process does not call `postMessage` or `thread.post`. The JSON
+field `delivered` is always `false`. A reply in the response body is the
+text the assistant computed; it is not an iMessage delivery receipt.
+Sending that text over iMessage still requires the Node
+`chat-adapter-imessage` client (`IMESSAGE_PROJECT_ID` and
+`IMESSAGE_PROJECT_SECRET` for Spectrum Cloud). Do not treat `reply` as
+proof the user received a message.
+
+Link a chat by storing Spectrum `space.id` (or the legacy `chatId`) on
+`Profile.photon_chat_id`. Tests sign requests locally and never call
+Photon.
 
 ## Linking a Finovate account to a chat
 
-`Profile.photon_chat_id` holds the chat/sender id Photon identifies a
-conversation by. It's empty until set — there's no UI for it yet (small
-scope decision to avoid building a settings form for an unverified
-field); set it directly via the Django admin or shell:
+`Profile.photon_chat_id` holds the Spectrum `space.id` (or the legacy
+`chatId`). It stays empty until you set it in the Django admin or shell:
 
 ```python
 user.profile.photon_chat_id = "<id from your Photon dashboard>"

@@ -28,6 +28,25 @@ class PendingConfirmation(TimeStampedModel):
         return f"Pending {self.intent} for user {self.user_id}"
 
 
+class SpectrumDelivery(TimeStampedModel):
+    """Idempotency record for a Spectrum webhook delivery.
+
+    Spectrum Cloud retries with at-least-once delivery. The composite key
+    is the documented dedupe pair: X-Spectrum-Webhook-Id plus message.id.
+    """
+
+    webhook_id = models.CharField(max_length=255)
+    message_id = models.CharField(max_length=255)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["webhook_id", "message_id"],
+                name="assistant_spectrum_delivery_unique",
+            )
+        ]
+
+
 class ConversationMessage(TimeStampedModel):
     """Audit trail of assistant traffic — never logs raw financial amounts
     beyond what's already in the message body itself; see logging policy

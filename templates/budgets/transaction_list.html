@@ -39,7 +39,7 @@
     {% for t in transactions %}
     <a class="transaction-row" href="{% url 'budgets:transaction_edit' t.pk %}">
       <span class="merchant-mark">{% if t.description %}{{ t.description|merchant_mark }}{% elif t.category %}{{ t.category.name|merchant_mark }}{% else %}TX{% endif %}</span>
-      <span class="transaction-name"><strong>{% if t.description %}{{ t.description }}{% elif t.category %}{{ t.category.name }}{% else %}Transaction{% endif %}</strong><small>{% if t.account %}{{ t.account.institution_name }} {{ t.account.masked_number }}{% else %}Manual entry{% endif %}{% if t.is_demo %} · demo{% endif %}</small></span>
+      <span class="transaction-name"><strong>{% if t.description %}{{ t.description }}{% elif t.category %}{{ t.category.name }}{% else %}Transaction{% endif %}</strong><small>{% if t.account %}{{ t.account.institution_name }} {{ t.account.masked_number }}{% else %}Manual entry{% endif %}</small></span>
       <span class="pill">{% if t.category %}{{ t.category.name }}{% else %}Uncategorized{% endif %}</span>
       <span class="date-cell">{{ t.occurred_on|date:"M j, Y" }}</span>
       <span class="amount {% if t.kind == 'income' %}positive{% endif %}">{% if t.kind == 'income' %}+{% else %}-{% endif %}{{ t.amount|money }}</span>

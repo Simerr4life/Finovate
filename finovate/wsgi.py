@@ -20,5 +20,6 @@ if os.environ.get("VERCEL"):
     from django.core.management import call_command
 
     call_command("migrate", interactive=False, verbosity=0)
-    if not User.objects.filter(username="demo").exists():
-        call_command("seed_demo", verbosity=0)
+    demo_password = os.environ.get("DEMO_ACCOUNT_PASSWORD")
+    if demo_password and not User.objects.filter(username="demo").exists():
+        call_command("seed_demo", password=demo_password, verbosity=0)

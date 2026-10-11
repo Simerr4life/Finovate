@@ -91,7 +91,7 @@
 
     <section class="card settings-panel" id="security">
       <div class="section-title">Security &amp; privacy</div>
-      <div class="muted">This prototype uses a local Django session. It does not store bank credentials.</div>
+      <div class="muted">Finovate keeps your session on this server. Bank passwords are not collected or stored.</div>
       <form method="post" action="{% url 'accounts:logout' %}" style="margin-top:16px;">
         {% csrf_token %}
         <button class="button secondary" type="submit">Log out</button>

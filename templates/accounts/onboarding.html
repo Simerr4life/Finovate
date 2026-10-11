@@ -2,7 +2,7 @@
 {% block title %}Welcome — Finovate{% endblock %}
 {% block content %}
 <section class="card auth-card">
-  <div class="eyebrow">FINOVATE</div>
+  {% include "partials/brand_logo.html" with large=True %}
   <div class="page-title">Set a few preferences</div>
   <p class="page-subtitle">You can change these later in Settings. Bank passwords are not collected here.</p>
   <form method="post" novalidate>

@@ -16,11 +16,13 @@ named user — never another user's data, and never the unrelated seed_demo
 dataset.
 """
 
+import os
 from datetime import date
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from budgets.models import Budget, BudgetPeriod
 from investing.models import RoundUpSettings
@@ -63,6 +65,8 @@ TRANSACTIONS = [
 
 # Illustrative category limits for a student living off-campus in Atlanta.
 # These are demo assumptions, not figures derived from the bank statement.
+PUBLISHED_LOCAL_PASSWORD = "demo-pass-1234"
+
 DEMO_BUDGET_LIMITS = {
     "Housing: Rent": Decimal("1000.00"),
     "Food: Groceries": Decimal("250.00"),
@@ -87,11 +91,23 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         username = options["username"]
+        password = options["password"]
+        if (
+            not settings.DEBUG
+            and password == PUBLISHED_LOCAL_PASSWORD
+            and not os.environ.get("DEMO_ACCOUNT_PASSWORD")
+        ):
+            raise CommandError(
+                "Refusing the published local demo password while DEBUG is false. "
+                "Set DEMO_ACCOUNT_PASSWORD or pass --password."
+            )
+        if password == PUBLISHED_LOCAL_PASSWORD and os.environ.get("DEMO_ACCOUNT_PASSWORD"):
+            password = os.environ["DEMO_ACCOUNT_PASSWORD"]
         user, created = User.objects.get_or_create(username=username, defaults={"email": f"{username}@example.com"})
         if created:
-            user.set_password(options["password"])
+            user.set_password(password)
             user.save()
-            self.stdout.write(self.style.SUCCESS(f"Created user '{username}'"))
+            self.stdout.write(self.style.SUCCESS(f"Created user '{username}'. The password is not written to the log."))
 
         user.profile.onboarding_completed = True
         user.profile.save()

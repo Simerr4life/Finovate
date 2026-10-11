@@ -11,15 +11,9 @@
 <body class="{% if not user.is_authenticated %}guest{% endif %}">
   <a href="#main-content" class="skip-link">Skip to content</a>
 
-  {% if FINOVATE_DEMO_MODE %}
-  <div class="demo-banner" role="status">
-    Demo mode — sample or locally entered data and local demo authentication only. No bank, brokerage, or messaging provider is connected.
-  </div>
-  {% endif %}
-
   <header class="auth-top guest-only">
     <a class="brand" href="{% url 'landing' %}" style="color: var(--navy);">
-      <div class="brand-mark">F</div>
+      {% include "partials/brand_logo.html" %}
       <span>finovate</span>
     </a>
     <div class="button-row">
@@ -31,7 +25,7 @@
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand" href="{% url 'dashboard' %}">
-        <div class="brand-mark">F</div>
+        {% include "partials/brand_logo.html" %}
         <span>finovate</span>
       </a>
       <nav class="side-nav" aria-label="Main navigation">
@@ -70,7 +64,7 @@
 
     <header class="mobile-header">
       <a class="brand" href="{% url 'dashboard' %}">
-        <div class="brand-mark">F</div>
+        {% include "partials/brand_logo.html" %}
         <span>finovate</span>
       </a>
       <button class="icon-button" type="button" data-menu-toggle aria-label="Open menu">{% include "partials/icon.html" with name="menu" %}</button>
@@ -111,7 +105,7 @@
         {% endif %}
         {% block content %}{% endblock %}
       </div>
-      <p class="page-footer">Finovate is a local prototype. Budgeting suggestions are estimates, not financial advice. Investing data is simulated — no brokerage is connected and no real trades occur.</p>
+      <p class="page-footer">Budgeting suggestions are estimates, not financial advice. Investing figures are simulated — no brokerage is connected and no real trades occur.</p>
     </main>
 
     <nav class="bottom-nav" aria-label="Mobile navigation">

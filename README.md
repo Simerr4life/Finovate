@@ -47,10 +47,12 @@ To create an admin user for `/admin/`: `python manage.py createsuperuser`.
 ### Configuration
 
 Copy `.env.example` to `.env` to override any setting. **The app runs
-fully in local/demo mode with no `.env` file at all** — nothing is
-required to get started. `FINOVATE_DEMO_MODE=true` (the default) shows the
-demo-mode banner and is independent of whether you're logged in as the
-seeded demo user or your own account.
+with no `.env` file at all** — nothing is required to get started.
+`python manage.py seed_demo` creates a local user named `demo` (password
+`demo-pass-1234` while `DEBUG` is true). That password is refused when
+`DEBUG` is false unless `DEMO_ACCOUNT_PASSWORD` is set. Auth0 remains
+the identity provider for real accounts; the seeded user is only a local
+development login and does not bypass Auth0.
 
 ### Optional: Auth0 login and Supabase/Postgres database
 
@@ -116,14 +118,14 @@ See the isolation tests in `budgets/tests.py`.
 
 ## Demo mode and sample data
 
-`python manage.py seed_demo [--reset]` creates a `demo` user with
+`python manage.py seed_demo` creates a local user named `demo` with
 transactions, categories, a budget period with limits, income/recurring
 expenses, two savings goals with contribution history, and pre-populated
 round-up ledger entries (including one already swept into a simulated
-portfolio snapshot). Every seeded row is tagged `source="demo"` /
-`is_demo=True` so it's always visually and programmatically distinguishable
-from data a real user enters — the dashboard and transaction list show a
-"demo" badge on these rows.
+portfolio snapshot). Seeded rows keep `source="demo"` / `is_demo=True` so
+the data stays isolated from records a person enters. The interface does
+not label those rows. Re-running the command updates the same records by
+`external_id` and does not wipe them on startup.
 
 ## What's simulated vs. real
 
@@ -134,8 +136,12 @@ from data a real user enters — the dashboard and transaction list show a
   is connected; "sweeping" round-ups and "filling" orders are local
   database updates, not real trades. The investing page and dashboard
   both carry explicit "simulated" labels and risk disclaimers.
-- **Not implemented yet:** any external integration (identity provider,
-  bank feed, brokerage, messaging). See `docs/integration-readiness.md`.
+- **Identity:** Auth0 is the account provider when configured. A local
+  login remains for this server.
+- **Messaging:** Photon Spectrum inbound webhooks are verified. This
+  server does not send iMessage. See `docs/messaging-assistant.md`.
+- **Not connected:** bank feeds and brokerages. See
+  `docs/integration-readiness.md`.
 
 ## Known limitations
 
