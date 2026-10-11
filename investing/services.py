@@ -8,8 +8,9 @@ provider would eventually confirm.
 
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 
+from django.db import transaction as db_transaction
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -18,7 +19,14 @@ from budgets.services import monthly_equivalent
 from core.services import quantize_money, round_up_to_nearest
 from transactions.models import Transaction
 
-from .models import PortfolioSnapshot, RoundUpLedgerEntry, RoundUpSettings, SimulatedOrder
+from .models import (
+    DemoInvestmentSuggestion,
+    MarketPrice,
+    PortfolioSnapshot,
+    RoundUpLedgerEntry,
+    RoundUpSettings,
+    SimulatedOrder,
+)
 
 
 def get_or_create_settings(user) -> RoundUpSettings:
@@ -258,6 +266,184 @@ def reject_order(order: SimulatedOrder) -> SimulatedOrder:
     order.status = SimulatedOrder.Status.REJECTED
     order.save(update_fields=["status", "updated_at"])
     return order
+
+
+def available_demo_investment_budget(user) -> Decimal:
+    surplus = compute_investable_surplus(user).investable_surplus
+    committed = (
+        SimulatedOrder.objects.filter(
+            user=user,
+            status__in=[SimulatedOrder.Status.PENDING, SimulatedOrder.Status.FILLED],
+        ).aggregate(total=Sum("amount"))["total"]
+        or Decimal("0.00")
+    )
+    return max(quantize_money(surplus - committed), Decimal("0.00"))
+
+
+def _demo_stock_metrics(rows: list[MarketPrice]) -> dict | None:
+    if len(rows) < 2 or rows[0].close <= 0:
+        return None
+
+    first, latest = rows[0], rows[-1]
+    total_return = quantize_money(
+        ((latest.close - first.close) / first.close) * Decimal("100")
+    )
+    daily_changes = [
+        row.daily_change_percent
+        for row in rows
+        if row.daily_change_percent is not None
+    ]
+    if daily_changes:
+        mean = sum(daily_changes, Decimal("0")) / len(daily_changes)
+        variance = sum(
+            ((change - mean) ** 2 for change in daily_changes), Decimal("0")
+        ) / len(daily_changes)
+        volatility = quantize_money(variance.sqrt())
+    else:
+        volatility = Decimal("0.00")
+
+    score = quantize_money(total_return - volatility)
+    return {
+        "symbol": latest.symbol,
+        "data_date": latest.date,
+        "price": latest.close,
+        "return": total_return,
+        "volatility": volatility,
+        "score": score,
+        "first_date": first.date,
+    }
+
+
+def generate_demo_investment_suggestions(user) -> list[DemoInvestmentSuggestion]:
+    """Create once-per-dataset, user-reviewed ideas from the bundled sample prices.
+
+    This is deterministic demo logic, not a predictive model or investment
+    advice. The suggested amounts are capped by the user's current estimated
+    investable surplus, and accepting an idea only creates a simulated order.
+    """
+    available_budget = available_demo_investment_budget(user)
+    if available_budget <= 0:
+        return []
+
+    stock_rows = MarketPrice.objects.filter(
+        asset_type=MarketPrice.AssetType.STOCK,
+        is_verified=True,
+        is_demo_sample=True,
+    ).order_by("symbol", "date")
+    grouped: dict[str, list[MarketPrice]] = {}
+    for row in stock_rows:
+        grouped.setdefault(row.symbol, []).append(row)
+
+    candidates = [
+        metrics
+        for rows in grouped.values()
+        if (metrics := _demo_stock_metrics(rows)) is not None
+    ]
+    candidates.sort(key=lambda candidate: (-candidate["score"], candidate["symbol"]))
+    candidates = candidates[:3]
+    if not candidates:
+        return []
+
+    new_candidates = [
+        candidate
+        for candidate in candidates
+        if not DemoInvestmentSuggestion.objects.filter(
+            user=user,
+            symbol=candidate["symbol"],
+            data_date=candidate["data_date"],
+        ).exists()
+    ]
+    if not new_candidates:
+        return [
+            DemoInvestmentSuggestion.objects.get(
+                user=user,
+                symbol=candidate["symbol"],
+                data_date=candidate["data_date"],
+            )
+            for candidate in candidates
+        ]
+
+    budget = min(available_budget, Decimal("75.00"))
+    cents = int((budget * 100).to_integral_value(rounding=ROUND_DOWN))
+    recommendation_count = min(len(new_candidates), cents)
+    if recommendation_count <= 0:
+        return []
+    new_candidates = new_candidates[:recommendation_count]
+    base_cents, extra_cents = divmod(cents, recommendation_count)
+
+    suggestions = []
+    for index, candidate in enumerate(new_candidates):
+        amount = Decimal(base_cents + (1 if index < extra_cents else 0)) / 100
+        explanation = (
+            f"From {candidate['first_date']} to {candidate['data_date']}, "
+            f"{candidate['symbol']} changed {candidate['return']}% in the supplied "
+            f"sample; observed daily volatility was {candidate['volatility']}%. "
+            "The demo ranks sample-period return minus volatility. Past movement "
+            "does not predict future results."
+        )
+        suggestion, _ = DemoInvestmentSuggestion.objects.get_or_create(
+            user=user,
+            symbol=candidate["symbol"],
+            data_date=candidate["data_date"],
+            defaults={
+                "amount": amount,
+                "demo_execution_price": candidate["price"],
+                "historical_return_percent": candidate["return"],
+                "volatility_percent": candidate["volatility"],
+                "score": candidate["score"],
+                "explanation": explanation,
+            },
+        )
+        suggestions.append(suggestion)
+    return suggestions
+
+
+@db_transaction.atomic
+def accept_demo_investment_suggestion(
+    user, suggestion: DemoInvestmentSuggestion, pool=None
+) -> SimulatedOrder:
+    suggestion = DemoInvestmentSuggestion.objects.select_for_update().get(
+        pk=suggestion.pk, user=user, status=DemoInvestmentSuggestion.Status.PENDING
+    )
+    if pool is not None and (
+        pool.user_id != user.pk or not pool.is_investable
+    ):
+        raise ValueError("Choose one of your investable savings pools.")
+
+    current_budget = available_demo_investment_budget(user)
+    if suggestion.amount > current_budget:
+        raise ValueError("Your current investable surplus is below this suggestion.")
+
+    shares = (suggestion.amount / suggestion.demo_execution_price).quantize(
+        SHARE_PLACES
+    )
+    order = SimulatedOrder.objects.create(
+        user=user,
+        pool=pool,
+        symbol=suggestion.symbol,
+        order_type=SimulatedOrder.OrderType.BUY,
+        amount=suggestion.amount,
+        status=SimulatedOrder.Status.PENDING,
+        demo_execution_price=suggestion.demo_execution_price,
+        demo_shares=shares,
+        demo_data_date=suggestion.data_date,
+    )
+    suggestion.status = DemoInvestmentSuggestion.Status.ACCEPTED
+    suggestion.simulated_order = order
+    suggestion.save(update_fields=["status", "simulated_order", "updated_at"])
+    return order
+
+
+@db_transaction.atomic
+def decline_demo_investment_suggestion(
+    user, suggestion: DemoInvestmentSuggestion
+) -> DemoInvestmentSuggestion:
+    suggestion = DemoInvestmentSuggestion.objects.select_for_update().get(
+        pk=suggestion.pk, user=user, status=DemoInvestmentSuggestion.Status.PENDING
+    )
+    suggestion.status = DemoInvestmentSuggestion.Status.DECLINED
+    suggestion.save(update_fields=["status", "updated_at"])
+    return suggestion
 
 
 def investable_pools(user):
