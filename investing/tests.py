@@ -1,7 +1,10 @@
+from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from budgets.models import RecurringExpense
 from savings.models import Goal
@@ -10,11 +13,13 @@ from transactions.models import Transaction
 from .forms import VerifiedScenarioForm
 from .models import (
     DemoInvestmentSuggestion,
+    LiveMarketQuote,
     MarketPrice,
     PortfolioSnapshot,
     RoundUpLedgerEntry,
     RoundUpSettings,
     SimulatedOrder,
+    TwelveDataUsageWindow,
 )
 from .services import (
     accept_demo_investment_suggestion,
@@ -33,6 +38,7 @@ from .services import (
     reject_order,
     sweep_pending_roundups,
 )
+from .live_quotes import refresh_live_market_quotes
 
 
 class RoundUpCreationTests(TestCase):
@@ -665,6 +671,8 @@ class DemoMarketExplorerTests(TestCase):
         self.assertContains(response, "AAPL")
         self.assertContains(response, "MSFT")
         self.assertContains(response, "These are not part of your holdings yet.")
+        self.assertContains(response, "live-holdings.js")
+        self.assertContains(response, "data-live-quotes-status")
         self.assertEqual(len(response.context["holdings"]), 1)
         self.assertEqual(response.context["holdings"][0]["symbol"], "AAPL")
         self.assertEqual(
@@ -732,6 +740,121 @@ class DemoMarketExplorerTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertFalse(SimulatedOrder.objects.filter(user=self.user).exists())
+
+
+class LiveMarketQuoteTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="live-quote-user")
+        self.client.force_login(self.user)
+        RoundUpSettings.objects.update_or_create(
+            user=self.user,
+            defaults={"minimum_cash_reserve": Decimal("0.00")},
+        )
+        Transaction.objects.create(
+            user=self.user,
+            kind=Transaction.Kind.INCOME,
+            amount=Decimal("100.00"),
+            occurred_on="2026-09-01",
+        )
+
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.live_quotes._fetch_twelve_data_price")
+    def test_quotes_are_shared_and_cached_for_five_minutes(self, fetch_price):
+        fetch_price.return_value = Decimal("250.1234")
+
+        quotes, errors = refresh_live_market_quotes(["AAPL"])
+        cached_quotes, cached_errors = refresh_live_market_quotes(["AAPL"])
+
+        self.assertEqual(errors, {})
+        self.assertEqual(cached_errors, {})
+        self.assertEqual(quotes["AAPL"].price, Decimal("250.1234"))
+        self.assertEqual(cached_quotes["AAPL"].price, Decimal("250.1234"))
+        fetch_price.assert_called_once_with("AAPL")
+        self.assertEqual(
+            TwelveDataUsageWindow.objects.get(provider="twelve-data").daily_credits,
+            1,
+        )
+
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.live_quotes._fetch_twelve_data_price")
+    def test_shared_free_tier_minute_quota_is_enforced(self, fetch_price):
+        now = timezone.now()
+        TwelveDataUsageWindow.objects.create(
+            provider="twelve-data",
+            minute_bucket=now.replace(second=0, microsecond=0),
+            minute_credits=8,
+            usage_date=now.date(),
+            daily_credits=8,
+        )
+
+        quotes, errors = refresh_live_market_quotes(["AAPL"])
+
+        self.assertEqual(quotes, {})
+        self.assertEqual(errors, {"AAPL": "minute-limit"})
+        fetch_price.assert_not_called()
+
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.views._is_us_regular_session", return_value=True)
+    @patch("investing.live_quotes._fetch_twelve_data_price")
+    def test_live_quotes_update_only_the_signed_in_users_filled_holdings(
+        self, fetch_price, _market_open
+    ):
+        fetch_price.return_value = Decimal("250.00")
+        order = create_demo_market_order(self.user, "AAPL", Decimal("20.00"))
+        approve_order(order)
+
+        response = self.client.get("/investing/live-quotes/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        quote = payload["quotes"]["AAPL"]
+        self.assertEqual(
+            Decimal(payload["portfolio_value"]),
+            order.demo_shares * Decimal("250.00"),
+        )
+        self.assertEqual(Decimal(quote["price"]), Decimal("250.00"))
+        self.assertEqual(payload["errors"], {})
+        fetch_price.assert_called_once_with("AAPL")
+
+    def test_live_quotes_require_server_side_api_key(self):
+        order = create_demo_market_order(self.user, "AAPL", Decimal("20.00"))
+        approve_order(order)
+
+        with override_settings(TWELVE_DATA_API_KEY=""):
+            response = self.client.get("/investing/live-quotes/")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("TWELVE_DATA_API_KEY", response.json()["error"])
+
+    def test_holdings_without_filled_orders_do_not_start_quote_polling(self):
+        response = self.client.get("/investing/?tab=holdings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "data-live-quotes-status")
+        self.assertNotContains(response, "live-holdings.js")
+
+    @override_settings(TWELVE_DATA_API_KEY="test-api-key")
+    @patch("investing.views._is_us_regular_session", return_value=False)
+    @patch("investing.live_quotes._fetch_twelve_data_price")
+    def test_market_closed_uses_cache_without_spending_provider_credits(
+        self, fetch_price, _market_open
+    ):
+        order = create_demo_market_order(self.user, "AAPL", Decimal("20.00"))
+        approve_order(order)
+        LiveMarketQuote.objects.create(
+            symbol="AAPL",
+            price=Decimal("200.00"),
+            fetched_at=timezone.now() - timedelta(hours=1),
+        )
+
+        response = self.client.get("/investing/live-quotes/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["market_open"])
+        self.assertEqual(response.json()["quotes"]["AAPL"]["price"], "200.0000")
+        fetch_price.assert_not_called()
+        self.assertEqual(TwelveDataUsageWindow.objects.count(), 0)
+        self.assertIn("no-store", response["Cache-Control"])
 
 
 class VerifiedScenarioFormTests(TestCase):

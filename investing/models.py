@@ -33,6 +33,28 @@ class DemoInvestmentFunding(TimeStampedModel):
         return f"Demo investing funds ${self.amount} for {self.user}"
 
 
+class LiveMarketQuote(models.Model):
+    """Shared, short-lived quote cache for the Twelve Data live-price feed."""
+
+    symbol = models.CharField(max_length=20, unique=True)
+    price = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
+    fetched_at = models.DateTimeField(null=True, blank=True)
+    fetch_started_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return f"Live quote cache for {self.symbol}"
+
+
+class TwelveDataUsageWindow(models.Model):
+    """Shared API-credit counters for the configured free Twelve Data tier."""
+
+    provider = models.CharField(max_length=20, primary_key=True)
+    minute_bucket = models.DateTimeField()
+    minute_credits = models.PositiveSmallIntegerField(default=0)
+    usage_date = models.DateField()
+    daily_credits = models.PositiveSmallIntegerField(default=0)
+
+
 class RoundUpSettings(TimeStampedModel):
     """Per-user configuration for the simulated round-up feature."""
 
