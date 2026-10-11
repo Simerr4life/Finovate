@@ -18,6 +18,7 @@ from .models import (
 )
 from .services import (
     accept_demo_investment_suggestion,
+    add_demo_investment_funds,
     approve_order,
     available_demo_investment_budget,
     compute_hypothetical_scenario,
@@ -431,7 +432,7 @@ class DemoAISuggestionTests(TestCase):
             amount=Decimal("10.00")
         )
 
-        with self.assertRaisesMessage(ValueError, "current investable surplus"):
+        with self.assertRaisesMessage(ValueError, "current demo investing budget"):
             accept_demo_investment_suggestion(self.user, suggestion)
 
         self.assertFalse(SimulatedOrder.objects.filter(user=self.user).exists())
@@ -460,6 +461,31 @@ class DemoAISuggestionTests(TestCase):
         pending.status = SimulatedOrder.Status.REJECTED
         pending.save()
         self.assertEqual(available_demo_investment_budget(self.user), Decimal("100.00"))
+
+    def test_virtual_funds_add_to_demo_budget_and_enable_recommendations(self):
+        Transaction.objects.filter(user=self.user).delete()
+
+        add_demo_investment_funds(self.user, Decimal("60.00"))
+        suggestions = generate_demo_investment_suggestions(self.user)
+
+        self.assertEqual(available_demo_investment_budget(self.user), Decimal("60.00"))
+        self.assertEqual(sum((item.amount for item in suggestions), Decimal("0")), Decimal("60.00"))
+        self.assertEqual(
+            Transaction.objects.filter(user=self.user).count(),
+            0,
+        )
+
+    def test_virtual_funding_rejects_invalid_precision_and_amounts(self):
+        for amount in (
+            Decimal("0"),
+            Decimal("-1.00"),
+            Decimal("1.001"),
+            Decimal("NaN"),
+            Decimal("10000000000.00"),
+        ):
+            with self.subTest(amount=amount):
+                with self.assertRaises(ValueError):
+                    add_demo_investment_funds(self.user, amount)
 
 
 class DemoAISuggestionViewTests(TestCase):
@@ -562,6 +588,49 @@ class DemoMarketExplorerTests(TestCase):
         self.assertContains(response, "Move through sample dates")
         self.assertEqual(len(response.context["market_assets"]), 8)
         self.assertEqual(response.context["demo_budget"], Decimal("100.00"))
+
+    def test_user_can_add_virtual_funds_then_generate_ideas_and_create_orders(self):
+        Transaction.objects.filter(user=self.user).delete()
+
+        response = self.client.post(
+            "/investing/demo-budget/add/",
+            {"amount": "60.00"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Added $60.00 in virtual demo funds")
+        self.assertContains(response, "Demo investing budget")
+        self.assertEqual(available_demo_investment_budget(self.user), Decimal("60.00"))
+        self.assertFalse(Transaction.objects.filter(user=self.user).exists())
+
+        response = self.client.post("/investing/demo-ai/generate/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            DemoInvestmentSuggestion.objects.filter(
+                user=self.user,
+                status=DemoInvestmentSuggestion.Status.PENDING,
+            ).count(),
+            3,
+        )
+
+        response = self.client.post(
+            "/investing/market-data/invest/",
+            {"symbol": "AAPL", "amount": "20.00"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(available_demo_investment_budget(self.user), Decimal("40.00"))
+
+    def test_add_virtual_funds_rejects_invalid_amount(self):
+        response = self.client.post(
+            "/investing/demo-budget/add/",
+            {"amount": "1.001"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "no more than two decimal places")
+        self.assertEqual(available_demo_investment_budget(self.user), Decimal("100.00"))
 
     def test_my_investments_shows_approved_holdings_but_not_pending_orders(self):
         approved_order = create_demo_market_order(self.user, "AAPL", Decimal("35.00"))
