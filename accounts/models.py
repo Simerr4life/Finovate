@@ -230,3 +230,53 @@ class ConnectedAccountPlaceholder(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.display_name} ({self.status})"
+
+
+class Auth0UserBackup(TimeStampedModel):
+    """Secondary signup record for Auth0 identities (account-recovery aid).
+
+    Auth0 remains the primary identity provider. This table is not a
+    restorable copy of Auth0 credentials or password hashes — it stores
+    only minimal, non-secret profile fields keyed by Auth0 subject.
+    """
+
+    class SyncStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SYNCED = "synced", "Synced"
+        FAILED = "failed", "Failed"
+
+    auth0_user_id = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="Immutable Auth0 subject (user_id / sub). Never keyed by email alone.",
+    )
+    email = models.EmailField(blank=True, default="")
+    email_verified = models.BooleanField(
+        default=False,
+        help_text="Last confirmed verification status. Never downgraded by stale client data.",
+    )
+    display_name = models.CharField(max_length=255, blank=True, default="")
+    signup_created_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Original Auth0 signup timestamp when known.",
+    )
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    sync_status = models.CharField(
+        max_length=16,
+        choices=SyncStatus.choices,
+        default=SyncStatus.PENDING,
+        db_index=True,
+    )
+    last_sync_error = models.CharField(max_length=255, blank=True, default="")
+    profile_metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Allowlisted non-sensitive profile fields only.",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Auth0UserBackup<{self.auth0_user_id}>"

@@ -183,12 +183,27 @@ def sync_profile_from_claims(claims, pending=None):
             profile.phone_verified = True
         elif pending.get("phone") and not profile.phone_number:
             profile.phone_number = pending["phone"][:20]
-        profile.email_verified = email_verified
-        profile.identity_status = status
+        # Never downgrade a confirmed verification from a stale ID token.
+        if email_verified and not profile.email_verified:
+            profile.email_verified = True
+            profile.identity_status = VERIFICATION_COMPLETED
+        elif not profile.email_verified:
+            profile.identity_status = status
         profile.save()
 
     _record_welcome(profile)
     profile.refresh_from_db()
+    try:
+        from .auth0_backup import enqueue_backup_sync
+
+        enqueue_backup_sync(
+            sub,
+            reason="signup" if created else "login",
+            claims=claims,
+            pending=pending,
+        )
+    except Exception:
+        logger.warning("auth0 backup enqueue after profile sync failed")
     return profile, created
 
 

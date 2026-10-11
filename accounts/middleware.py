@@ -22,6 +22,7 @@ from .identity import safe_next
 _VERIFICATION_ALLOWED = (
     "/accounts/verify",
     "/accounts/logout/",
+    "/accounts/auth0/hooks/",
     "/static/",
     "/callback/",
 )

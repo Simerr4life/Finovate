@@ -169,9 +169,12 @@ currently needs it.
 Website signup collects a name, email, and optional phone number, then
 redirects to Auth0 Universal Login (`screen_hint=signup`). Auth0 creates
 the database identity and sends the verification email. Finovate stores
-`email_verified` only when that claim is true. A phone number typed into
-Finovate is contact data; `phone_verified` stays false unless Auth0
-returns `phone_number_verified`.
+`email_verified` only from trusted Auth0 state (fresh ID-token claim or
+Management API user record) and never downgrades a confirmed verification.
+See [auth0-verification-supabase-backup.md](auth0-verification-supabase-backup.md)
+for the verification lifecycle and `Auth0UserBackup` signup backup table.
+A phone number typed into Finovate is contact data; `phone_verified` stays
+false unless Auth0 returns `phone_number_verified`.
 
 The configured connection is email/password through Universal Login.
 Passwordless SMS is not enabled on the Finovate application, so entering

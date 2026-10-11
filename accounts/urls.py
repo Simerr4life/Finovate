@@ -9,6 +9,7 @@ urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("logout/", views.auth0_logout, name="logout"),
     path("verify/", views.verification_pending, name="verify"),
+    path("verify/result/", views.verification_result, name="verify_result"),
     path("verify/resend/", views.verification_resend, name="verify_resend"),
     path("verify/refresh/", views.verification_refresh, name="verify_refresh"),
     path("onboarding/", views.onboarding, name="onboarding"),
@@ -20,4 +21,5 @@ urlpatterns = [
     path("settings/messaging/unlink/", views.messaging_unlink, name="messaging_unlink"),
     path("auth0/login/", views.auth0_login, name="auth0_login"),
     path("auth0/callback/", views.auth0_callback, name="auth0_callback"),
+    path("auth0/hooks/signup/", views.auth0_signup_webhook, name="auth0_signup_webhook"),
 ]

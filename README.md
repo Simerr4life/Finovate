@@ -80,8 +80,9 @@ DATABASE_URL=postgresql://...
 ```
 
 See [docs/architecture-auth0-supabase.md](docs/architecture-auth0-supabase.md)
-for how identity mapping and database connectivity work, and exactly
-what's unverified until you've configured real credentials.
+for how identity mapping and database connectivity work, and
+[docs/auth0-verification-supabase-backup.md](docs/auth0-verification-supabase-backup.md)
+for email verification refresh and the Auth0 signup backup table.
 
 ## Testing
 
