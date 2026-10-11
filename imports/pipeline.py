@@ -52,7 +52,18 @@ OPTIONAL_METADATA_ALIASES = {
 REQUIRED_ROLES = ("date", "description")
 
 # Tried in order; the first one that parses the whole string wins.
-DATE_FORMATS = ["%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%d/%m/%Y", "%b %d %Y", "%B %d, %Y"]
+# Extra formats are additive — existing US-style CSVs still hit earlier entries.
+DATE_FORMATS = [
+    "%Y-%m-%d",
+    "%m/%d/%Y",
+    "%m/%d/%y",
+    "%d/%m/%Y",
+    "%d.%m.%Y",
+    "%d.%m.%y",
+    "%Y/%m/%d",
+    "%b %d %Y",
+    "%B %d, %Y",
+]
 
 ASSUMED_CURRENCY = "USD"
 
@@ -140,6 +151,102 @@ def read_headers(text: str) -> list[str]:
     return next(reader, [])
 
 
+def mapping_roles(mapping: dict) -> dict:
+    """Column roles only — strips reserved keys like `_reader`."""
+    if not mapping:
+        return {}
+    return {key: value for key, value in mapping.items() if not str(key).startswith("_")}
+
+
+def text_for_parsing(text: str, mapping: dict | None = None) -> str:
+    """Return the CSV text the classic parser should read.
+
+    Classic imports (no `_reader` meta) pass through unchanged. Enhanced
+    imports re-materialize a normalized CSV from the original bytes so
+    preamble / delimiter / decimal quirks stay out of parse_rows.
+    """
+    meta = (mapping or {}).get("_reader") if isinstance(mapping, dict) else None
+    if isinstance(meta, dict) and meta.get("engine") == "enhanced":
+        from . import csv_enhanced
+
+        return csv_enhanced.materialize(text, meta)
+    return text
+
+
+@dataclass
+class PreparedStatement:
+    """Result of classic-first, enhanced-fallback preparation."""
+
+    text: str
+    mapping: dict
+    rows: list
+    engine: str  # "classic" | "enhanced"
+    problems: list = field(default_factory=list)
+
+    @property
+    def readable(self) -> bool:
+        return not self.problems
+
+
+def _headers_include_dr_cr_type(headers: list[str]) -> bool:
+    """True when a dedicated DR/CR column is present (not generic type labels)."""
+    from . import csv_enhanced
+
+    for header in headers:
+        if csv_enhanced._role_for_header(header) == "type":
+            return True
+    return False
+
+
+def _use_enhanced_result(enhanced, account_id=None) -> PreparedStatement | None:
+    enhanced_mapping = detect_columns(read_headers(enhanced.text))
+    enhanced_rows = parse_rows(enhanced.text, enhanced_mapping, account_id=account_id)
+    enhanced_ok, _problems = assess_readability(enhanced_mapping, enhanced_rows)
+    if not enhanced_ok:
+        return None
+    stored = dict(enhanced_mapping)
+    stored["_reader"] = enhanced.meta.as_dict()
+    return PreparedStatement(
+        text=enhanced.text,
+        mapping=stored,
+        rows=enhanced_rows,
+        engine="enhanced",
+    )
+
+
+def prepare_statement(text: str, account_id=None) -> PreparedStatement:
+    """Try the classic CSV format first; fall back to the enhanced reader.
+
+    Existing simple exports keep using the classic path so behavior stays
+    stable. Messier bank files (preamble rows, `;` delimiters, European
+    decimals, DR/CR type columns) are normalized by `csv_enhanced` into the
+    same shape classic already understands — the classic format itself is
+    not replaced.
+    """
+    from . import csv_enhanced
+
+    headers = read_headers(text)
+    mapping = detect_columns(headers)
+    rows = parse_rows(text, mapping, account_id=account_id)
+    readable, problems = assess_readability(mapping, rows)
+
+    if readable and not _headers_include_dr_cr_type(headers):
+        return PreparedStatement(text=text, mapping=mapping, rows=rows, engine="classic")
+
+    enhanced = csv_enhanced.prepare(text)
+    if enhanced is not None:
+        prepared = _use_enhanced_result(enhanced, account_id=account_id)
+        if prepared is not None:
+            return prepared
+
+    if readable:
+        return PreparedStatement(text=text, mapping=mapping, rows=rows, engine="classic")
+
+    return PreparedStatement(
+        text=text, mapping=mapping, rows=rows, engine="classic", problems=problems
+    )
+
+
 def _normalize_header(name: str) -> str:
     name = name.lower().strip().replace("_", " ").replace("-", " ")
     cleaned = "".join(ch for ch in name if ch.isalnum() or ch == " ")
@@ -194,6 +301,12 @@ def _parse_date(value: str) -> date | None:
     value = (value or "").strip()
     if not value:
         return None
+    # ISO datetimes from some exports: keep the date portion only.
+    if len(value) >= 10 and value[4] == "-" and value[7] == "-":
+        try:
+            return datetime.strptime(value[:10], "%Y-%m-%d").date()
+        except ValueError:
+            pass
     for fmt in DATE_FORMATS:
         try:
             return datetime.strptime(value, fmt).date()
@@ -291,7 +404,11 @@ def parse_rows(text: str, mapping: dict, account_id=None) -> list[ParsedRow]:
     + kind convention matching transactions.Transaction. Never raises on a
     single bad row -- it's recorded in that row's `errors` and flagged for
     review instead, so one malformed row never blocks the rest of the file.
+
+    Reserved mapping keys starting with `_` (e.g. `_reader`) are ignored so
+    enhanced-reader metadata can live alongside role → header entries.
     """
+    roles = mapping_roles(mapping)
     reader = csv.DictReader(io.StringIO(text))
     rows: list[ParsedRow] = []
     for i, raw in enumerate(reader, start=1):
@@ -299,23 +416,23 @@ def parse_rows(text: str, mapping: dict, account_id=None) -> list[ParsedRow]:
             break
         row = ParsedRow(row_number=i, raw=raw)
 
-        occurred_on = _parse_date(raw.get(mapping.get("date", ""), ""))
+        occurred_on = _parse_date(raw.get(roles.get("date", ""), ""))
         if occurred_on is None:
             row.errors.append("Couldn't read the date for this row.")
         row.occurred_on = occurred_on
 
-        row.description = (raw.get(mapping.get("description", ""), "") or "").strip()
+        row.description = (raw.get(roles.get("description", ""), "") or "").strip()
 
-        amount, kind, amount_errors = _resolve_amount(raw, mapping)
+        amount, kind, amount_errors = _resolve_amount(raw, roles)
         row.errors.extend(amount_errors)
         row.amount = amount
         row.kind = kind
 
-        if mapping.get("balance"):
-            row.balance_after = _parse_decimal(raw.get(mapping["balance"], ""))
+        if roles.get("balance"):
+            row.balance_after = _parse_decimal(raw.get(roles["balance"], ""))
 
-        if mapping.get("currency"):
-            currency = (raw.get(mapping["currency"], "") or "").strip().upper() or None
+        if roles.get("currency"):
+            currency = (raw.get(roles["currency"], "") or "").strip().upper() or None
             row.currency = currency
             if currency and currency != ASSUMED_CURRENCY:
                 row.errors.append(
@@ -323,8 +440,8 @@ def parse_rows(text: str, mapping: dict, account_id=None) -> list[ParsedRow]:
                     "Finovate only supports single-currency accounts today -- please review."
                 )
 
-        if mapping.get("reference"):
-            ref = (raw.get(mapping["reference"], "") or "").strip()
+        if roles.get("reference"):
+            ref = (raw.get(roles["reference"], "") or "").strip()
             if ref:
                 row.external_id = f"csv:{ref}"
 
