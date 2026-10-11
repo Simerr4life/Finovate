@@ -29,9 +29,27 @@ class DebtObligationForm(forms.ModelForm):
 
 
 class PlanAllocationForm(forms.Form):
-    rainy_day_percent = forms.DecimalField(min_value=0, max_value=100, max_digits=5, decimal_places=2)
-    investment_percent = forms.DecimalField(min_value=0, max_value=100, max_digits=5, decimal_places=2)
-    regular_percent = forms.DecimalField(min_value=0, max_value=100, max_digits=5, decimal_places=2)
+    rainy_day_percent = forms.DecimalField(
+        min_value=0,
+        max_value=100,
+        max_digits=5,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0", "max": "100", "data-plan-percent": "1"}),
+    )
+    investment_percent = forms.DecimalField(
+        min_value=0,
+        max_value=100,
+        max_digits=5,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0", "max": "100", "data-plan-percent": "1"}),
+    )
+    regular_percent = forms.DecimalField(
+        min_value=0,
+        max_value=100,
+        max_digits=5,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0", "max": "100", "data-plan-percent": "1"}),
+    )
 
     def clean(self):
         cleaned = super().clean()

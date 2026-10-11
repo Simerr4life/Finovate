@@ -174,7 +174,8 @@ def sync_profile_from_claims(claims, pending=None):
         )
     if not created:
         user = profile.user
-        _apply_name(user, claims, pending.get("name") or "")
+        if profile.name_customized_at is None:
+            _apply_name(user, claims, pending.get("name") or "")
         if email:
             user.email = email
         user.save()

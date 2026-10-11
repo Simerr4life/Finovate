@@ -110,16 +110,17 @@
 {% endif %}
 
 {% if allocation_form and plan.status == "active" %}
-<section class="card" style="margin-top:1.25rem;">
+<section class="card plan-settings" style="margin-top:1.25rem;" data-reveal>
   <div class="section-title">Adjust allocation percentages</div>
-  <p class="muted">Percents apply only to the amount actually allocated from safe-to-save. They must total 100%.</p>
-  <form method="post" action="{% url 'savings:plan_allocations' %}" class="stack-form">
+  <p class="muted">Default split is 40% Rainy Day / 20% Investment / 40% Regular Savings when finances are stable. Percents apply only to safe-to-save and must total 100%.</p>
+  <form method="post" action="{% url 'savings:plan_allocations' %}" class="stack-form" data-plan-form>
     {% csrf_token %}
     {{ allocation_form.non_field_errors }}
     <label>Rainy Day % {{ allocation_form.rainy_day_percent }}</label>
     <label>Investment % {{ allocation_form.investment_percent }}</label>
     <label>Regular Savings % {{ allocation_form.regular_percent }}</label>
-    <button class="button" type="submit">Save percentages</button>
+    <p class="muted" data-percent-total>Total: —</p>
+    <button class="button" type="submit" data-loading-text="Saving…">Save percentages</button>
   </form>
 </section>
 {% endif %}

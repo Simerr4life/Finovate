@@ -117,7 +117,13 @@ class ScenarioEngineTests(TestCase):
         analysis.monthly_income = Decimal("6000")
         self.assertEqual(choose_scenario(analysis), SavingsPlan.Scenario.STABLE)
         rec = build_recommendation(analysis)
+        self.assertEqual(rec.rainy_day_percent, Decimal("40.00"))
+        self.assertEqual(rec.investment_percent, Decimal("20.00"))
+        self.assertEqual(rec.regular_percent, Decimal("40.00"))
         self.assertEqual(rec.rainy_day_percent + rec.investment_percent + rec.regular_percent, Decimal("100.00"))
+        self.assertEqual(rec.rainy_day_amount, Decimal("160.00"))
+        self.assertEqual(rec.investment_amount, Decimal("80.00"))
+        self.assertEqual(rec.regular_amount, Decimal("160.00"))
 
     def test_strong_capacity(self):
         self._income(Decimal("8000"))
