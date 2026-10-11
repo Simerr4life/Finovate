@@ -191,3 +191,7 @@ not label those rows. Re-running the command updates the same records by
 - Decide on and implement the first real integration (most likely the
   identity provider, since it touches every page) when credentials are
   available.
+
+## Full documentation
+
+Comprehensive product, developer, and visual documentation (including DOCX and PPTX deliverables) lives in [`docs/README.md`](docs/README.md).
