@@ -32,7 +32,7 @@
         <a class="nav-item {% if nav_active == 'overview' %}active{% endif %}" href="{% url 'dashboard' %}">{% include "partials/icon.html" with name="grid" %} <span>Overview</span></a>
         <a class="nav-item {% if nav_active == 'transactions' %}active{% endif %}" href="{% url 'budgets:transaction_list' %}">{% include "partials/icon.html" with name="card" %} <span>Transactions</span></a>
         <a class="nav-item {% if nav_active == 'savings' %}active{% endif %}" href="{% url 'savings:index' %}">{% include "partials/icon.html" with name="vault" %} <span>Savings</span></a>
-        <a class="nav-item {% if nav_active == 'pools' %}active{% endif %}" href="{% url 'savings:pools' %}">{% include "partials/icon.html" with name="target" %} <span>Pools</span></a>
+        <a class="nav-item {% if nav_active == 'pools' %}active{% endif %}" href="{% url 'savings:pools' %}">{% include "partials/icon.html" with name="bag" %} <span>Pools</span></a>
         <a class="nav-item {% if nav_active == 'investments' %}active{% endif %}" href="{% url 'investing:index' %}">{% include "partials/icon.html" with name="trend" %} <span>Investments</span></a>
         <a class="nav-item {% if nav_active == 'goals' %}active{% endif %}" href="{% url 'savings:goals' %}">{% include "partials/icon.html" with name="target" %} <span>Financial Goals</span></a>
         <a class="nav-item {% if nav_active == 'insights' %}active{% endif %}" href="{% url 'insights' %}">{% include "partials/icon.html" with name="chart" %} <span>Insights</span></a>
