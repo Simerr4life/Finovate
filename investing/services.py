@@ -280,6 +280,43 @@ def available_demo_investment_budget(user) -> Decimal:
     return max(quantize_money(surplus - committed), Decimal("0.00"))
 
 
+@db_transaction.atomic
+def create_demo_market_order(user, symbol: str, amount: Decimal, pool=None) -> SimulatedOrder:
+    """Create a pending simulated buy order using the latest bundled sample close."""
+    if not amount.is_finite() or amount <= 0:
+        raise ValueError("Enter an amount greater than $0.00.")
+    amount = quantize_money(amount)
+    if pool is not None and (pool.user_id != user.pk or not pool.is_investable):
+        raise ValueError("Choose one of your investable savings pools.")
+
+    latest_price = MarketPrice.objects.filter(
+        symbol=symbol,
+        is_verified=True,
+        is_demo_sample=True,
+    ).order_by("-date").first()
+    if latest_price is None:
+        raise ValueError("Choose an asset from the supplied sample market data.")
+
+    if amount > available_demo_investment_budget(user):
+        raise ValueError(
+            "That amount is above your available demo investing budget. "
+            "Check your investable surplus and pending orders."
+        )
+
+    shares = (amount / latest_price.close).quantize(SHARE_PLACES)
+    return SimulatedOrder.objects.create(
+        user=user,
+        pool=pool,
+        symbol=latest_price.symbol,
+        order_type=SimulatedOrder.OrderType.BUY,
+        amount=amount,
+        status=SimulatedOrder.Status.PENDING,
+        demo_execution_price=latest_price.close,
+        demo_shares=shares,
+        demo_data_date=latest_price.date,
+    )
+
+
 def _demo_stock_metrics(rows: list[MarketPrice]) -> dict | None:
     if len(rows) < 2 or rows[0].close <= 0:
         return None

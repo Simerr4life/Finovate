@@ -233,6 +233,7 @@ class MarketPrice(TimeStampedModel):
         STOCK = "stock", "Stock"
 
     symbol = models.CharField(max_length=20)
+    asset_name = models.CharField(max_length=80, blank=True, default="")
     asset_type = models.CharField(max_length=10, choices=AssetType.choices)
     date = models.DateField()
     open = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)

@@ -568,6 +568,55 @@ body.guest .content { max-width: 1120px; padding-top: 48px; }
 .w-3 { width: 12px; }
 .w-4 { width: 16px; }
 .h-4 { height: 16px; }
+.market-demo-notice { display: block; }
+.market-budget-banner { display: grid; grid-template-columns: 1fr auto; gap: 4px 18px; align-items: center; padding: 18px 22px; margin-bottom: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.market-budget-banner > span { font-size: 13px; font-weight: 700; }
+.market-budget-banner > strong { grid-column: 2; grid-row: 1 / span 2; font: 700 25px "Manrope", sans-serif; }
+.market-budget-banner > small { color: var(--muted); font-size: 11px; }
+.market-assets-section { margin: 28px 0; }
+.market-section-heading { display: flex; justify-content: space-between; align-items: end; gap: 14px; margin-bottom: 14px; }
+.market-section-heading h2 { margin: 0; font: 700 20px "Manrope", sans-serif; }
+.market-section-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.market-section-heading > span, .market-type-chip { color: var(--muted); font-size: 10px; font-weight: 700; }
+.market-asset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 390px), 1fr)); gap: 16px; }
+.market-asset-card { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 15px; background: var(--surface); scroll-margin-top: 24px; }
+.market-asset-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.market-asset-heading h3 { margin: 5px 0 2px; font: 700 18px "Manrope", sans-serif; }
+.market-symbol { color: var(--muted); font-size: 11px; }
+.market-current-price { display: grid; gap: 4px; text-align: right; }
+.market-current-price small, .market-asset-stats small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.market-current-price strong { font: 700 19px "Manrope", sans-serif; }
+.market-asset-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 14px 0; margin-top: 12px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.market-asset-stats > div { display: grid; gap: 5px; }
+.market-asset-stats strong { font-size: 13px; }
+.market-asset-stats .negative { color: var(--danger); }
+.market-history { margin-top: 12px; }
+.market-history summary { color: var(--green); cursor: pointer; font-size: 12px; font-weight: 700; }
+.market-history-scroll { max-width: 100%; margin-top: 8px; overflow-x: auto; }
+.market-history .data-table { min-width: 720px; font-size: 11px; }
+.market-history .data-table th, .market-history .data-table td { padding: 8px; white-space: nowrap; }
+.market-buy-form { padding-top: 16px; margin-top: 14px; border-top: 1px solid var(--border); }
+.market-buy-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; }
+.market-buy-heading span, .market-buy-note { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.market-buy-fields { display: grid; grid-template-columns: minmax(90px, .7fr) minmax(120px, 1fr) auto; gap: 10px; align-items: end; margin-top: 10px; }
+.market-buy-fields .field-label { margin-top: 0; }
+.market-buy-fields .button { min-height: 40px; white-space: nowrap; }
+.market-buy-fields input, .market-buy-fields select { min-height: 40px; padding: 0 9px; }
+.market-buy-fields input:disabled, .market-buy-fields select:disabled, .market-buy-fields button:disabled { cursor: not-allowed; opacity: .55; }
+.market-buy-note { margin: 9px 0 0; }
+.market-no-data { padding: 26px; }
+.market-no-data h2 { margin-top: 0; }
+.market-data-footnote { margin-top: 20px; }
+@media (max-width: 560px) {
+  .market-budget-banner { padding: 15px; }
+  .market-section-heading { align-items: start; }
+  .market-section-heading > span { white-space: nowrap; }
+  .market-asset-card { padding: 15px; }
+  .market-asset-heading { align-items: start; flex-direction: column; }
+  .market-current-price { text-align: left; }
+  .market-buy-fields { grid-template-columns: 1fr 1fr; }
+  .market-buy-fields .button { grid-column: 1 / -1; width: 100%; }
+}
 @media (min-width: 640px) {
   .sm\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
   .sm\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }

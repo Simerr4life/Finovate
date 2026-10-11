@@ -1,16 +1,21 @@
 # Sample-data investing recommendations
 
-Finovate's demo investing ideas use the September 2026 CSV supplied with the
-project owner's Excel demo package. Load or refresh those 109 rows with:
+Finovate's demo investing ideas and Explore page use the September 2026 CSV
+supplied with the project owner's Excel demo package. Applying the database
+migrations loads those 109 sample rows automatically. To load or refresh them
+manually later, run:
 
 ```bash
-python manage.py migrate
 python manage.py seed_excel_demo_market
 ```
 
 The command is safe to run again and uses the CSV committed at
 `demo_data/september_2026_verified_market_data.csv`. It does not contact a
 market-data provider. The source notes travel with each imported sample row.
+The Explore page groups those rows by stock and index, shows the supplied
+price history, and lets each user create a pending simulated buy order with
+an amount and optional savings-pool attribution. The available demo budget
+is rechecked before an order is created.
 
 The "Demo AI" is transparent, deterministic ranking logic, not a language
 model, machine-learning prediction, or investment advice. It ranks symbols
