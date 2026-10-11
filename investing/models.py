@@ -16,6 +16,23 @@ from savings.models import Goal
 from transactions.models import Transaction
 
 
+class DemoInvestmentFunding(TimeStampedModel):
+    """A user-entered balance top-up for simulated investing only."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="demo_investment_fundings",
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Demo investing funds ${self.amount} for {self.user}"
+
+
 class RoundUpSettings(TimeStampedModel):
     """Per-user configuration for the simulated round-up feature."""
 

@@ -14,6 +14,7 @@ from accounts.models import NotificationEvent
 from .forms import HypotheticalScenarioForm, RoundUpSettingsForm, VerifiedScenarioForm
 from .models import (
     DemoInvestmentSuggestion,
+    DemoInvestmentFunding,
     MarketPrice,
     PortfolioSnapshot,
     RoundUpLedgerEntry,
@@ -21,6 +22,7 @@ from .models import (
 )
 from .services import (
     accept_demo_investment_suggestion,
+    add_demo_investment_funds,
     available_demo_investment_budget,
     approve_order,
     compute_hypothetical_scenario,
@@ -271,6 +273,20 @@ def index(request):
         "investable_pools": pools,
         "pool_summaries": pool_summaries,
         "demo_budget": available_demo_investment_budget(request.user),
+        "demo_pool_funds": sum(
+            (pool.current_amount for pool in pools), Decimal("0.00")
+        ),
+        "demo_funded_total": (
+            DemoInvestmentFunding.objects.filter(user=request.user).aggregate(
+                total=Sum("amount")
+            )["total"]
+            or Decimal("0.00")
+        ),
+        "demo_stock_count": MarketPrice.objects.filter(
+            asset_type=MarketPrice.AssetType.STOCK,
+            is_verified=True,
+            is_demo_sample=True,
+        ).values("symbol").distinct().count(),
         "market_assets": market_assets,
         "market_stocks": [
             asset for asset in market_assets
@@ -303,6 +319,27 @@ def index(request):
         "tab": tab,
     }
     return render(request, "investing/index.html", context)
+
+
+@login_required
+@require_POST
+def add_demo_investment_funds_view(request):
+    try:
+        amount = Decimal(request.POST.get("amount", ""))
+    except (InvalidOperation, TypeError, ValueError):
+        messages.error(request, "Enter a valid demo amount greater than $0.00.")
+        return redirect("investing:index")
+
+    try:
+        add_demo_investment_funds(request.user, amount)
+    except ValueError as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(
+            request,
+            f"Added ${amount:.2f} in virtual demo funds. No real money was added or moved.",
+        )
+    return redirect("investing:index")
 
 
 @login_required

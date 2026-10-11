@@ -20,6 +20,7 @@ from core.services import quantize_money, round_up_to_nearest
 from transactions.models import Transaction
 
 from .models import (
+    DemoInvestmentFunding,
     DemoInvestmentSuggestion,
     MarketPrice,
     PortfolioSnapshot,
@@ -269,7 +270,21 @@ def reject_order(order: SimulatedOrder) -> SimulatedOrder:
 
 
 def available_demo_investment_budget(user) -> Decimal:
+    from savings.models import Goal
+
     surplus = compute_investable_surplus(user).investable_surplus
+    pool_funds = (
+        Goal.objects.filter(user=user, is_investable=True).aggregate(
+            total=Sum("current_amount")
+        )["total"]
+        or Decimal("0.00")
+    )
+    demo_funds = (
+        DemoInvestmentFunding.objects.filter(user=user).aggregate(
+            total=Sum("amount")
+        )["total"]
+        or Decimal("0.00")
+    )
     committed = (
         SimulatedOrder.objects.filter(
             user=user,
@@ -277,7 +292,22 @@ def available_demo_investment_budget(user) -> Decimal:
         ).aggregate(total=Sum("amount"))["total"]
         or Decimal("0.00")
     )
-    return max(quantize_money(surplus - committed), Decimal("0.00"))
+    return max(
+        quantize_money(surplus + pool_funds + demo_funds - committed),
+        Decimal("0.00"),
+    )
+
+
+def add_demo_investment_funds(user, amount: Decimal) -> DemoInvestmentFunding:
+    """Record a virtual top-up without changing the user's real cash ledger."""
+    if not amount.is_finite() or amount <= 0:
+        raise ValueError("Enter a demo amount greater than $0.00.")
+    if amount > Decimal("9999999999.99"):
+        raise ValueError("Enter a demo amount no greater than $9,999,999,999.99.")
+    rounded_amount = quantize_money(amount)
+    if amount != rounded_amount:
+        raise ValueError("Enter a demo amount with no more than two decimal places.")
+    return DemoInvestmentFunding.objects.create(user=user, amount=rounded_amount)
 
 
 @db_transaction.atomic
@@ -300,7 +330,8 @@ def create_demo_market_order(user, symbol: str, amount: Decimal, pool=None) -> S
     if amount > available_demo_investment_budget(user):
         raise ValueError(
             "That amount is above your available demo investing budget. "
-            "Check your investable surplus and pending orders."
+            "Check your investable pool balances, cash surplus, virtual funds, "
+            "and pending orders."
         )
 
     shares = (amount / latest_price.close).quantize(SHARE_PLACES)
@@ -355,8 +386,8 @@ def generate_demo_investment_suggestions(user) -> list[DemoInvestmentSuggestion]
     """Create once-per-dataset, user-reviewed ideas from the bundled sample prices.
 
     This is deterministic demo logic, not a predictive model or investment
-    advice. The suggested amounts are capped by the user's current estimated
-    investable surplus, and accepting an idea only creates a simulated order.
+    advice. The suggested amounts are capped by the user's available demo
+    investing budget, and accepting an idea only creates a simulated order.
     """
     available_budget = available_demo_investment_budget(user)
     if available_budget <= 0:
@@ -449,7 +480,7 @@ def accept_demo_investment_suggestion(
 
     current_budget = available_demo_investment_budget(user)
     if suggestion.amount > current_budget:
-        raise ValueError("Your current investable surplus is below this suggestion.")
+        raise ValueError("Your current demo investing budget is below this suggestion.")
 
     shares = (suggestion.amount / suggestion.demo_execution_price).quantize(
         SHARE_PLACES
