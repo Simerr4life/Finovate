@@ -1,5 +1,5 @@
 {% load finovate %}
-<article class="market-asset-card" id="asset-{{ asset.anchor }}" data-series-id="{{ asset.chart_id }}">
+<article class="market-asset-card {% if chart_default %}market-asset-card-wide{% endif %}" id="asset-{{ asset.anchor }}" data-series-id="{{ asset.chart_id }}" data-default-view="{% if chart_default %}chart{% else %}table{% endif %}">
   <header class="market-asset-heading">
     <div>
       <span class="market-type-chip">{{ asset.asset_type_label }} · demo sample</span>
@@ -24,10 +24,10 @@
   </div>
 
   <div class="market-view-controls" role="group" aria-label="Choose {{ asset.name }} data view">
-    <button class="market-view-button active" type="button" data-market-view="chart" aria-pressed="false">Graph</button>
-    <button class="market-view-button" type="button" data-market-view="table" aria-pressed="true">Price table</button>
+    <button class="market-view-button {% if chart_default %}active{% endif %}" type="button" data-market-view="chart" aria-pressed="{{ chart_default|yesno:'true,false' }}">Graph</button>
+    <button class="market-view-button {% if not chart_default %}active{% endif %}" type="button" data-market-view="table" aria-pressed="{{ chart_default|yesno:'false,true' }}">Price table</button>
   </div>
-  <section class="market-chart-panel" data-market-chart hidden aria-label="{{ asset.name }} sample price graph">
+  <section class="market-chart-panel" data-market-chart {% if not chart_default %}hidden{% endif %} aria-label="{{ asset.name }} sample price graph">
     <div class="market-chart-reading" aria-live="polite">
       <span data-chart-date>{{ asset.latest.date }}</span>
       <strong data-chart-price>${{ asset.latest.close }}</strong>
@@ -50,7 +50,7 @@
     <p class="market-chart-help">Hover over the graph or drag the slider to see the sample close for each recorded date.</p>
   </section>
 
-  <details class="market-history" data-market-table>
+  <details class="market-history" data-market-table {% if chart_default %}hidden{% endif %}>
     <summary>View all {{ asset.history|length }} sample price days</summary>
     <div class="market-history-scroll">
       <table class="data-table">

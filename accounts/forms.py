@@ -40,8 +40,9 @@ class ProfileSettingsForm(OnboardingForm):
     """Same fields as onboarding, plus notification choices used only in Settings."""
 
     class Meta(OnboardingForm.Meta):
-        fields = OnboardingForm.Meta.fields + ["notify_simulated_orders"]
+        fields = [*OnboardingForm.Meta.fields, "theme", "notify_simulated_orders"]
         labels = {
             **OnboardingForm.Meta.labels,
+            "theme": "Color theme",
             "notify_simulated_orders": "Record simulated investment proposals",
         }

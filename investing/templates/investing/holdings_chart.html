@@ -1,0 +1,38 @@
+{% load finovate %}
+<article class="holding-chart-card interactive-chart-card" data-series-id="{{ chart_id }}" data-default-view="chart">
+  <header class="holding-chart-heading">
+    <div>
+      <div class="eyebrow">{% if holding %}{{ holding.symbol }} · SIMULATED HOLDING{% else %}PORTFOLIO VALUE{% endif %}</div>
+      <h3>{{ title }}</h3>
+      <p>{{ subtitle }}</p>
+    </div>
+    <div class="holding-chart-current">
+      <small>Latest sample valuation{% if latest_date %} · {{ latest_date }}{% endif %}</small>
+      <strong>{{ latest_value|money }}</strong>
+      {% if holding %}<span>{{ holding.shares }} simulated shares · cost {{ holding.cost_basis|money }}</span>{% endif %}
+    </div>
+  </header>
+  <div class="market-chart-panel" data-market-chart>
+    <div class="market-chart-reading" aria-live="polite">
+      <span data-chart-date></span>
+      <strong data-chart-price></strong>
+      <span data-chart-change></span>
+    </div>
+    <div class="market-chart-scroll">
+      <svg class="market-price-chart" viewBox="0 0 1000 360" role="img" aria-label="{{ title }} estimated sample value over time">
+        <title>{{ title }} estimated value based on supplied sample prices. Move over the graph or use the slider to inspect each date.</title>
+      </svg>
+    </div>
+    <label class="market-chart-slider-label">
+      <span>Move through sample dates</span>
+      <input type="range" min="0" max="{{ chart_data|length|add:'-1' }}" value="{{ chart_data|length|add:'-1' }}" step="1" data-chart-slider aria-label="Choose a sample date for {{ title }}">
+    </label>
+    <div class="market-chart-range"><span>{{ chart_data.0.date }}</span><span>{{ latest_date }}</span></div>
+    <div class="market-chart-legend" aria-label="Graph colors">
+      <span><i class="up"></i> Up from prior sample date</span>
+      <span><i class="down"></i> Down from prior sample date</span>
+    </div>
+    <p class="market-chart-help">Value is estimated from your simulated shares and the supplied historical sample closes, not live prices.</p>
+  </div>
+  {{ chart_data|json_script:chart_id }}
+</article>
