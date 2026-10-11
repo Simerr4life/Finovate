@@ -165,6 +165,38 @@ class LocalLogoutUnaffectedTests(TestCase):
         self.assertRedirects(response, reverse("landing"))
 
 
+class ThemeSettingsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="theme-user", password="test-password-123"
+        )
+        self.client.force_login(self.user)
+
+    def test_settings_page_exposes_saved_theme_choice(self):
+        response = self.client.get(reverse("accounts:settings"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Color theme")
+        self.assertContains(response, '<option value="dark">Dark</option>')
+        self.assertContains(response, 'data-theme="system"')
+
+    def test_dark_theme_setting_is_saved_and_applied_to_pages(self):
+        response = self.client.post(reverse("accounts:settings"), {
+            "income_cadence": "monthly",
+            "risk_comfort": "unspecified",
+            "cash_reserve_target": "0.00",
+            "budget_warning_threshold_percent": "80",
+            "notify_budget_warnings": "on",
+            "notify_goal_milestones": "on",
+            "theme": "dark",
+        })
+
+        self.assertRedirects(response, reverse("accounts:settings"))
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.theme, "dark")
+        self.assertContains(self.client.get(reverse("accounts:settings")), 'data-theme="dark"')
+
+
 class PostgresUrlParsingTests(TestCase):
     def test_parses_a_supabase_style_connection_string(self):
         config = _postgres_config_from_url(

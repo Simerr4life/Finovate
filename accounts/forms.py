@@ -40,4 +40,8 @@ class ProfileSettingsForm(OnboardingForm):
     """Same fields as onboarding, reused on the Settings page."""
 
     class Meta(OnboardingForm.Meta):
-        pass
+        fields = [*OnboardingForm.Meta.fields, "theme"]
+        labels = {
+            **OnboardingForm.Meta.labels,
+            "theme": "Color theme",
+        }

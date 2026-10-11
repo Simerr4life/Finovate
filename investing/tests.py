@@ -552,6 +552,40 @@ class DemoMarketExplorerTests(TestCase):
         self.assertContains(response, "Down from prior sample date")
         self.assertContains(response, "market-charts.js")
 
+    def test_explore_tab_shows_full_width_charts_by_default(self):
+        response = self.client.get("/investing/?tab=explore")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Explore price movement")
+        self.assertContains(response, "market-asset-card-wide")
+        self.assertContains(response, 'data-default-view="chart"')
+        self.assertContains(response, "Move through sample dates")
+        self.assertEqual(len(response.context["market_assets"]), 8)
+        self.assertEqual(response.context["demo_budget"], Decimal("100.00"))
+
+    def test_my_investments_shows_approved_holdings_but_not_pending_orders(self):
+        approved_order = create_demo_market_order(self.user, "AAPL", Decimal("35.00"))
+        approve_order(approved_order)
+        create_demo_market_order(self.user, "MSFT", Decimal("20.00"))
+        latest_price = MarketPrice.objects.filter(
+            symbol="AAPL", is_demo_sample=True
+        ).latest("date")
+
+        response = self.client.get("/investing/?tab=holdings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "My investments")
+        self.assertContains(response, "AAPL")
+        self.assertContains(response, "MSFT")
+        self.assertContains(response, "These are not part of your holdings yet.")
+        self.assertEqual(len(response.context["holdings"]), 1)
+        self.assertEqual(response.context["holdings"][0]["symbol"], "AAPL")
+        self.assertEqual(
+            response.context["holdings_market_value"],
+            approved_order.demo_shares * latest_price.close,
+        )
+        self.assertGreater(len(response.context["portfolio_series"]), 1)
+
     def test_user_can_create_pending_order_from_a_selected_sample_asset(self):
         pool = Goal.objects.create(
             user=self.user,

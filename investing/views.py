@@ -1,7 +1,9 @@
+from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import slugify
@@ -33,6 +35,169 @@ from .services import (
     reject_order,
     sweep_pending_roundups,
 )
+
+
+def _demo_market_assets():
+    rows = MarketPrice.objects.filter(
+        is_verified=True,
+        is_demo_sample=True,
+    ).order_by("symbol", "date")
+    grouped_rows = defaultdict(list)
+    for row in rows:
+        grouped_rows[row.symbol].append(row)
+
+    assets = []
+    for symbol, history in grouped_rows.items():
+        first_price, latest_price = history[0], history[-1]
+        period_change = Decimal("0.00")
+        if first_price.close:
+            period_change = (
+                (latest_price.close - first_price.close)
+                / first_price.close
+                * Decimal("100")
+            ).quantize(Decimal("0.01"))
+        assets.append({
+            "symbol": symbol,
+            "name": latest_price.asset_name or symbol,
+            "asset_type": latest_price.asset_type,
+            "asset_type_label": latest_price.get_asset_type_display(),
+            "latest": latest_price,
+            "history": list(reversed(history)),
+            "period_change": period_change,
+            "anchor": slugify(symbol),
+            "chart_id": f"market-series-{slugify(symbol)}",
+            "first_date": first_price.date,
+            "chart_data": [
+                {"date": price.date.isoformat(), "close": str(price.close)}
+                for price in history
+            ],
+        })
+    return assets
+
+
+def _user_demo_holdings(user):
+    orders = list(
+        SimulatedOrder.objects.filter(
+            user=user,
+            status=SimulatedOrder.Status.FILLED,
+            demo_shares__isnull=False,
+            demo_data_date__isnull=False,
+        ).order_by("demo_data_date", "created_at")
+    )
+    orders_by_symbol = defaultdict(list)
+    for order in orders:
+        orders_by_symbol[order.symbol].append(order)
+
+    holdings = []
+    series_by_symbol = {}
+    for symbol, symbol_orders in orders_by_symbol.items():
+        history = list(
+            MarketPrice.objects.filter(
+                symbol=symbol,
+                is_verified=True,
+                is_demo_sample=True,
+            ).order_by("date")
+        )
+        if not history:
+            continue
+
+        shares = Decimal("0")
+        cost_basis = Decimal("0")
+        series = []
+        order_index = 0
+        for price in history:
+            while (
+                order_index < len(symbol_orders)
+                and symbol_orders[order_index].demo_data_date <= price.date
+            ):
+                order = symbol_orders[order_index]
+                order_index += 1
+                order_shares = order.demo_shares or Decimal("0")
+                if order.order_type == SimulatedOrder.OrderType.BUY:
+                    shares += order_shares
+                    cost_basis += order.amount
+                elif order.order_type == SimulatedOrder.OrderType.SELL and shares > 0:
+                    sold_shares = min(shares, order_shares)
+                    cost_basis -= cost_basis * sold_shares / shares
+                    shares -= sold_shares
+
+            series.append({
+                "date": price.date.isoformat(),
+                "close": str(shares * price.close),
+            })
+
+        series_by_symbol[symbol] = series
+        if shares <= 0:
+            continue
+
+        latest_price = history[-1]
+        market_value = shares * latest_price.close
+        holdings.append({
+            "symbol": symbol,
+            "name": latest_price.asset_name or symbol,
+            "shares": shares,
+            "cost_basis": cost_basis,
+            "latest_price": latest_price.close,
+            "price_date": latest_price.date,
+            "market_value": market_value,
+            "gain_loss": market_value - cost_basis,
+            "chart_id": f"holding-series-{slugify(symbol)}",
+            "chart_data": series,
+        })
+
+    holdings.sort(key=lambda holding: holding["market_value"], reverse=True)
+    date_series = defaultdict(dict)
+    all_dates = sorted({
+        point["date"]
+        for series in series_by_symbol.values()
+        for point in series
+    })
+    for symbol, series in series_by_symbol.items():
+        for point in series:
+            date_series[symbol][point["date"]] = Decimal(point["close"])
+
+    portfolio_series = []
+    latest_values = {}
+    for sample_date in all_dates:
+        total_value = Decimal("0")
+        for symbol, points in date_series.items():
+            if sample_date in points:
+                latest_values[symbol] = points[sample_date]
+            total_value += latest_values.get(symbol, Decimal("0"))
+        portfolio_series.append({
+            "date": sample_date,
+            "close": str(total_value),
+        })
+
+    filled_unpriced_total = (
+        SimulatedOrder.objects.filter(
+            user=user,
+            status=SimulatedOrder.Status.FILLED,
+            order_type=SimulatedOrder.OrderType.BUY,
+            demo_shares__isnull=True,
+        ).aggregate(total=Sum("amount"))["total"]
+        or Decimal("0")
+    )
+    return {
+        "holdings": holdings,
+        "portfolio_series": portfolio_series,
+        "holdings_cost_basis": sum(
+            (holding["cost_basis"] for holding in holdings), Decimal("0")
+        ),
+        "holdings_market_value": sum(
+            (holding["market_value"] for holding in holdings), Decimal("0")
+        ),
+        "holdings_gain_loss": sum(
+            (holding["gain_loss"] for holding in holdings), Decimal("0")
+        ),
+        "unpriced_filled_total": filled_unpriced_total,
+        "pending_market_orders": SimulatedOrder.objects.filter(
+            user=user,
+            status=SimulatedOrder.Status.PENDING,
+            order_type=SimulatedOrder.OrderType.BUY,
+            demo_shares__isnull=False,
+        ).order_by("-created_at"),
+    }
 
 
 @login_required
@@ -85,22 +250,12 @@ def index(request):
         is_verified=True,
         is_demo_sample=True,
     ).exists()
-    market_rows = []
-    for row in MarketPrice.objects.filter(
-        is_verified=True,
-        is_demo_sample=True,
-    ).order_by("symbol", "-date"):
-        if not any(existing["symbol"] == row.symbol for existing in market_rows):
-            market_rows.append(
-                {
-                    "symbol": row.symbol,
-                    "asset_name": row.asset_name or row.symbol,
-                    "asset_type": row.get_asset_type_display(),
-                    "date": row.date,
-                    "close": row.close,
-                    "source_note": row.source_note,
-                }
-            )
+    market_assets = _demo_market_assets()
+    holdings = _user_demo_holdings(request.user)
+    portfolio_chart_id = "simulated-portfolio-series"
+    tab = request.GET.get("tab", "portfolio")
+    if tab not in {"portfolio", "explore", "holdings", "calculator"}:
+        tab = "portfolio"
 
     context = {
         "form": form,
@@ -115,7 +270,29 @@ def index(request):
         "surplus": surplus,
         "investable_pools": pools,
         "pool_summaries": pool_summaries,
-        "market_rows": market_rows,
+        "demo_budget": available_demo_investment_budget(request.user),
+        "market_assets": market_assets,
+        "market_stocks": [
+            asset for asset in market_assets
+            if asset["asset_type"] == MarketPrice.AssetType.STOCK
+        ],
+        "market_indexes": [
+            asset for asset in market_assets
+            if asset["asset_type"] == MarketPrice.AssetType.INDEX
+        ],
+        "holdings": holdings["holdings"],
+        "portfolio_series": holdings["portfolio_series"],
+        "portfolio_chart_id": portfolio_chart_id,
+        "holdings_cost_basis": holdings["holdings_cost_basis"],
+        "holdings_market_value": holdings["holdings_market_value"],
+        "holdings_gain_loss": holdings["holdings_gain_loss"],
+        "portfolio_latest_date": (
+            holdings["portfolio_series"][-1]["date"]
+            if holdings["portfolio_series"]
+            else None
+        ),
+        "unpriced_filled_total": holdings["unpriced_filled_total"],
+        "pending_market_orders": holdings["pending_market_orders"],
         "demo_suggestions": demo_suggestions,
         "reviewed_demo_suggestions": DemoInvestmentSuggestion.objects.filter(
             user=request.user
@@ -123,7 +300,7 @@ def index(request):
             "simulated_order"
         )[:5],
         "has_demo_market_data": has_demo_market_data,
-        "tab": request.GET.get("tab", "portfolio"),
+        "tab": tab,
     }
     return render(request, "investing/index.html", context)
 
@@ -307,52 +484,20 @@ def historical_demo(request):
 
 @login_required
 def market_data(request):
-    rows = MarketPrice.objects.filter(
-        is_verified=True,
-        is_demo_sample=True,
-    ).order_by("symbol", "date")
-    grouped_rows = {}
-    for row in rows:
-        grouped_rows.setdefault(row.symbol, []).append(row)
-
-    stock_assets = []
-    index_assets = []
-    for symbol, history in grouped_rows.items():
-        first_price, latest_price = history[0], history[-1]
-        period_change = Decimal("0.00")
-        if first_price.close:
-            period_change = (
-                (latest_price.close - first_price.close)
-                / first_price.close
-                * Decimal("100")
-            ).quantize(Decimal("0.01"))
-        asset = {
-            "symbol": symbol,
-            "name": latest_price.asset_name or symbol,
-            "asset_type": latest_price.asset_type,
-            "asset_type_label": latest_price.get_asset_type_display(),
-            "latest": latest_price,
-            "history": list(reversed(history)),
-            "period_change": period_change,
-            "anchor": slugify(symbol),
-            "chart_id": f"market-series-{slugify(symbol)}",
-            "first_date": history[0].date,
-            "chart_data": [
-                {"date": price.date.isoformat(), "close": str(price.close)}
-                for price in history
-            ],
-        }
-        if latest_price.asset_type == MarketPrice.AssetType.STOCK:
-            stock_assets.append(asset)
-        else:
-            index_assets.append(asset)
+    assets = _demo_market_assets()
 
     return render(
         request,
         "investing/market_data.html",
         {
-            "stock_assets": stock_assets,
-            "index_assets": index_assets,
+            "stock_assets": [
+                asset for asset in assets
+                if asset["asset_type"] == MarketPrice.AssetType.STOCK
+            ],
+            "index_assets": [
+                asset for asset in assets
+                if asset["asset_type"] == MarketPrice.AssetType.INDEX
+            ],
             "demo_budget": available_demo_investment_budget(request.user),
             "investable_pools": investable_pools(request.user),
         },

@@ -13,6 +13,7 @@
 <div class="settings-layout">
   <nav class="card settings-nav" aria-label="Settings sections">
     <a class="active" href="#profile">Profile {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+    <a href="#appearance">Appearance {% include "partials/icon.html" with name="chevron" size=15 %}</a>
     <a href="#accounts">Connected accounts {% include "partials/icon.html" with name="chevron" size=15 %}</a>
     <a href="#savings">Savings preferences {% include "partials/icon.html" with name="chevron" size=15 %}</a>
     <a href="#investing">Investment preferences {% include "partials/icon.html" with name="chevron" size=15 %}</a>
@@ -55,6 +56,15 @@
 
     <form method="post" class="card settings-panel" id="preferences" novalidate>
       {% csrf_token %}
+      <div id="appearance">
+        <div class="section-title">Appearance</div>
+        <p class="muted">Choose a light or dark look, or follow your device setting.</p>
+        {% for field in form %}
+          {% if field.name == 'theme' %}
+          <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
+          {% endif %}
+        {% endfor %}
+      </div>
       <div id="savings">
         <div class="section-title">Savings preferences</div>
         {% for field in form %}

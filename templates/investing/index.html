@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load finovate %}
+{% load finovate static %}
 {% block title %}Investments — Finovate{% endblock %}
 {% block crumb %}Investments{% endblock %}
 {% block content %}
@@ -15,33 +15,80 @@
 <div class="top-tabs" role="tablist">
   <a href="?tab=portfolio" class="{% if tab == 'portfolio' %}active{% endif %}">Portfolio</a>
   <a href="?tab=explore" class="{% if tab == 'explore' %}active{% endif %}">Explore</a>
+  <a href="?tab=holdings" class="{% if tab == 'holdings' %}active{% endif %}">My investments</a>
   <a href="?tab=calculator" class="{% if tab == 'calculator' %}active{% endif %}">Calculator</a>
 </div>
 
 {% if tab == 'explore' %}
-<section class="card">
-  <div class="filter-row">
-  <p class="muted">Browse the included September 2026 stock and index sample, see each recorded price day, and try a simulated buy.</p>
-  <a class="button secondary" href="{% url 'investing:market_data' %}">Browse sample data &amp; invest</a>
+<section class="market-explore-heading">
+  <div>
+    <div class="eyebrow">SAMPLE MARKET</div>
+    <h2>Explore price movement</h2>
+    <p>Large interactive charts from the supplied historical sample. Hover or drag the slider to inspect each recorded date.</p>
   </div>
-  {% if market_rows %}
-  <div class="etf-list">
-    {% for row in market_rows %}
-  <a class="etf-row" href="{% url 'investing:market_data' %}#asset-{{ row.symbol|slugify }}">
-      <span class="ticker">{{ row.symbol }}</span>
-    <span><strong>{{ row.asset_name }}</strong><small>{{ row.asset_type }} · {{ row.source_note }}</small></span>
-      <span><small>Latest close</small><strong>{{ row.close }}</strong></span>
-      <span><small>As of</small><strong>{{ row.date }}</strong></span>
-    <span class="pill">Demo sample</span>
-      {% include "partials/icon.html" with name="chevron" size=16 %}
-    </a>
-    {% endfor %}
-  </div>
-  {% else %}
-<p class="empty">Sample market prices will appear after the database migrations are applied.</p>
-  {% endif %}
-<div class="estimate-note">These are historical sample closes, not live prices or a projection of your portfolio.</div>
+  <span class="demo-only-pill">HISTORICAL DATA · SIMULATED</span>
 </section>
+{% if market_stocks or market_indexes %}
+<div class="market-explore-list">
+  {% for asset in market_stocks %}
+    {% include "investing/market_asset_card.html" with asset=asset chart_default=True %}
+  {% endfor %}
+  {% for asset in market_indexes %}
+    {% include "investing/market_asset_card.html" with asset=asset chart_default=True %}
+  {% endfor %}
+</div>
+<p class="disclosure market-data-footnote">These charts use only supplied sample prices. They are not live quotes or predictions. Any order remains simulated and requires your approval.</p>
+{% else %}
+<section class="card"><p class="empty">Sample market prices will appear after the database migrations are applied.</p></section>
+{% endif %}
+
+{% elif tab == 'holdings' %}
+<section class="market-explore-heading">
+  <div>
+    <div class="eyebrow">YOUR SIMULATED PORTFOLIO</div>
+    <h2>My investments</h2>
+    <p>See your approved demo holdings and how their sample-based value has moved. Pending orders are not counted as invested yet.</p>
+  </div>
+  <a class="button secondary" href="?tab=explore">Explore sample assets</a>
+</section>
+<div class="summary-grid compact holdings-summary">
+  <section class="card summary-card"><div class="label">Sample-priced value</div><div class="money">{{ holdings_market_value|money }}</div><div class="summary-detail">Latest supplied sample closes</div></section>
+  <section class="card summary-card"><div class="label">Amount invested</div><div class="money">{{ holdings_cost_basis|money }}</div><div class="summary-detail">Cost basis of tracked demo holdings</div></section>
+  <section class="card summary-card"><div class="label">Change in sample value</div><div class="money {% if holdings_gain_loss >= 0 %}positive{% else %}negative{% endif %}">{{ holdings_gain_loss|money }}</div><div class="summary-detail">Illustrative only, based on sample data</div></section>
+</div>
+{% if holdings %}
+{% if portfolio_series|length > 1 %}
+  {% include "investing/holdings_chart.html" with chart_id=portfolio_chart_id chart_data=portfolio_series title="Total sample-priced holdings" subtitle="Combined estimated value across the sample dates" latest_value=holdings_market_value latest_date=portfolio_latest_date chart_color="portfolio" %}
+{% endif %}
+<div class="holding-chart-list">
+  {% for holding in holdings %}
+    {% include "investing/holdings_chart.html" with chart_id=holding.chart_id chart_data=holding.chart_data title=holding.name subtitle=holding.symbol latest_value=holding.market_value latest_date=holding.price_date holding=holding %}
+  {% endfor %}
+</div>
+{% else %}
+<section class="card holdings-empty">
+  <div class="demo-ai-mark">{% include "partials/icon.html" with name="trend" size=23 %}</div>
+  <h2>No approved sample holdings yet</h2>
+  <p>When you approve a simulated order for a sample asset, its shares and sample-price history will show up here.</p>
+  <a class="button" href="?tab=explore">Explore sample assets</a>
+</section>
+{% endif %}
+{% if unpriced_filled_total > 0 %}
+<section class="card unpriced-holdings">
+  <div><strong>Other simulated contributions</strong><p>These approved simulated orders do not have a sample price history, so they are not included in the graphs.</p></div>
+  <strong>{{ unpriced_filled_total|money }}</strong>
+</section>
+{% endif %}
+{% if pending_market_orders %}
+<section class="card padded holdings-pending">
+  <div class="section-title">Waiting for your approval</div>
+  <p class="muted">These are not part of your holdings yet.</p>
+  {% for order in pending_market_orders %}
+  <div class="list-row"><span><strong>{{ order.symbol }}</strong> · {{ order.demo_shares }} simulated shares at ${{ order.demo_execution_price }} sample close</span><strong>{{ order.amount|money }}</strong></div>
+  {% endfor %}
+  <a class="text-link" href="?tab=portfolio">Review pending orders</a>
+</section>
+{% endif %}
 
 {% elif tab == 'calculator' %}
 <div class="calculator-grid">
@@ -278,6 +325,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/market-charts.js' %}?v=2" defer></script>
 <script>
 (function () {
   const years = document.getElementById("calc-years");

@@ -31,7 +31,7 @@
   </div>
   <div class="market-asset-grid">
     {% for asset in stock_assets %}
-      {% include "investing/market_asset_card.html" with asset=asset %}
+      {% include "investing/market_asset_card.html" with asset=asset chart_default=True %}
     {% endfor %}
   </div>
 </section>
@@ -45,7 +45,7 @@
   </div>
   <div class="market-asset-grid">
     {% for asset in index_assets %}
-      {% include "investing/market_asset_card.html" with asset=asset %}
+      {% include "investing/market_asset_card.html" with asset=asset chart_default=True %}
     {% endfor %}
   </div>
 </section>
