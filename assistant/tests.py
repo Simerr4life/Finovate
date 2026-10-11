@@ -278,6 +278,69 @@ class ConversationLogTests(TestCase):
         self.assertEqual(ConversationMessage.objects.filter(user=user, direction="outbound").count(), 1)
 
 
+class SpectrumBridgeTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="x")
+        self.user.profile.photon_chat_id = "chat-bridge"
+        self.user.profile.save()
+        self.client = Client()
+        self.url = reverse("assistant:spectrum_bridge")
+
+    def _post(self, payload, secret=None, **headers):
+        kwargs = {
+            "data": json.dumps(payload),
+            "content_type": "application/json",
+        }
+        if secret is not None:
+            kwargs["HTTP_X_FINOVATE_BRIDGE_SECRET"] = secret
+        kwargs.update(headers)
+        return self.client.post(self.url, **kwargs)
+
+    @override_settings(DEBUG=True, ASSISTANT_BRIDGE_SECRET="", IMESSAGE_PROJECT_SECRET="")
+    def test_bridge_runs_assistant_for_linked_chat(self):
+        response = self._post({"chat_id": "chat-bridge", "text": "help", "message_id": "m1"})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["ok"])
+        self.assertIn("budget", body["reply"].lower())
+        self.assertFalse(body["duplicate"])
+
+    @override_settings(DEBUG=True, ASSISTANT_BRIDGE_SECRET="", IMESSAGE_PROJECT_SECRET="")
+    def test_bridge_dedupes_on_message_id(self):
+        first = self._post({"chat_id": "chat-bridge", "text": "help", "message_id": "same"})
+        second = self._post({"chat_id": "chat-bridge", "text": "help", "message_id": "same"})
+        self.assertTrue(first.json()["ok"])
+        self.assertTrue(second.json()["duplicate"])
+        self.assertEqual(ConversationMessage.objects.filter(user=self.user, direction="inbound").count(), 1)
+
+    @override_settings(DEBUG=False, ASSISTANT_BRIDGE_SECRET="bridge-secret", IMESSAGE_PROJECT_SECRET="")
+    def test_bridge_rejects_bad_secret(self):
+        response = self._post(
+            {"chat_id": "chat-bridge", "text": "help", "message_id": "m2"},
+            secret="wrong",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    @override_settings(DEBUG=False, ASSISTANT_BRIDGE_SECRET="", IMESSAGE_PROJECT_SECRET="proj-secret")
+    def test_bridge_accepts_project_secret_fallback(self):
+        response = self._post(
+            {"space_id": "chat-bridge", "text": "help", "message_id": "m3"},
+            secret="proj-secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("budget", response.json()["reply"].lower())
+
+    @override_settings(DEBUG=True, ASSISTANT_BRIDGE_SECRET="", IMESSAGE_PROJECT_SECRET="")
+    def test_bridge_redeems_link_code(self):
+        code = issue_link_code(self.user)
+        self.user.profile.photon_chat_id = ""
+        self.user.profile.save()
+        response = self._post({"chat_id": "chat-new-bridge", "text": code, "message_id": "link-1"})
+        self.assertIn("now linked", response.json()["reply"])
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.photon_chat_id, "chat-new-bridge")
+
+
 class PhotonWebhookTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="alice", password="x")

@@ -154,8 +154,9 @@ not label those rows. Re-running the command updates the same records by
     [docs/demo-ai-investing.md](docs/demo-ai-investing.md).
 - **Identity:** Auth0 is the account provider when configured. A local
   login remains for this server.
-- **Messaging:** Photon Spectrum inbound webhooks are verified. This
-  server does not send iMessage. See `docs/messaging-assistant.md`.
+- **Messaging:** Photon Spectrum inbound webhooks are verified. Outbound
+  iMessage is sent by the Node adapter in `spectrum/`. See
+  `docs/messaging-assistant.md`.
 - **Not connected:** bank feeds and brokerages. See
   `docs/integration-readiness.md`.
 

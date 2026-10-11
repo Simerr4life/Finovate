@@ -19,7 +19,12 @@ from finovate.settings import _postgres_config_from_url
 from budgets.models import IncomeSource, RecurringExpense
 from budgets.services import build_budget_plan
 
-from .auth0 import auth0_configured, get_auth0_client
+from .auth0 import (
+    DjangoStateStore,
+    DjangoTransactionStore,
+    auth0_configured,
+    get_auth0_client,
+)
 from .identity import safe_next, sync_profile_from_claims
 from .manual_setup import TAKE_HOME_INCOME_NAME, apply_manual_setup, has_manual_estimate, initial_from_existing
 from .models import NotificationEvent, Profile
@@ -88,6 +93,22 @@ class Auth0UnconfiguredFallbackTests(TestCase):
 class Auth0ConfiguredTests(TestCase):
     def test_auth0_configured_is_true(self):
         self.assertTrue(auth0_configured())
+
+    def test_auth0_client_uses_typed_cookie_stores(self):
+        import accounts.auth0 as auth0_mod
+
+        auth0_mod._client = None
+        auth0_mod._client_key = None
+        client = get_auth0_client()
+        self.assertIsNotNone(client)
+        self.assertIsInstance(client._state_store, DjangoStateStore)
+        self.assertIsInstance(client._transaction_store, DjangoTransactionStore)
+
+    def test_state_store_logout_token_is_noop(self):
+        from asgiref.sync import async_to_sync
+
+        store = DjangoStateStore("test-secret")
+        self.assertIsNone(async_to_sync(store.delete_by_logout_token)({"sub": "auth0|x"}))
 
     def test_login_page_shows_auth0_button(self):
         response = self.client.get(reverse("accounts:login"))

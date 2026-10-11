@@ -248,3 +248,6 @@ PHOTON_WEBHOOK_SECRET = os.environ.get("PHOTON_WEBHOOK_SECRET", "")
 IMESSAGE_WEBHOOK_SECRET = os.environ.get("IMESSAGE_WEBHOOK_SECRET", "")
 IMESSAGE_PROJECT_ID = os.environ.get("IMESSAGE_PROJECT_ID", "")
 IMESSAGE_PROJECT_SECRET = os.environ.get("IMESSAGE_PROJECT_SECRET", "")
+# Shared secret for the Node Spectrum adapter calling /assistant/bridge/.
+# Falls back to IMESSAGE_PROJECT_SECRET when unset.
+ASSISTANT_BRIDGE_SECRET = os.environ.get("ASSISTANT_BRIDGE_SECRET", "")

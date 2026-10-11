@@ -124,8 +124,8 @@ def claims_from_login_result(result):
 def attempt_messaging_welcome(user):
     """Best-effort welcome delivery. A provider outage must not undo the account.
 
-    This server does not send iMessage. The call stays here so a configured
-    provider can be attached later, and so tests can simulate an outage.
+    Welcome pushes still go through the Spectrum adapter when linked.
+    This hook stays best-effort so a provider outage cannot undo signup.
     """
     profile = user.profile
     if not (profile.phone_verified and profile.messaging_consent and profile.photon_chat_id):

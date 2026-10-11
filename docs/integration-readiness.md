@@ -145,9 +145,9 @@ than a REST webhook Django can receive directly. Full writeup:
   `v0:{timestamp}:{raw body}`), a 5-minute timestamp window, and dedupe
   on `X-Spectrum-Webhook-Id` + `message.id`. See
   [docs/messaging-assistant.md](messaging-assistant.md).
-- **Outbound iMessage is not sent from Django.** Photon documents send
-  as the Node adapter's `postMessage` / `thread.post`. The webhook's
-  `delivered` field stays false until that client confirms a send.
+- **Outbound iMessage is sent by `spectrum/` (Node Spectrum adapter).**
+  It POSTs to `/assistant/bridge/` and delivers the reply with
+  `message.reply`. Django webhook responses still set `delivered: false`.
 - **Interface:** a thin handler parses an inbound message, maps it to one
   of a fixed set of intents, calls the relevant service function, and
   formats a reply — no duplicated budget/goal/round-up logic.

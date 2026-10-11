@@ -1,6 +1,6 @@
 # spectrum — agent instructions
 
-This is a [Spectrum](https://photon.codes/docs/spectrum-ts) app, pinned to `spectrum-ts@^12.10.1`. The entry point is `src/index.ts`, which configures the imessage provider(s) and runs the echo loop.
+This is a [Spectrum](https://photon.codes/docs/spectrum-ts) app, pinned to `spectrum-ts@^12.10.1`. The entry point is `src/index.ts`, which configures the imessage (and optional terminal) provider(s), asks Finovate's Django bridge for a reply, and delivers that reply over Spectrum.
 
 ## Working in this project
 
