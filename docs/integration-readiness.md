@@ -28,7 +28,7 @@ that's a decision for whoever owns credentials and legal/consent review.
 - **Config required to activate:** set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
   `AUTH0_CLIENT_SECRET` in `.env`. In your Auth0 tenant, create a
   "Regular Web Application" with Allowed Callback URL
-  `<your-url>/accounts/auth0/callback/` and Allowed Logout URL
+  `<your-url>/callback` and Allowed Logout URL
   `<your-url>/`. Until these are set, the "Log in with Auth0" button
   doesn't render and local login/signup is the only path (tested).
 - **Tests:** `accounts/tests.py` — unconfigured fallback, successful

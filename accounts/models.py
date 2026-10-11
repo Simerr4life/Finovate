@@ -77,6 +77,15 @@ class Profile(TimeStampedModel):
             "Finovate user."
         ),
     )
+    messaging_linked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this user proved control of photon_chat_id by sending a one-time link code.",
+    )
+    notify_simulated_orders = models.BooleanField(
+        default=False,
+        help_text="Opt in to local records when a simulated investment proposal is created. This does not send iMessage.",
+    )
 
     def __str__(self) -> str:
         return f"Profile<{self.user_id}>"
@@ -102,6 +111,11 @@ class NotificationEvent(TimeStampedModel):
     event_type = models.CharField(max_length=30, choices=EventType.choices)
     message = models.CharField(max_length=255)
     read_at = models.DateTimeField(null=True, blank=True)
+    delivery_status = models.CharField(
+        max_length=20,
+        default="recorded",
+        help_text="recorded means Finovate stored the event. This server does not mark events sent over iMessage.",
+    )
 
     class Meta:
         ordering = ["-created_at"]

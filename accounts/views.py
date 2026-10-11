@@ -8,6 +8,9 @@ from django.views.decorators.http import require_POST
 
 from auth0_server_python.auth_types import LogoutOptions, StartInteractiveLoginOptions
 
+from assistant.linking import code_is_active, issue_link_code
+from assistant.models import MessagingLinkCode
+
 from .auth0 import apply_auth0_cookies, auth0_configured, get_auth0_client, logout_return_url
 from .forms import OnboardingForm, ProfileSettingsForm, SignUpForm
 from .models import Profile
@@ -129,6 +132,18 @@ def auth0_logout(request):
 
 @login_required
 def onboarding(request):
+    """Step 1: add financial data, or skip. Deliberately has no form of its
+    own -- it only routes to the import wizard, to the "coming soon" bank
+    connection, or past itself to the preferences step.
+    """
+    profile = request.user.profile
+    if profile.onboarding_completed:
+        return redirect("dashboard")
+    return render(request, "accounts/onboarding_start.html")
+
+
+@login_required
+def onboarding_preferences(request):
     profile = request.user.profile
     if profile.onboarding_completed:
         return redirect("dashboard")
@@ -158,6 +173,10 @@ def settings_view(request):
         form = ProfileSettingsForm(instance=profile)
     connected_accounts = request.user.connected_accounts.all()
     roundup_settings = getattr(request.user, "roundup_settings", None)
+    link_code = request.session.get("messaging_link_preview") or ""
+    if link_code and not code_is_active(request.user, link_code):
+        link_code = ""
+        request.session.pop("messaging_link_preview", None)
     return render(
         request,
         "accounts/settings.html",
@@ -165,5 +184,34 @@ def settings_view(request):
             "form": form,
             "connected_accounts": connected_accounts,
             "roundup_settings": roundup_settings,
+            "link_code": link_code,
+            "notification_events": request.user.notification_events.all()[:15],
         },
     )
+
+
+@login_required
+@require_POST
+def messaging_link_issue(request):
+    if request.user.profile.photon_chat_id:
+        messages.error(request, "Unlink the current chat before creating a new link code.")
+        return redirect("accounts:settings")
+    request.session["messaging_link_preview"] = issue_link_code(request.user)
+    messages.success(
+        request,
+        "Send the code below from the chat you want to link. It expires in 15 minutes and works once.",
+    )
+    return redirect("accounts:settings")
+
+
+@login_required
+@require_POST
+def messaging_unlink(request):
+    profile = request.user.profile
+    profile.photon_chat_id = ""
+    profile.messaging_linked_at = None
+    profile.save(update_fields=["photon_chat_id", "messaging_linked_at", "updated_at"])
+    MessagingLinkCode.objects.filter(user=request.user, used_at__isnull=True).delete()
+    request.session.pop("messaging_link_preview", None)
+    messages.success(request, "Messaging chat unlinked. It can no longer change this account.")
+    return redirect("accounts:settings")

@@ -19,6 +19,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .models import SpectrumDelivery
+from .linking import redeem_link_code
 from .services import handle_incoming_message
 from .spectrum import parse_inbound, verify_signature, webhook_secret
 
@@ -81,8 +82,17 @@ def photon_webhook(request):
 
     user = User.objects.filter(profile__photon_chat_id=chat_id).first()
     if user is None:
+        linked = redeem_link_code(text, chat_id)
+        if linked is None:
+            return JsonResponse({
+                "reply": "This chat isn't linked to a Finovate account yet.",
+                "delivered": False,
+            })
         return JsonResponse({
-            "reply": "This chat isn't linked to a Finovate account yet.",
+            "reply": (
+                "This chat is now linked to your Finovate account. "
+                "Confirm it in Settings. This server does not send iMessage."
+            ),
             "delivered": False,
         })
 

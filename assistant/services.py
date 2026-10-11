@@ -12,8 +12,8 @@ from django.utils import timezone
 from accounts.models import NotificationEvent
 from budgets.models import Budget, BudgetPeriod
 from budgets.services import compute_budget_progress
-from investing.models import PortfolioSnapshot
-from investing.services import get_or_create_settings
+from investing.models import PortfolioSnapshot, SimulatedOrder
+from investing.services import compute_investable_surplus, get_or_create_settings, propose_surplus_investment
 from savings.models import Goal
 from transactions.models import Transaction
 from transactions.services import record_transaction
@@ -24,12 +24,16 @@ from .models import ConversationMessage, PendingConfirmation
 HELP_TEXT = (
     "I can help with:\n"
     "- \"how's my budget\" — budget status\n"
+    "- \"what is my emergency fund goal\" — goal progress\n"
     "- \"I got paid $500\" — record income (I'll confirm first)\n"
     "- \"set my risk to high/medium/low\" — update risk comfort (confirm first)\n"
     "- \"set my Trip goal to $2000\" — change a goal's target (confirm first)\n"
     "- \"pause round-ups\" / \"resume round-ups\"\n"
-    "- \"how's my portfolio doing\" — performance summary\n"
-    "- \"how's the market today\""
+    "- \"how's my portfolio doing\" — simulated performance\n"
+    "- \"show my investment allocation\" — simulated allocation\n"
+    "- \"propose investing $100\" — a pending simulated proposal (confirm first; not a trade)\n"
+    "- \"how's the market today\"\n"
+    "Bank withdrawals are not available. I will not move money from a text message."
 )
 
 MARKET_STATUS_REPLY = (
@@ -146,10 +150,93 @@ def _portfolio_performance(user, payload) -> str:
     return "\n".join(lines)
 
 
+def _goal_status(user, payload) -> str:
+    hint = (payload.get("name_hint") or "").lower()
+    goals = list(Goal.objects.filter(user=user))
+    if hint:
+        matches = [
+            goal for goal in goals
+            if hint in goal.name.lower()
+            or hint in goal.get_category_display().lower()
+            or hint in goal.category
+        ]
+    else:
+        matches = goals
+    if not matches:
+        return "I couldn't find a savings goal with that name on your account."
+    lines = ["Savings goal progress (cash on the goal, not invested funds):"]
+    for goal in matches[:8]:
+        lines.append(
+            f"- {goal.name}: ${goal.current_amount} of ${goal.target_amount} ({goal.progress_percent}%)"
+        )
+    return "\n".join(lines)
+
+
+def _allocation(user, payload) -> str:
+    settings_row = get_or_create_settings(user)
+    if settings_row.is_paused:
+        roundups = "paused"
+    elif settings_row.enabled:
+        roundups = "enabled"
+    else:
+        roundups = "disabled"
+    return (
+        "There is no approved brokerage allocation. "
+        f"Risk comfort is {user.profile.risk_comfort}, and simulated round-ups are {roundups}. "
+        "Nothing here is a live ETF position."
+    )
+
+
+def _available_to_invest(user, payload) -> str:
+    surplus = compute_investable_surplus(user)
+    return (
+        f"Estimated investable surplus is ${surplus.investable_surplus}. "
+        "That estimate is not a brokerage buying power figure, and no trade has been created."
+    )
+
+
+def _invested_this_month(user, payload) -> str:
+    from django.db.models import Sum
+
+    month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    total = (
+        SimulatedOrder.objects.filter(
+            user=user,
+            status=SimulatedOrder.Status.FILLED,
+            filled_at__gte=month_start,
+        ).aggregate(total=Sum("amount"))["total"]
+        or Decimal("0.00")
+    )
+    return (
+        f"Simulated filled orders this month total ${total}. "
+        "These are not brokerage executions."
+    )
+
+
+def _withdraw_unsupported(user, payload) -> str:
+    return (
+        "Withdrawals to a bank account are not available. "
+        "No transfer provider is connected, so nothing was requested, pending, or completed."
+    )
+
+
+def _monthly_target_unsupported(user, payload) -> str:
+    return (
+        "Finovate does not store a separate monthly savings target. "
+        "You can change a goal's target amount, for example: set my Trip goal to $2000."
+    )
+
+
 IMMEDIATE_HANDLERS = {
     "budget_status": _budget_status,
+    "goal_status": _goal_status,
     "pause_roundups": _pause_roundups,
     "portfolio_performance": _portfolio_performance,
+    "allocation": _allocation,
+    "available_to_invest": _available_to_invest,
+    "invested_this_month": _invested_this_month,
+    "withdraw_unsupported": _withdraw_unsupported,
+    "monthly_target_unsupported": _monthly_target_unsupported,
     "market_status": lambda user, payload: MARKET_STATUS_REPLY,
 }
 
@@ -220,6 +307,41 @@ def _execute_update_goal_target(user, payload) -> str:
     return f"Done — \"{goal.name}\"'s target is now ${goal.target_amount}."
 
 
+def _prompt_propose_invest(user, payload) -> str | None:
+    amount = payload.get("amount")
+    if not amount or Decimal(amount) <= 0:
+        return None
+    surplus = compute_investable_surplus(user).investable_surplus
+    return (
+        f"Create a simulated pending proposal to invest ${amount}? "
+        f"Estimated investable surplus is ${surplus}. "
+        "This does not place a brokerage order or move money. "
+        "Approving it later on the Investments page is still simulated."
+    )
+
+
+def _execute_propose_invest(user, payload) -> str:
+    amount = Decimal(payload["amount"])
+    surplus = compute_investable_surplus(user).investable_surplus
+    if amount > surplus:
+        return (
+            f"Not created. ${amount} is above the estimated investable surplus of ${surplus}. "
+            "No proposal was saved."
+        )
+    order = propose_surplus_investment(user, amount)
+    if user.profile.notify_simulated_orders:
+        NotificationEvent.objects.create(
+            user=user,
+            event_type=NotificationEvent.EventType.SYSTEM,
+            message=f"Simulated investment proposal for ${order.amount} is pending. This is not a brokerage order.",
+            delivery_status="recorded",
+        )
+    return (
+        f"Saved a simulated pending proposal for ${order.amount}. "
+        f"Status: {order.status}. No brokerage is connected, so this is not a trade."
+    )
+
+
 def _prompt_resume_roundups(user, payload) -> str:
     return "Resume round-up investing? New eligible purchases will start generating round-ups again."
 
@@ -235,6 +357,7 @@ CONFIRMATION_PROMPTS = {
     "report_income": _prompt_report_income,
     "set_risk_comfort": _prompt_set_risk_comfort,
     "update_goal_target": _prompt_update_goal_target,
+    "propose_invest": _prompt_propose_invest,
     "resume_roundups": _prompt_resume_roundups,
 }
 
@@ -242,6 +365,7 @@ CONFIRMATION_EXECUTORS = {
     "report_income": _execute_report_income,
     "set_risk_comfort": _execute_set_risk_comfort,
     "update_goal_target": _execute_update_goal_target,
+    "propose_invest": _execute_propose_invest,
     "resume_roundups": _execute_resume_roundups,
 }
 

@@ -36,6 +36,26 @@ def parse_intent(text: str) -> tuple[str, dict] | None:
     if any(lower == w for w in CANCEL_WORDS):
         return ("cancel", {})
 
+    if re.search(r"\bmonthly\b", lower) and re.search(r"\b(savings|save)\b", lower) and re.search(r"\btarget\b", lower):
+        return ("monthly_target_unsupported", {})
+
+    if re.search(r"\bwithdraw", lower):
+        return ("withdraw_unsupported", {})
+
+    if re.search(r"\b(available|spare)\b", lower) and re.search(r"\binvest", lower):
+        return ("available_to_invest", {})
+
+    if re.search(r"\binvested\b", lower) and re.search(r"\bmonth\b", lower):
+        return ("invested_this_month", {})
+
+    if re.search(r"\ballocation\b", lower):
+        return ("allocation", {})
+
+    if re.search(r"\binvest(?:ing)?\b", lower):
+        amount = _extract_amount(lower)
+        if amount and amount > 0:
+            return ("propose_invest", {"amount": str(amount)})
+
     if re.search(r"\b(budget|spending)\b", lower):
         return ("budget_status", {})
 
@@ -49,7 +69,7 @@ def parse_intent(text: str) -> tuple[str, dict] | None:
             if level in lower:
                 return ("set_risk_comfort", {"level": level})
 
-    if re.search(r"\bgoal\b", lower) and _extract_amount(lower):
+    if re.search(r"\bgoal\b", lower) and _extract_amount(lower) and re.search(r"\b(set|change|update|to)\b", lower):
         amount = _extract_amount(lower)
         # Pull a loose "name" hint: whatever's left after stripping noise words.
         name_hint = re.sub(
@@ -57,6 +77,15 @@ def parse_intent(text: str) -> tuple[str, dict] | None:
             "", lower,
         ).strip()
         return ("update_goal_target", {"amount": str(amount), "name_hint": name_hint})
+
+    if re.search(r"\b(goal|goals|emergency)\b", lower) or re.search(r"\bsavings\b.*\bprogress\b", lower):
+        name_hint = re.sub(
+            r"\b(what|whats|what's|is|are|my|the|a|an|goal|goals|progress|how|much|have|i|made|toward|towards|show|savings|fund|status)\b|[?]",
+            " ",
+            lower,
+        )
+        name_hint = re.sub(r"\s+", " ", name_hint).strip()
+        return ("goal_status", {"name_hint": name_hint})
 
     if re.search(r"\bpause\b.*\bround.?up", lower):
         return ("pause_roundups", {})

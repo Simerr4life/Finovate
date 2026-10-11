@@ -13,6 +13,9 @@ from investing.services import get_or_create_settings
 from savings.models import Goal
 from transactions.models import Category, Transaction
 
+from investing.models import SimulatedOrder
+
+from .linking import issue_link_code
 from .models import ConversationMessage, PendingConfirmation
 from .services import handle_incoming_message
 
@@ -143,6 +146,127 @@ class GoalTargetIntentTests(TestCase):
         handle_incoming_message(self.user, "yes")
         goal.refresh_from_db()
         self.assertEqual(goal.target_amount, Decimal("3000"))
+
+
+class MessagingCommandTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="x")
+        self.other = User.objects.create_user(username="bob", password="x")
+
+    def test_goal_query_returns_only_that_users_goal(self):
+        Goal.objects.create(user=self.user, name="Emergency fund", category="emergency", target_amount=Decimal("1000"), current_amount=Decimal("250"))
+        Goal.objects.create(user=self.other, name="Emergency fund", category="emergency", target_amount=Decimal("9000"), current_amount=Decimal("1"))
+        reply = handle_incoming_message(self.user, "What is my emergency fund goal?")
+        self.assertIn("$250.00 of $1000.00", reply)
+        self.assertNotIn("9000", reply)
+
+    def test_goal_change_still_requires_confirmation_and_persists(self):
+        goal = Goal.objects.create(user=self.user, name="Vacation", target_amount=Decimal("1000"), current_amount=Decimal("100"))
+        reply = handle_incoming_message(self.user, "Change my vacation goal to $3000")
+        self.assertIn("yes", reply)
+        goal.refresh_from_db()
+        self.assertEqual(goal.target_amount, Decimal("1000"))
+        handle_incoming_message(self.user, "yes")
+        goal.refresh_from_db()
+        self.assertEqual(goal.target_amount, Decimal("3000"))
+
+    def test_withdraw_is_rejected_without_creating_an_order(self):
+        reply = handle_incoming_message(self.user, "Withdraw $50 to my linked bank account")
+        self.assertIn("not available", reply)
+        self.assertIn("nothing was requested", reply)
+        self.assertEqual(SimulatedOrder.objects.filter(user=self.user).count(), 0)
+
+    def test_invest_proposal_requires_confirmation_and_stays_pending(self):
+        Transaction.objects.create(
+            user=self.user, kind=Transaction.Kind.INCOME, amount=Decimal("500"), occurred_on="2026-10-01",
+            description="Pay",
+        )
+        reply = handle_incoming_message(self.user, "Propose investing $100")
+        self.assertIn("simulated pending proposal", reply.lower())
+        self.assertEqual(SimulatedOrder.objects.filter(user=self.user).count(), 0)
+        reply = handle_incoming_message(self.user, "yes")
+        self.assertIn("pending", reply)
+        self.assertIn("not a trade", reply)
+        order = SimulatedOrder.objects.get(user=self.user)
+        self.assertEqual(order.status, SimulatedOrder.Status.PENDING)
+        self.assertIsNone(order.filled_at)
+
+    def test_monthly_savings_target_is_not_invented(self):
+        reply = handle_incoming_message(self.user, "Set my monthly savings target to $250")
+        self.assertIn("does not store a separate monthly savings target", reply)
+
+
+class MessagingLinkTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="x")
+        self.other = User.objects.create_user(username="bob", password="x")
+        self.client = Client()
+        self.url = reverse("assistant:photon_webhook")
+
+    def _post(self, chat_id, text, guid="g-link"):
+        return self.client.post(
+            self.url,
+            data=json.dumps({"guid": guid, "text": text, "chatId": chat_id}),
+            content_type="application/json",
+        )
+
+    @override_settings(DEBUG=True)
+    def test_one_time_code_links_the_chat_and_cannot_be_reused(self):
+        code = issue_link_code(self.user)
+        response = self._post("chat-new", code, guid="g1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("now linked", response.json()["reply"])
+        self.assertFalse(response.json()["delivered"])
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.photon_chat_id, "chat-new")
+        self.assertIsNotNone(self.user.profile.messaging_linked_at)
+
+        again = self._post("chat-other", code, guid="g2")
+        self.assertIn("isn't linked", again.json()["reply"])
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.photon_chat_id, "chat-new")
+
+    @override_settings(DEBUG=True)
+    def test_code_does_not_steal_a_chat_or_overwrite_an_existing_link(self):
+        self.other.profile.photon_chat_id = "chat-bob"
+        self.other.profile.save()
+        code = issue_link_code(self.user)
+        stolen = self._post("chat-bob", code, guid="g3")
+        self.assertNotIn("now linked", stolen.json()["reply"])
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.photon_chat_id, "")
+        self.other.profile.refresh_from_db()
+        self.assertEqual(self.other.profile.photon_chat_id, "chat-bob")
+
+        self.user.profile.photon_chat_id = "chat-alice"
+        self.user.profile.save()
+        fresh = issue_link_code(self.user)
+        overwrite = self._post("chat-other", fresh, guid="g4")
+        self.assertIn("isn't linked", overwrite.json()["reply"])
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.photon_chat_id, "chat-alice")
+
+    @override_settings(DEBUG=True)
+    def test_duplicate_webhook_does_not_link_twice(self):
+        code = issue_link_code(self.user)
+        body = json.dumps({"guid": "same", "text": code, "chatId": "chat-once"})
+        headers = {"HTTP_X_SPECTRUM_WEBHOOK_ID": "wh-link"}
+        first = self.client.post(self.url, data=body, content_type="application/json", **headers)
+        second = self.client.post(self.url, data=body, content_type="application/json", **headers)
+        self.assertIn("now linked", first.json()["reply"])
+        self.assertTrue(second.json()["duplicate"])
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.photon_chat_id, "chat-once")
+
+    def test_signed_in_user_can_unlink(self):
+        self.user.profile.photon_chat_id = "chat-abc"
+        self.user.profile.save()
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("accounts:messaging_unlink"))
+        self.assertEqual(response.status_code, 302)
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.photon_chat_id, "")
+        self.assertIsNone(self.user.profile.messaging_linked_at)
 
 
 class ConversationLogTests(TestCase):

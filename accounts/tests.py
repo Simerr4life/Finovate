@@ -46,7 +46,10 @@ class Auth0UnconfiguredFallbackTests(TestCase):
     def test_login_page_shows_the_logo_and_no_demo_banner(self):
         response = self.client.get(reverse("accounts:login"))
         self.assertContains(response, "brand/Finovate_Logo.svg")
+        self.assertContains(response, 'rel="icon"')
+        self.assertContains(response, "Finovate | Log in")
         self.assertNotContains(response, "Demo mode")
+        self.assertNotContains(response, "phone number")
 
 
 @override_settings(
