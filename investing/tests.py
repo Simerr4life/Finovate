@@ -475,6 +475,24 @@ class DemoAISuggestionTests(TestCase):
             0,
         )
 
+    def test_investable_pool_cash_funds_demo_recommendations_and_orders(self):
+        Transaction.objects.filter(user=self.user).delete()
+        pool = Goal.objects.create(
+            user=self.user,
+            name="Investing pool",
+            target_amount=Decimal("2000.00"),
+            current_amount=Decimal("1000.00"),
+            is_investable=True,
+        )
+
+        suggestions = generate_demo_investment_suggestions(self.user)
+        order = create_demo_market_order(self.user, "AAA", Decimal("250.00"), pool)
+
+        self.assertEqual(available_demo_investment_budget(self.user), Decimal("750.00"))
+        self.assertGreater(len(suggestions), 0)
+        self.assertEqual(order.pool, pool)
+        self.assertEqual(order.amount, Decimal("250.00"))
+
     def test_virtual_funding_rejects_invalid_precision_and_amounts(self):
         for amount in (
             Decimal("0"),
