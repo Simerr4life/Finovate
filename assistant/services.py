@@ -281,6 +281,10 @@ def _find_goal(user, name_hint: str):
             return matches[0], None
         if len(matches) > 1:
             return None, f"That matches more than one goal: {', '.join(g.name for g in matches)}. Be more specific."
+    # Prefer a sole user-created goal over the three auto-created system pools.
+    custom = list(qs.filter(system_key=""))
+    if len(custom) == 1:
+        return custom[0], None
     if qs.count() == 1:
         return qs.first(), None
     return None, "I couldn't tell which goal you meant — include part of its name."

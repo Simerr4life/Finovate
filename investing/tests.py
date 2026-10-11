@@ -227,6 +227,11 @@ class SavingsPoolTargetingTests(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(username="alice", password="x")
+        # New accounts auto-create an investable Investment system pool; keep
+        # these targeting tests focused on the explicitly created pool below.
+        Goal.objects.filter(user=self.user, system_key=Goal.SystemKey.INVESTMENT).update(
+            is_investable=False
+        )
         self.pool = Goal.objects.create(
             user=self.user, name="Retirement nest egg", target_amount=Decimal("5000"), is_investable=True
         )

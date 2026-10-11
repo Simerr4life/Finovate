@@ -43,10 +43,21 @@
       {% if budget_progress %}{{ budget_remaining|money }} still inside active limits{% else %}No active budget limits{% endif %}
     </div>
   </section>
-  <section class="card summary-card">
-    <div class="label">Potential savings</div>
+  <section class="card summary-card" data-reveal>
+    <div class="label">Available to save</div>
+    {% if savings_plan %}
+    <div class="money" data-count-to="{{ savings_plan.safe_to_save }}">{{ savings_plan.safe_to_save|money }}</div>
+    <div class="summary-detail">
+      {% if savings_plan.monthly_surplus < 0 %}
+      Shortfall after income and expenses — no positive allocation
+      {% else %}
+      Income {{ savings_plan.monthly_income|money }} − costs {{ savings_plan.monthly_expenses|money }} − buffer {{ savings_plan.additional_buffer|money }}
+      {% endif %}
+    </div>
+    {% else %}
     <div class="money">{{ surplus.investable_surplus|money }}</div>
-    <div class="summary-detail">Estimated after reserves</div>
+    <div class="summary-detail">Add income and expenses to calculate available savings</div>
+    {% endif %}
   </section>
 </div>
 

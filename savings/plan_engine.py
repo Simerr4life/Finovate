@@ -13,9 +13,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from accounts.models import NotificationEvent
 from budgets.models import IncomeSource, RecurringExpense
 from budgets.services import monthly_equivalent
 from core.services import quantize_money
@@ -27,9 +28,11 @@ from .models import DebtObligation, Goal, SavingsPlan, SavingsPlanRevision
 HIGH_INTEREST_APR = Decimal("10.00")
 STARTER_EMERGENCY_FLOOR = Decimal("500.00")
 STARTER_EMERGENCY_CAP = Decimal("1000.00")
-FALLBACK_RAINY = Decimal("20")
-FALLBACK_INVEST = Decimal("30")
-FALLBACK_REGULAR = Decimal("50")
+# Default split for the STABLE scenario and any normalize fallback.
+# Configurable via PlanAllocationForm / user_override_percents; must total 100.
+FALLBACK_RAINY = Decimal("40")
+FALLBACK_INVEST = Decimal("20")
+FALLBACK_REGULAR = Decimal("40")
 RECALC_DOLLAR_THRESHOLD = Decimal("25.00")
 RECALC_PERCENT_THRESHOLD = Decimal("0.05")
 
@@ -145,16 +148,22 @@ def ensure_default_pools(user) -> dict[str, Goal]:
                     goal.is_investable = True
                 goal.save()
             else:
-                goal = Goal.objects.create(
-                    user=user,
-                    name=spec["name"],
-                    system_key=key,
-                    category=spec["category"],
-                    color=spec["color"],
-                    is_investable=spec["is_investable"],
-                    target_amount=spec["target_amount"],
-                    current_amount=Decimal("0.00"),
-                )
+                try:
+                    with transaction.atomic():
+                        goal, _ = Goal.objects.get_or_create(
+                            user=user,
+                            system_key=key,
+                            defaults={
+                                "name": spec["name"],
+                                "category": spec["category"],
+                                "color": spec["color"],
+                                "is_investable": spec["is_investable"],
+                                "target_amount": spec["target_amount"],
+                                "current_amount": Decimal("0.00"),
+                            },
+                        )
+                except IntegrityError:
+                    goal = Goal.objects.get(user=user, system_key=key)
         pools[key] = goal
     return pools
 
@@ -630,6 +639,7 @@ def refresh_savings_plan(user, reason: str = "manual", force: bool = False) -> S
         }
     recommendation = build_recommendation(analysis, override_percents=override)
 
+    created = plan is None
     if plan is None:
         plan = SavingsPlan(user=user, status=SavingsPlan.Status.ACTIVE)
     elif not force and not _materially_changed(plan, recommendation):
@@ -650,6 +660,7 @@ def refresh_savings_plan(user, reason: str = "manual", force: bool = False) -> S
             },
         )
 
+    previous_fingerprint = plan.fingerprint
     plan.scenario = recommendation.scenario
     plan.name = recommendation.name
     plan.objective = recommendation.objective
@@ -678,7 +689,27 @@ def refresh_savings_plan(user, reason: str = "manual", force: bool = False) -> S
     if force and plan.status != SavingsPlan.Status.DISABLED:
         plan.status = SavingsPlan.Status.ACTIVE
     plan.save()
+    if created or previous_fingerprint != plan.fingerprint:
+        _record_plan_notification(user, plan, created=created, reason=reason)
     return plan
+
+
+def _record_plan_notification(user, plan: SavingsPlan, *, created: bool, reason: str) -> None:
+    if plan.monthly_surplus < 0:
+        message = (
+            "Your budget cannot support a positive savings target right now "
+            f"(shortfall {quantize_money(abs(plan.monthly_surplus))})."
+        )
+    elif created:
+        message = f"Savings plan ready: {plan.name}."
+    else:
+        message = f"Savings plan updated ({reason.replace('_', ' ')}): {plan.name}."
+    NotificationEvent.objects.create(
+        user=user,
+        event_type=NotificationEvent.EventType.SAVINGS_PLAN,
+        message=message[:255],
+        delivery_status="recorded",
+    )
 
 
 def get_or_build_plan(user) -> SavingsPlan | None:

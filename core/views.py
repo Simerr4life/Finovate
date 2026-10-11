@@ -23,6 +23,7 @@ from core.display import (
 from investing.models import PortfolioSnapshot, RoundUpLedgerEntry
 from investing.services import compute_investable_surplus
 from savings.models import Goal
+from savings.plan_engine import ensure_default_pools, get_or_build_plan
 from transactions.models import Transaction
 
 
@@ -58,7 +59,9 @@ def dashboard(request):
         for budget in Budget.objects.filter(period=active_period).select_related("category"):
             budget_progress.append(compute_budget_progress(budget))
 
+    ensure_default_pools(user)
     goals = Goal.objects.filter(user=user)[:4]
+    savings_plan = get_or_build_plan(user)
 
     pending_roundups_total = RoundUpLedgerEntry.objects.filter(
         user=user, status=RoundUpLedgerEntry.Status.PENDING
@@ -93,6 +96,7 @@ def dashboard(request):
         "recent_transactions": recent_transactions,
         "budget_progress": budget_progress,
         "goals": goals,
+        "savings_plan": savings_plan,
         "pending_roundups_total": pending_roundups_total,
         "latest_snapshot": latest_snapshot,
         "has_demo_data": Transaction.objects.filter(user=user, is_demo=True).exists(),

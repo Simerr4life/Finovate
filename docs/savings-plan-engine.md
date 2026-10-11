@@ -46,7 +46,7 @@ Chosen automatically (never asked of the user):
 | Stable | Adequate reserve, manageable debt |
 | Strong | Full reserve, solid surplus, no debt |
 
-Stable/strong use the 20/30/50 Rainy/Investment/Regular fallback only when
+Stable uses the 40/20/40 Rainy/Investment/Regular fallback only when
 that scenario fits — never for underfunded emergency or cash-flow stress.
 
 ## Persistence
