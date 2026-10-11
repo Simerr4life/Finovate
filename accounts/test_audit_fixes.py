@@ -1,7 +1,9 @@
 """Regressions found in the codebase audit: webhook auth, rate limiting,
 backup timestamp parsing, and server-side validation of profile settings."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone as dt_timezone
+
+UTC = dt_timezone.utc
 
 from django.contrib.auth.models import User
 from django.core.cache import cache

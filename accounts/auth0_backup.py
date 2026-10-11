@@ -9,7 +9,9 @@ or the reconcile_auth0_backups management command.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone as dt_timezone
+
+UTC = dt_timezone.utc
 
 from django.db import transaction
 from django.utils import timezone
