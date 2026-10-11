@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Import — map columns — Finovate{% endblock %}
+{% block crumb %}Import a statement{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 max-w-2xl">
+  <h1 class="text-xl font-bold mb-2">Confirm the columns</h1>
+  <p class="text-sm text-slate-500 mb-4">
+    We guessed how your file's columns map to transaction fields. Check them and adjust anything
+    that's wrong before continuing.
+  </p>
+  <p class="text-xs text-slate-400 mb-4">Detected columns: {{ headers|join:", " }}</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="grid sm:grid-cols-2 gap-4">
+      {% for field in form %}
+      <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}
+        {% if field.errors %}<span class="text-coral-600 text-xs">{{ field.errors.0 }}</span>{% endif %}
+      </label>
+      {% endfor %}
+    </div>
+    <button type="submit" class="button" style="width:100%;margin-top:18px;">Continue to preview</button>
+  </form>
+</section>
+{% endblock %}

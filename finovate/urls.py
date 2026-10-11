@@ -12,6 +12,7 @@ urlpatterns = [
     path("insights/", core_views.insights, name="insights"),
     path("accounts/", include("accounts.urls")),
     path("statements/", include("transactions.urls")),
+    path("imports/", include("imports.urls")),
     path("budgets/", include("budgets.urls")),
     path("savings/", include("savings.urls")),
     path("investing/", include("investing.urls")),

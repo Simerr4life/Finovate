@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Import a statement — Finovate{% endblock %}
+{% block crumb %}Import a statement{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 max-w-xl">
+  <h1 class="text-xl font-bold mb-2">Import a statement</h1>
+  <p class="text-sm text-slate-500 mb-4">
+    Upload a CSV transaction export from your bank. You'll pick an account, confirm how the
+    columns map, and review everything before anything is saved.
+  </p>
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% if form.file.errors %}<p class="text-sm text-coral-600 mb-2">{{ form.file.errors.0 }}</p>{% endif %}
+    <label class="field-label" for="{{ form.file.id_for_label }}">{{ form.file.label }}{{ form.file }}</label>
+    <p class="text-xs text-slate-400 mt-2">CSV only, up to 2 MB. OFX/QFX, QIF, and PDF statements aren't supported yet.</p>
+    <button type="submit" class="button" style="width:100%;margin-top:18px;">Continue</button>
+  </form>
+  <a class="text-sm text-slate-500 underline mt-4 inline-block" href="{% url 'imports:history' %}">View import history</a>
+</section>
+{% endblock %}

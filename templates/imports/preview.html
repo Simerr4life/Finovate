@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Import — review — Finovate{% endblock %}
+{% block crumb %}Import a statement{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+  <h1 class="text-xl font-bold mb-2">Review before importing</h1>
+  <p class="text-sm text-slate-500">
+    Into <strong>{{ batch.account.institution_name }} {{ batch.account.masked_number }}</strong>.
+    Nothing is saved until you confirm below.
+  </p>
+  <div class="grid sm:grid-cols-3 gap-4 mt-4 text-sm">
+    <div class="rounded-lg p-3 bg-mint-500/10">
+      <p class="text-slate-500">Ready to import</p>
+      <p class="font-bold text-mint-600">{{ summary.importable }}</p>
+    </div>
+    <div class="rounded-lg p-3 bg-slate-100">
+      <p class="text-slate-500">Likely duplicates (skipped)</p>
+      <p class="font-bold">{{ summary.duplicate }}</p>
+    </div>
+    <div class="rounded-lg p-3 bg-coral-500/10">
+      <p class="text-slate-500">Needs review (not imported)</p>
+      <p class="font-bold text-coral-600">{{ summary.needs_review }}</p>
+    </div>
+  </div>
+</section>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  <section class="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+    <h2 class="font-semibold text-lg mb-4">Ready to import ({{ summary.importable }})</h2>
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="text-slate-400 text-left">
+        <tr><th class="py-2"></th><th>Date</th><th>Description</th><th class="text-right">Amount</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for row in rows %}
+        {% if row.is_importable %}
+        <tr>
+          <td class="py-2"><input type="checkbox" name="include" value="{{ row.row_number }}" checked></td>
+          <td>{{ row.occurred_on }}</td>
+          <td>{{ row.description }}</td>
+          <td class="text-right {% if row.kind == 'income' %}text-mint-600{% endif %}">
+            {% if row.kind == 'expense' %}-{% endif %}${{ row.amount }}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  {% if summary.duplicate %}
+  <section class="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+    <h2 class="font-semibold text-lg mb-2">Likely duplicates — will be skipped ({{ summary.duplicate }})</h2>
+    <p class="text-xs text-slate-400 mb-4">Already imported for this account. Re-importing this file won't double-count them.</p>
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-slate-100 text-slate-400">
+        {% for row in rows %}
+        {% if row.is_duplicate and not row.needs_review %}
+        <tr><td class="py-2">{{ row.occurred_on }}</td><td>{{ row.description }}</td><td class="text-right">${{ row.amount }}</td></tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if summary.needs_review %}
+  <section class="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+    <h2 class="font-semibold text-lg mb-2 text-coral-600">Needs review — not imported ({{ summary.needs_review }})</h2>
+    <p class="text-xs text-slate-400 mb-4">
+      These rows couldn't be read confidently, or might be ambiguous duplicates. They're never
+      guessed at — fix the file and re-upload, or enter them manually, then re-import the rest.
+    </p>
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-slate-100">
+        {% for row in rows %}
+        {% if row.needs_review %}
+        <tr>
+          <td class="py-2">{{ row.occurred_on|default:"—" }}</td>
+          <td>{{ row.description|default:"—" }}</td>
+          <td class="text-right">{% if row.amount %}${{ row.amount }}{% else %}—{% endif %}</td>
+          <td class="text-coral-600 text-xs">
+            {% if row.errors %}{{ row.errors|join:"; " }}{% else %}Might duplicate another row in this file.{% endif %}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <button type="submit" class="button" style="width:100%;">Confirm import</button>
+</form>
+{% endblock %}

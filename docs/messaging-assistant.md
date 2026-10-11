@@ -66,19 +66,31 @@ Photon.
 
 ## Linking a Finovate account to a chat
 
-`Profile.photon_chat_id` holds the Spectrum `space.id` (or the legacy
-`chatId`). It stays empty until you set it in the Django admin or shell:
+Settings creates a single-use code for the signed-in user. The code is
+stored only as a SHA-256 hash, expires in 15 minutes, and is shown once
+in that session. The user sends that exact code from their Spectrum chat.
+The verified webhook binds `space.id` / `chatId` to `Profile.photon_chat_id`
+and sets `messaging_linked_at`.
 
-```python
-user.profile.photon_chat_id = "<id from your Photon dashboard>"
-user.profile.save()
-```
+A phone number is not an identity key. Typing someone else's number does
+not link their account. A code will not overwrite a chat that already
+belongs to another user, and it will not replace a user's existing link.
+Unlink is a signed-in Settings action.
+
+`Profile.photon_chat_id` can still be set in the Django admin for local
+debugging. Prefer the code flow.
 
 ## Supported intents
 
 | You say (examples) | What happens |
 |---|---|
 | "how's my budget" | Reports each category's spent/limit for the active budget period. Read-only. |
+| "what is my emergency fund goal?" | Reports that user's goal progress. Read-only. |
+| "show my investment allocation" | Reports risk comfort and simulated round-up state. Not a brokerage allocation. |
+| "how much have I invested this month?" | Sums simulated filled orders for the current month. |
+| "propose investing $100" | Confirms, then saves a **pending simulated** proposal. It does not fill an order or place a trade. |
+| "withdraw $50" | Refused. No bank-transfer provider is connected, and no withdrawal record is created. |
+| "set my monthly savings target to $250" | Refused. Finovate does not store a separate monthly savings target. |
 | "how's my portfolio doing" | Reports simulated contributions/value/gain per bucket, stating they're simulated. Read-only. |
 | "how's the market today" | Honest "no live feed" reply — Finovate has no live market data connection. Read-only. |
 | "I got paid $500" | Proposes recording $500 income today. **Requires "yes" to confirm.** |

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Import history — Finovate{% endblock %}
+{% block crumb %}Import history{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6">
+  <div class="flex justify-between items-center mb-4">
+    <h1 class="text-xl font-bold">Import history</h1>
+    <a class="button" href="{% url 'imports:upload' %}">Import a statement</a>
+  </div>
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="text-slate-400 text-left">
+      <tr><th class="py-2">Date</th><th>File</th><th>Account</th><th>Status</th><th class="text-right">Imported</th><th class="text-right">Duplicates</th><th class="text-right">Flagged</th><th></th></tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for batch in batches %}
+      <tr>
+        <td class="py-2">{{ batch.created_at|date:"M j, Y" }}</td>
+        <td><a class="underline" href="{% url 'imports:batch_detail' pk=batch.pk %}">{{ batch.original_filename|default:"—" }}</a></td>
+        <td>{{ batch.account.institution_name|default:"—" }}</td>
+        <td>
+          <span class="{% if batch.status == 'committed' %}text-mint-600{% elif batch.status == 'failed' %}text-coral-600{% else %}text-slate-400{% endif %}">
+            {{ batch.get_status_display }}
+          </span>
+        </td>
+        <td class="text-right">{{ batch.rows_imported }}</td>
+        <td class="text-right">{{ batch.rows_duplicate_skipped }}</td>
+        <td class="text-right">{{ batch.rows_flagged }}</td>
+        <td class="text-right">
+          {% if batch.status == "failed" %}
+          <form method="post" action="{% url 'imports:retry' pk=batch.pk %}" style="display:inline;">{% csrf_token %}<button type="submit" class="button ghost">Retry</button></form>
+          {% endif %}
+          <form method="post" action="{% url 'imports:delete' pk=batch.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="button ghost">{% if batch.status == "committed" %}Delete source file{% else %}Discard{% endif %}</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="py-4 text-slate-400">No imports yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

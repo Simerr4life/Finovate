@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "savings",
     "investing",
     "assistant",
+    "imports",
 ]
 
 MIDDLEWARE = [

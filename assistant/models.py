@@ -47,6 +47,24 @@ class SpectrumDelivery(TimeStampedModel):
         ]
 
 
+class MessagingLinkCode(TimeStampedModel):
+    """Single-use code that binds a Spectrum chat to the signed-in user.
+
+    Only the hash is stored. The person must already be logged in to see
+    the code, then send that exact code from the chat they control.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="messaging_link_codes"
+    )
+    code_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return f"MessagingLinkCode<{self.user_id}>"
+
+
 class ConversationMessage(TimeStampedModel):
     """Audit trail of assistant traffic — never logs raw financial amounts
     beyond what's already in the message body itself; see logging policy

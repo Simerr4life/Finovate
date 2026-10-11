@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Import summary — Finovate{% endblock %}
+{% block crumb %}Import a statement{% endblock %}
+{% block content %}
+<section class="bg-white rounded-2xl border border-slate-200 p-6 max-w-xl">
+  <h1 class="text-xl font-bold mb-2">
+    {% if batch.status == "committed" %}Import complete{% elif batch.status == "failed" %}Import failed{% else %}Import in progress{% endif %}
+  </h1>
+  <p class="text-sm text-slate-500 mb-4">{{ batch.original_filename }} — {{ batch.account.institution_name|default:"No account" }}</p>
+
+  {% if batch.status == "committed" %}
+  <div class="grid sm:grid-cols-3 gap-4 text-sm mb-4">
+    <div class="rounded-lg p-3 bg-mint-500/10"><p class="text-slate-500">Imported</p><p class="font-bold text-mint-600">{{ batch.rows_imported }}</p></div>
+    <div class="rounded-lg p-3 bg-slate-100"><p class="text-slate-500">Duplicates skipped</p><p class="font-bold">{{ batch.rows_duplicate_skipped }}</p></div>
+    <div class="rounded-lg p-3 bg-coral-500/10"><p class="text-slate-500">Flagged for review</p><p class="font-bold text-coral-600">{{ batch.rows_flagged }}</p></div>
+  </div>
+  {% if batch.validation_summary %}
+  <details class="text-sm text-slate-500 mb-4">
+    <summary class="cursor-pointer">Warnings ({{ batch.validation_summary|length }})</summary>
+    <ul class="list-disc pl-5 mt-2">
+      {% for warning in batch.validation_summary %}<li>{{ warning }}</li>{% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  {% if batch.started_from_onboarding and not user.profile.onboarding_completed %}
+  <a class="button" style="width:100%;" href="{% url 'accounts:onboarding_preferences' %}">Continue setup</a>
+  {% else %}
+  <a class="button" style="width:100%;" href="{% url 'dashboard' %}">Go to dashboard</a>
+  {% endif %}
+  {% elif batch.status == "failed" %}
+  <p class="text-sm text-coral-600 mb-4">{{ batch.error_message }}</p>
+  <form method="post" action="{% url 'imports:retry' pk=batch.pk %}">
+    {% csrf_token %}
+    <button type="submit" class="button" style="width:100%;">Retry</button>
+  </form>
+  {% else %}
+  <a class="button" href="{% url 'imports:preview' pk=batch.pk %}">Resume this import</a>
+  {% endif %}
+</section>
+{% endblock %}
