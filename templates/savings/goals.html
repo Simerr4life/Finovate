@@ -5,41 +5,113 @@
 {% block content %}
 <div class="page-heading">
   <div>
-    <div class="eyebrow">FINOVATE</div>
+    <div class="eyebrow">YOUR NEXT MILESTONE</div>
     <div class="page-title">Financial Goals</div>
-    <div class="page-subtitle">Turn important plans into cash you have actually recorded.</div>
+    <div class="page-subtitle">A clear plan turns a big goal into small, doable steps.</div>
   </div>
   <a class="button" href="{% url 'savings:goal_add' %}">{% include "partials/icon.html" with name="plus" size=17 %} Create a goal</a>
 </div>
 
 <div class="goal-overview">
-  <div><span>Total saved toward goals</span><div class="money">{{ saved_total|money }}</div></div>
-  <div><span>Planned monthly contributions</span><div class="money">{{ monthly_total|money }}</div></div>
-  <div><span>Goals with a pace or completion</span><div class="money">{{ on_track }} of {{ goal_count }}</div></div>
+  <div><span>Already saved</span><div class="money">{{ saved_total|money }}</div></div>
+  <div><span>Still to save</span><div class="money">{{ remaining_total|money }}</div></div>
+  <div><span>Monthly plan across goals</span><div class="money">{{ monthly_total|money }}</div></div>
 </div>
 
 {% if goal_rows %}
-<div class="goals-grid">
+<section class="goal-coaching">
+  <div class="goal-coaching-icon">{% include "partials/icon.html" with name="chart" size=20 %}</div>
+  <div>
+    <strong>Progress is built one contribution at a time.</strong>
+    <p>Choose a pace that fits your budget. These targets are estimates to help you plan, not a commitment or financial advice.</p>
+  </div>
+  <span class="goal-count">{{ on_track }} of {{ goal_count }} with a plan</span>
+</section>
+
+<div class="goal-plans">
   {% for row in goal_rows %}
   {% with g=row.goal %}
-  <article class="card goal-card">
-    <div class="goal-icon">{% include "partials/icon.html" with name="target" %}</div>
-    <a class="goal-menu" href="{% url 'savings:goal_edit' g.pk %}" aria-label="Edit {{ g.name }}">Edit</a>
-    <div class="recommend-title">{{ g.name }}</div>
-    <div class="goal-money"><strong>{{ g.current_amount|money }}</strong><span>of {{ g.target_amount|money }}</span></div>
-    <div class="progress"><i style="width: {{ g.progress_percent }}%"></i></div>
-    <div class="progress-label"><strong>{{ g.progress_percent }}% complete</strong><span>{{ g.remaining_amount|money }} remaining</span></div>
-    <div class="goal-footer">
-      <span>{% if g.target_date %}Target · {{ g.target_date|date:"F Y" }}{% elif row.estimated_completion %}Estimate · {{ row.estimated_completion|date:"F Y" }}{% else %}No target date{% endif %}</span>
-      <strong>{% if row.monthly %}{{ row.monthly|money }}/month{% elif g.achieved_at %}Complete{% else %}No pace yet{% endif %}</strong>
+  <article class="card goal-plan-card">
+    <div class="goal-plan-heading">
+      <div class="goal-icon">{% include "partials/icon.html" with name="target" %}</div>
+      <div class="goal-plan-name">
+        <span class="eyebrow">{{ g.get_category_display }}</span>
+        <h2>{{ g.name }}</h2>
+      </div>
+      <a class="goal-menu" href="{% url 'savings:goal_edit' g.pk %}" aria-label="Edit {{ g.name }}">Edit</a>
     </div>
-    <a class="text-link" href="{% url 'savings:goal_detail' g.pk %}">Open goal {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+
+    <div class="goal-plan-balance">
+      <div><span>Saved so far</span><strong>{{ g.current_amount|money }}</strong></div>
+      <div class="goal-plan-target"><span>Goal target</span><strong>{{ g.target_amount|money }}</strong></div>
+    </div>
+
+    <div class="goal-distance" role="progressbar" aria-label="{{ g.name }} progress" aria-valuenow="{{ g.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+      <div class="goal-distance-fill" style="width: {{ g.progress_percent }}%;"></div>
+      <i class="goal-distance-marker" style="left: {{ row.next_milestone_percent }}%;"></i>
+    </div>
+    <div class="goal-distance-labels">
+      <span>{{ g.progress_percent }}% complete</span>
+      <span>{% if g.remaining_amount == 0 %}Goal reached!{% else %}{{ g.remaining_amount|money }} to go{% endif %}</span>
+    </div>
+
+    {% if g.remaining_amount == 0 %}
+    <div class="goal-nudge achieved">
+      <strong>You did it! {{ g.name }} is fully funded.</strong>
+      <span>Celebrate the progress, or set a new target to keep going.</span>
+    </div>
+    {% else %}
+    <div class="goal-milestone">
+      <span class="milestone-icon">{% include "partials/icon.html" with name="check" size=16 %}</span>
+      <span><strong>Next milestone: {{ row.next_milestone_percent }}%</strong><small>{{ row.next_milestone_amount|money }} away. Every little bit moves you closer.</small></span>
+    </div>
+
+    <div class="goal-pace-heading">
+      <div>
+        <h3>Your suggested pace</h3>
+        {% if g.target_date %}
+          {% if row.deadline_passed %}
+          <span>Target date {{ g.target_date|date:"M j, Y" }} has passed. Pick a new date for a fresh plan.</span>
+          {% else %}
+          <span>To reach your goal by {{ g.target_date|date:"M j, Y" }} ({{ row.pace.days_remaining }} days).</span>
+          {% endif %}
+        {% else %}
+        <span>Choose a target date to get a personal weekly, monthly, and yearly plan.</span>
+        {% endif %}
+      </div>
+      <a class="text-link" href="{% url 'savings:goal_edit' g.pk %}">{% if g.target_date %}Update date{% else %}Set target date{% endif %}</a>
+    </div>
+
+    {% if row.pace %}
+    <div class="goal-pace-options">
+      <div><span>Per week</span><strong>{{ row.pace.weekly|money }}</strong></div>
+      <div class="recommended"><span>Per month</span><strong>{{ row.pace.monthly|money }}</strong><i>Easy to plan</i></div>
+      <div><span>Per year</span><strong>{{ row.pace.yearly|money }}</strong></div>
+    </div>
+    {% elif row.deadline_passed %}
+    <div class="goal-nudge"><strong>Give yourself a new finish line.</strong><span>Update your target date and we’ll recalculate a fresh pace.</span></div>
+    {% else %}
+    <div class="goal-nudge"><strong>Make it a plan you can picture.</strong><span>Even a flexible target date helps turn this goal into manageable steps.</span></div>
+    {% endif %}
+    {% endif %}
+
+    <div class="goal-plan-actions">
+      <a class="text-link" href="{% url 'savings:goal_detail' g.pk %}">{% if g.remaining_amount == 0 %}View goal{% else %}Add to this goal{% endif %} {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+      {% if row.estimated_completion and not g.target_date %}
+      <span class="muted">At your recent pace: goal reached around {{ row.estimated_completion|date:"M Y" }}</span>
+      {% endif %}
+    </div>
   </article>
   {% endwith %}
   {% endfor %}
 </div>
 {% else %}
-<p class="empty">No savings goals yet. <a class="text-link" href="{% url 'savings:goal_add' %}">Create your first one</a></p>
+<div class="card goal-empty">
+  <div class="goal-icon">{% include "partials/icon.html" with name="target" %}</div>
+  <h2>Your first goal starts with a name.</h2>
+  <p>Save toward something that matters to you. Add a target date when you’re ready and we’ll help map out a pace.</p>
+  <a class="button" href="{% url 'savings:goal_add' %}">Create your first goal</a>
+</div>
 {% endif %}
-<p class="muted">Amounts here are cash tracked toward each goal, not invested market value.</p>
+<p class="muted">Goal balances are cash recorded toward each goal, not invested market value. Suggested contribution amounts are estimates.</p>
 {% endblock %}

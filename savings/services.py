@@ -86,3 +86,24 @@ def estimate_completion_date(goal, lookback_days: int = 90) -> date | None:
     if days_needed > Decimal(365 * 50):  # sanity cap: don't project absurd dates
         return None
     return timezone.now().date() + timedelta(days=int(days_needed) + 1)
+
+
+def contribution_pace(
+    remaining_amount: Decimal, target_date: date | None, today: date | None = None
+):
+    """Return suggested weekly, monthly, and yearly savings rates for a deadline."""
+    if target_date is None:
+        return None
+    today = today or timezone.localdate()
+    days_remaining = (target_date - today).days
+    if remaining_amount <= 0 or days_remaining <= 0:
+        return None
+
+    daily_amount = remaining_amount / Decimal(days_remaining)
+    yearly = quantize_money(daily_amount * Decimal("365.25"))
+    return {
+        "days_remaining": days_remaining,
+        "weekly": quantize_money(yearly / Decimal("52")),
+        "monthly": quantize_money(yearly / Decimal("12")),
+        "yearly": yearly,
+    }

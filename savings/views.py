@@ -10,7 +10,7 @@ from investing.models import PortfolioSnapshot
 
 from .forms import ContributionForm, GoalForm
 from .models import Goal
-from .services import MILESTONES, estimate_completion_date
+from .services import MILESTONES, contribution_pace, estimate_completion_date
 
 
 @login_required
@@ -57,37 +57,63 @@ def pools(request):
 @login_required
 def goals(request):
     goals = Goal.objects.filter(user=request.user)
-    goal_rows = [
-        {"goal": g, "estimated_completion": estimate_completion_date(g)} for g in goals
-    ]
-    saved = sum((row["goal"].current_amount for row in goal_rows), start=0)
+    today = timezone.localdate()
+    goal_rows = []
+    for goal in goals:
+        row = {
+            "goal": goal,
+            "estimated_completion": estimate_completion_date(goal),
+            "pace": None,
+            "deadline_passed": False,
+        }
+        if goal.remaining_amount <= 0:
+            row["next_milestone_percent"] = 100
+            row["next_milestone_amount"] = Decimal("0.00")
+        else:
+            next_milestone = next(
+                (milestone for milestone in MILESTONES if goal.progress_percent < milestone),
+                100,
+            )
+            milestone_target = (
+                goal.target_amount * Decimal(next_milestone) / Decimal("100")
+            ).quantize(Decimal("0.01"))
+            row["next_milestone_percent"] = next_milestone
+            row["next_milestone_amount"] = max(
+                milestone_target - goal.current_amount, Decimal("0.00")
+            )
+            if goal.target_date:
+                row["pace"] = contribution_pace(
+                    goal.remaining_amount, goal.target_date, today=today
+                )
+                row["deadline_passed"] = goal.target_date <= today and goal.remaining_amount > 0
+        goal_rows.append(row)
+
+    saved = sum((row["goal"].current_amount for row in goal_rows), Decimal("0.00"))
+    remaining_total = sum(
+        (row["goal"].remaining_amount for row in goal_rows), Decimal("0.00")
+    )
     monthly = Decimal("0")
     on_track = 0
     for row in goal_rows:
         goal = row["goal"]
         if goal.achieved_at or goal.progress_percent >= 100:
             on_track += 1
-        elif row["estimated_completion"]:
+        elif row["pace"]:
             on_track += 1
-        if goal.target_date and not goal.achieved_at:
-            months = max(
-                ((goal.target_date.year - timezone.now().date().year) * 12)
-                + (goal.target_date.month - timezone.now().date().month),
-                1,
-            )
-            row["monthly"] = (goal.remaining_amount / months).quantize(Decimal("0.01"))
+        row["monthly"] = row["pace"]["monthly"] if row["pace"] else None
+        if row["monthly"]:
             monthly += row["monthly"]
-        else:
-            row["monthly"] = None
     return render(
         request,
         "savings/goals.html",
         {
             "goal_rows": goal_rows,
             "saved_total": saved,
+            "remaining_total": remaining_total,
             "monthly_total": monthly,
             "on_track": on_track,
             "goal_count": len(goal_rows),
+            "today": today,
         },
     )
 
