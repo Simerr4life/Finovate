@@ -227,6 +227,7 @@ SESSION_COOKIE_AGE = 60 * 60 * 8
 BANK_PROVIDER_API_KEY = os.environ.get("BANK_PROVIDER_API_KEY", "")
 BROKERAGE_PROVIDER_API_KEY = os.environ.get("BROKERAGE_PROVIDER_API_KEY", "")
 MESSAGING_PROVIDER_API_KEY = os.environ.get("MESSAGING_PROVIDER_API_KEY", "")
+TWELVE_DATA_API_KEY = os.environ.get("TWELVE_DATA_API_KEY", "")
 
 # Shared secret expected on the Photon Spectrum (iMessage) self-hosted
 # webhook, if/when that mode is enabled on the Photon side. Empty by

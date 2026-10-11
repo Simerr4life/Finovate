@@ -1,17 +1,23 @@
 from collections import defaultdict
+from datetime import time
 from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import slugify
-from django.views.decorators.http import require_POST
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET, require_POST
 
 from accounts.models import NotificationEvent
 
 from .forms import HypotheticalScenarioForm, RoundUpSettingsForm, VerifiedScenarioForm
+from .live_quotes import refresh_live_market_quotes
 from .models import (
     DemoInvestmentSuggestion,
     DemoInvestmentFunding,
@@ -202,6 +208,14 @@ def _user_demo_holdings(user):
     }
 
 
+def _is_us_regular_session(now):
+    market_time = now.astimezone(ZoneInfo("America/New_York"))
+    return (
+        market_time.weekday() < 5
+        and time(9, 30) <= market_time.time().replace(tzinfo=None) < time(16)
+    )
+
+
 @login_required
 def index(request):
     rs = get_or_create_settings(request.user)
@@ -340,6 +354,48 @@ def add_demo_investment_funds_view(request):
             f"Added ${amount:.2f} in virtual demo funds. No real money was added or moved.",
         )
     return redirect("investing:index")
+
+
+@login_required
+@require_GET
+@never_cache
+def live_demo_quotes(request):
+    holdings = _user_demo_holdings(request.user)["holdings"]
+    symbols = [holding["symbol"] for holding in holdings]
+    market_open = _is_us_regular_session(timezone.now())
+    quotes, errors = refresh_live_market_quotes(symbols, allow_refresh=market_open)
+    if errors.get("configuration") == "missing-api-key":
+        return JsonResponse(
+            {
+                "error": "Live prices are not configured. Set TWELVE_DATA_API_KEY on the server.",
+                "market_open": market_open,
+            },
+            status=503,
+        )
+
+    quote_data = {}
+    portfolio_value = Decimal("0")
+    for holding in holdings:
+        quote = quotes.get(holding["symbol"])
+        if quote is None:
+            continue
+        market_value = holding["shares"] * quote.price
+        portfolio_value += market_value
+        quote_data[holding["symbol"]] = {
+            "price": str(quote.price),
+            "market_value": str(market_value),
+            "fetched_at": quote.fetched_at.isoformat(),
+        }
+    complete = len(quote_data) == len(holdings)
+    return JsonResponse(
+        {
+            "quotes": quote_data,
+            "portfolio_value": str(portfolio_value) if complete and holdings else None,
+            "market_open": market_open,
+            "errors": errors,
+            "refresh_seconds": 300,
+        }
+    )
 
 
 @login_required

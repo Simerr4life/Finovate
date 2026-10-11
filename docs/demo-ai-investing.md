@@ -24,6 +24,20 @@ budget. Demo orders reserve their amounts against that combined budget.
 Virtual demo funds only increase the simulated investing budget; they do not
 change cash balances or move real money.
 
+The My investments page fetches the latest available holding quotes from
+Twelve Data when opened, including outside market hours when no quote is
+cached yet, then refreshes stale quotes every five minutes during regular US
+market hours. Set `TWELVE_DATA_API_KEY` in the server
+environment (for Vercel, add it under the project's Environment Variables and
+redeploy); the key is never sent to the browser. Quotes are shared and cached
+for five minutes, and a shared limiter enforces the Basic-tier allowance of
+eight requests per minute and 800 per UTC day. Refreshes are requested only
+during regular US market hours on weekdays, apart from the one initial fetch
+for a missing cached quote. The historical chart stays based on supplied
+sample data, with current quote valuation points appended while the page
+remains open. Demo order execution still uses bundled sample prices and
+remains simulated.
+
 The "Demo AI" is transparent, deterministic ranking logic, not a language
 model, machine-learning prediction, or investment advice. It ranks symbols
 with at least two supplied stock-price rows by sample-period percentage

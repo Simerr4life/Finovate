@@ -714,6 +714,7 @@ body.has-market-chart-js .market-view-controls { display: flex; }
 .holding-chart-heading .eyebrow { margin-bottom: 4px; }
 .holding-chart-heading h3 { margin: 0; font: 700 18px "Manrope", sans-serif; }
 .holding-chart-heading p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+.live-quotes-status { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
 .holding-chart-current { display: grid; gap: 4px; text-align: right; }
 .holding-chart-current small, .holding-chart-current span { color: var(--muted); font-size: 10px; }
 .holding-chart-current strong { font: 700 22px "Manrope", sans-serif; }
