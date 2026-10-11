@@ -4,6 +4,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f2747">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Finovate">
+  <link rel="manifest" href="{% static 'pwa/manifest.webmanifest' %}">
+  <link rel="apple-touch-icon" href="{% static 'pwa/icons/apple-touch-icon.png' %}">
   <title>{% block title %}Finovate{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/finovate.css' %}">
   {% block extra_head %}{% endblock %}
@@ -126,6 +133,7 @@
 
   {% include "partials/review_modal.html" %}
   <script src="{% static 'js/finovate.js' %}?v=2"></script>
+  <script src="{% static 'js/pwa-register.js' %}"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>

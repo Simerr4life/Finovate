@@ -1,10 +1,13 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
+from django.http import FileResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_GET
 
 from budgets.models import Budget, BudgetPeriod, RecurringExpense
 from budgets.services import build_budget_plan, compute_budget_progress
@@ -23,6 +26,17 @@ from investing.models import PortfolioSnapshot, RoundUpLedgerEntry
 from investing.services import compute_investable_surplus
 from savings.models import Goal
 from transactions.models import Transaction
+
+
+@require_GET
+def service_worker(request):
+    response = FileResponse(
+        (settings.BASE_DIR / "static" / "pwa" / "service-worker.js").open("rb"),
+        content_type="application/javascript",
+    )
+    response["Cache-Control"] = "no-cache"
+    response["Service-Worker-Allowed"] = "/"
+    return response
 
 
 def landing(request):

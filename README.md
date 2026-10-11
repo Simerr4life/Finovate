@@ -44,6 +44,22 @@ questions, then take you to the dashboard).
 
 To create an admin user for `/admin/`: `python manage.py createsuperuser`.
 
+### Install on iPhone or Android
+
+Finovate can be installed as a Progressive Web App (PWA) from its deployed
+HTTPS website. On Android, open the site in Chrome and choose **Install app**
+or **Add to Home screen**. On iPhone, open it in Safari, tap **Share**, then
+**Add to Home Screen**. The installed app uses the same website, account, and
+backend; deploying website changes updates the app without maintaining a
+separate mobile codebase. It is not an App Store or Play Store application,
+and it needs an internet connection for account and financial pages.
+The included app icons are placeholders and can be replaced with the final
+Finovate logo using the same filenames.
+
+The service worker caches only static app assets, refreshes those assets from
+the deployed site while online, and never caches authenticated financial
+pages.
+
 ### Configuration
 
 Copy `.env.example` to `.env` to override any setting. **The app runs

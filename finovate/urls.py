@@ -6,6 +6,7 @@ from core import views as core_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("service-worker.js", core_views.service_worker, name="service_worker"),
     path("callback/", account_views.auth0_callback, name="auth0_callback"),
     path("", core_views.landing, name="landing"),
     path("dashboard/", core_views.dashboard, name="dashboard"),
