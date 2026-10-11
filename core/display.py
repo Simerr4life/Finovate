@@ -45,8 +45,10 @@ def cash_series(user, range_key: str = "6M"):
     """End-of-bucket cash balances from recorded transactions only."""
     today = timezone.now().date()
     range_key = range_key if range_key in RANGE_MONTHS else "6M"
-    if range_key == "1W":
-        start = today - timedelta(days=6)
+    if range_key in ("1W", "1M"):
+        # Daily points: one monthly bucket would draw a single dot for 1M.
+        days = 7 if range_key == "1W" else 30
+        start = today - timedelta(days=days - 1)
         labels = []
         points = []
         running = _balance_before(user, start)
@@ -54,7 +56,11 @@ def cash_series(user, range_key: str = "6M"):
         day = start
         while day <= today:
             running = quantize_money(running + by_day.get(day, Decimal("0")))
-            labels.append(day.strftime("%a"))
+            if range_key == "1W":
+                labels.append(day.strftime("%a"))
+            else:
+                index = (day - start).days
+                labels.append(f"{day:%b} {day.day}" if index % 5 == 4 else "")
             points.append(running)
             day += timedelta(days=1)
         return labels, points

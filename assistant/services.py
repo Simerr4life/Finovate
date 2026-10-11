@@ -13,7 +13,12 @@ from accounts.models import NotificationEvent
 from budgets.models import Budget, BudgetPeriod
 from budgets.services import compute_budget_progress
 from investing.models import PortfolioSnapshot, SimulatedOrder
-from investing.services import compute_investable_surplus, get_or_create_settings, propose_surplus_investment
+from investing.services import (
+    compute_investable_surplus,
+    get_or_create_settings,
+    max_surplus_proposal,
+    propose_surplus_investment,
+)
 from savings.models import Goal
 from transactions.models import Transaction
 from transactions.services import record_transaction
@@ -292,7 +297,7 @@ def _find_goal(user, name_hint: str):
 
 def _prompt_update_goal_target(user, payload) -> str | None:
     amount = payload.get("amount")
-    if not amount:
+    if not amount or Decimal(amount) <= 0:
         return None
     goal, error = _find_goal(user, payload.get("name_hint", ""))
     if error:
@@ -307,7 +312,8 @@ def _execute_update_goal_target(user, payload) -> str:
     if not goal:
         return "That goal no longer exists."
     goal.target_amount = Decimal(payload["amount"])
-    goal.save(update_fields=["target_amount", "updated_at"])
+    goal.sync_achieved()
+    goal.save(update_fields=["target_amount", "achieved_at", "updated_at"])
     return f"Done — \"{goal.name}\"'s target is now ${goal.target_amount}."
 
 
@@ -315,10 +321,10 @@ def _prompt_propose_invest(user, payload) -> str | None:
     amount = payload.get("amount")
     if not amount or Decimal(amount) <= 0:
         return None
-    surplus = compute_investable_surplus(user).investable_surplus
+    surplus = max_surplus_proposal(user)
     return (
         f"Create a simulated pending proposal to invest ${amount}? "
-        f"Estimated investable surplus is ${surplus}. "
+        f"Estimated investable surplus not already proposed is ${surplus}. "
         "This does not place a brokerage order or move money. "
         "Approving it later on the Investments page is still simulated."
     )
@@ -326,10 +332,11 @@ def _prompt_propose_invest(user, payload) -> str | None:
 
 def _execute_propose_invest(user, payload) -> str:
     amount = Decimal(payload["amount"])
-    surplus = compute_investable_surplus(user).investable_surplus
+    surplus = max_surplus_proposal(user)
     if amount > surplus:
         return (
-            f"Not created. ${amount} is above the estimated investable surplus of ${surplus}. "
+            f"Not created. ${amount} is above the estimated investable surplus not already "
+            f"proposed (${surplus}). "
             "No proposal was saved."
         )
     order = propose_surplus_investment(user, amount)

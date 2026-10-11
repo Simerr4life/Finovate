@@ -10,7 +10,7 @@
     <div class="page-subtitle">Review, categorize, and understand every recorded transaction.</div>
   </div>
   <div class="button-row">
-    <a class="button secondary" href="{% url 'budgets:transaction_export' %}?q={{ query }}&amp;category={{ category_id }}&amp;month={{ month }}">Export CSV</a>
+    <a class="button secondary" href="{% url 'budgets:transaction_export' %}?q={{ query|urlencode }}&amp;category={{ category_id|urlencode }}&amp;month={{ month|urlencode }}">Export CSV</a>
     <a class="button" href="{% url 'budgets:transaction_add' %}">{% include "partials/icon.html" with name="plus" size=17 %} Add transaction</a>
   </div>
 </div>

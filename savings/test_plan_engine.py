@@ -1,6 +1,6 @@
 """Scenario coverage for the personalized savings-plan engine."""
 
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User

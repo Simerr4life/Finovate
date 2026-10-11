@@ -9,7 +9,7 @@ or the reconcile_auth0_backups management command.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from django.db import transaction
 from django.utils import timezone
@@ -241,16 +241,16 @@ def _parse_created(value):
         return None
     if isinstance(value, datetime):
         if timezone.is_naive(value):
-            return timezone.make_aware(value, timezone.utc)
+            return timezone.make_aware(value, UTC)
         return value
     if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value, tz=timezone.utc)
+        return datetime.fromtimestamp(value, tz=UTC)
     if isinstance(value, str):
         parsed = parse_datetime(value.replace("Z", "+00:00"))
         if parsed is None:
             return None
         if timezone.is_naive(parsed):
-            return timezone.make_aware(parsed, timezone.utc)
+            return timezone.make_aware(parsed, UTC)
         return parsed
     return None
 

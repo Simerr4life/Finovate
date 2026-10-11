@@ -92,6 +92,7 @@ def available_cash_balance(user) -> Decimal:
     return quantize_money(income - expenses)
 
 
+@db_transaction.atomic
 def sweep_pending_roundups(user, as_of: date | None = None) -> dict:
     """Simulate sweeping eligible pending round-ups into the portfolio.
 
@@ -102,7 +103,10 @@ def sweep_pending_roundups(user, as_of: date | None = None) -> dict:
     they land in the general/unassigned bucket (pool=None).
     """
     as_of = as_of or timezone.now().date()
-    rs = get_or_create_settings(user)
+    get_or_create_settings(user)
+    # Lock the settings row so two concurrent sweeps (double click, retry)
+    # run one after the other instead of both sweeping the same entries.
+    rs = RoundUpSettings.objects.select_for_update().get(user=user)
     pool = rs.target_pool if (rs.target_pool_id and rs.target_pool.is_investable) else None
     if not rs.enabled or rs.is_paused:
         return {"swept_amount": Decimal("0.00"), "entries_swept": 0, "reason": "round-ups disabled or paused"}
@@ -223,6 +227,18 @@ def compute_investable_surplus(user) -> SurplusBreakdown:
     )
 
 
+def max_surplus_proposal(user) -> Decimal:
+    """Largest surplus proposal that isn't already spoken for.
+
+    The surplus estimate is computed from the cash ledger, which a
+    simulated order never changes, so on its own it would let the same
+    surplus be proposed (and approved) again and again. Pending and filled
+    orders are subtracted through the demo investing budget.
+    """
+    surplus = compute_investable_surplus(user).investable_surplus
+    return max(min(surplus, available_demo_investment_budget(user)), Decimal("0.00"))
+
+
 def propose_surplus_investment(user, amount: Decimal, pool=None) -> SimulatedOrder:
     """Create a PENDING simulated order representing a proposed investment
     of surplus cash into an investable savings pool (or the general
@@ -241,8 +257,14 @@ def propose_surplus_investment(user, amount: Decimal, pool=None) -> SimulatedOrd
     )
 
 
+@db_transaction.atomic
 def approve_order(order: SimulatedOrder, as_of: date | None = None) -> SimulatedOrder:
     """Simulate approving/filling a pending order: never a real trade."""
+    # Re-read under a lock: a second concurrent approval of the same order
+    # must not add its amount to the portfolio twice.
+    order = SimulatedOrder.objects.select_for_update().get(pk=order.pk)
+    if order.status != SimulatedOrder.Status.PENDING:
+        raise ValueError("This order has already been handled.")
     if (
         order.demo_execution_price is not None
         and order.demo_price_source != SimulatedOrder.PriceSource.TWELVE_DATA
@@ -271,7 +293,11 @@ def approve_order(order: SimulatedOrder, as_of: date | None = None) -> Simulated
     return order
 
 
+@db_transaction.atomic
 def reject_order(order: SimulatedOrder) -> SimulatedOrder:
+    order = SimulatedOrder.objects.select_for_update().get(pk=order.pk)
+    if order.status != SimulatedOrder.Status.PENDING:
+        raise ValueError("This order has already been handled.")
     order.status = SimulatedOrder.Status.REJECTED
     order.save(update_fields=["status", "updated_at"])
     return order

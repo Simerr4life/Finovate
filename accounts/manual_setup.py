@@ -8,7 +8,6 @@ how a manually-declared figure is distinguished from anything else in the
 budgets UI, without adding a source column to IncomeSource/RecurringExpense.
 """
 
-from decimal import Decimal
 
 from django.utils import timezone
 

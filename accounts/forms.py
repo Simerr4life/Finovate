@@ -127,6 +127,17 @@ class OnboardingForm(forms.ModelForm):
             "messaging_consent": "I agree to Finovate messages",
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["cash_reserve_target"].validators += [
+            MinValueValidator(Decimal("0"), "Enter zero or more."),
+            MaxValueValidator(MAX_REASONABLE_AMOUNT),
+        ]
+        self.fields["budget_warning_threshold_percent"].validators += [
+            MinValueValidator(1, "Enter a percentage from 1 to 100."),
+            MaxValueValidator(100, "Enter a percentage from 1 to 100."),
+        ]
+
     def clean_phone_number(self):
         phone = normalize_phone(self.cleaned_data.get("phone_number"))
         if phone is None:

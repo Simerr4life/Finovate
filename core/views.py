@@ -127,13 +127,16 @@ def insights(request):
     bars = monthly_bars(user, 6, today)
     categories, category_total = category_totals(user, month_begin, today)
     prior_categories, _ = category_totals(user, prior_begin, prior_end)
+    current_map = {item["name"]: item["total"] for item in categories}
     prior_map = {item["name"]: item["total"] for item in prior_categories}
     changes = []
-    for item in categories:
-        delta = item["total"] - prior_map.get(item["name"], Decimal("0"))
+    # Include categories with no spending this month: dropping to $0 is the
+    # biggest decrease there is.
+    for name in current_map.keys() | prior_map.keys():
+        delta = current_map.get(name, Decimal("0")) - prior_map.get(name, Decimal("0"))
         if delta != 0:
-            changes.append({"name": item["name"], "delta": delta})
-    changes.sort(key=lambda row: row["delta"])
+            changes.append({"name": name, "delta": delta})
+    changes.sort(key=lambda row: (row["delta"], row["name"]))
     income_months = [bar for bar in bars if bar["income"] > 0]
     expense_months = [bar for bar in bars if bar["expense"] > 0]
     avg_income = (

@@ -14,9 +14,8 @@ import urllib.request
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.utils import timezone
 
-from .identity import VERIFICATION_COMPLETED, VERIFICATION_PENDING
+from .identity import VERIFICATION_COMPLETED
 
 logger = logging.getLogger(__name__)
 

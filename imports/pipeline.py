@@ -109,7 +109,7 @@ def decode_text(content: bytes) -> str:
             raise ImportValidationError(
                 "That file doesn't look like a text CSV export. "
                 "Please export a CSV statement from your bank and try again."
-            )
+            ) from None
     if "\x00" in text:
         raise ImportValidationError("That file contains binary data and isn't a valid CSV.")
     return text
@@ -138,7 +138,7 @@ def validate_file(filename: str, content: bytes, max_bytes: int) -> str:
     try:
         header = next(reader)
     except StopIteration:
-        raise ImportValidationError("That file has no header row.")
+        raise ImportValidationError("That file has no header row.") from None
     if len(header) < 2:
         raise ImportValidationError(
             "That file doesn't look like a multi-column CSV export."

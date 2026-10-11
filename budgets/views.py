@@ -20,7 +20,18 @@ from .forms import (
     TransactionForm,
 )
 from .models import Budget, BudgetPeriod, IncomeSource, RecurringExpense
-from .services import build_budget_plan, compute_budget_progress
+from .services import build_budget_plan, compute_budget_progress, monthly_equivalent
+
+
+def _report_invalid(request, form, what):
+    """Forms on the budgeting page post and redirect back, so the errors
+    travel as a message instead of being dropped with the user's input."""
+    details = []
+    for field, errors in form.errors.items():
+        label = form.fields[field].label if field in form.fields else ""
+        for error in errors:
+            details.append(f"{label}: {error}" if label else error)
+    messages.error(request, f"Couldn't add {what}. " + " ".join(details))
 
 
 @login_required
@@ -53,7 +64,7 @@ def index(request):
         "categories": Category.objects.filter(user=user),
         "period_form": BudgetPeriodForm(),
         "budget_form": BudgetForm(user=user),
-        "category_form": CategoryForm(),
+        "category_form": CategoryForm(user=user),
         "income_form": IncomeSourceForm(),
         "expense_form": RecurringExpenseForm(user=user),
     }
@@ -89,8 +100,6 @@ def transaction_list(request):
     income_count = month_txns.filter(kind=Transaction.Kind.INCOME).count()
     recurring = RecurringExpense.objects.filter(user=request.user, is_active=True)
     recurring_total = Decimal("0")
-    from budgets.services import monthly_equivalent
-
     for exp in recurring:
         recurring_total += monthly_equivalent(exp.amount, exp.cadence)
     return render(
@@ -160,7 +169,7 @@ def transaction_edit(request, pk):
             return redirect("budgets:transaction_list")
     else:
         form = TransactionForm(instance=txn, user=request.user)
-    return render(request, "budgets/transaction_form.html", {"form": form, "mode": "edit"})
+    return render(request, "budgets/transaction_form.html", {"form": form, "mode": "edit", "transaction": txn})
 
 
 @login_required
@@ -176,12 +185,14 @@ def transaction_delete(request, pk):
 @login_required
 def category_add(request):
     if request.method == "POST":
-        form = CategoryForm(request.POST)
+        form = CategoryForm(request.POST, user=request.user)
         if form.is_valid():
             cat = form.save(commit=False)
             cat.user = request.user
             cat.save()
             messages.success(request, "Category created.")
+        else:
+            _report_invalid(request, form, "that category")
     return redirect("budgets:index")
 
 
@@ -205,6 +216,8 @@ def period_add(request):
                 BudgetPeriod.objects.filter(user=request.user, is_active=True).update(is_active=False)
             period.save()
             messages.success(request, "Budget period created.")
+        else:
+            _report_invalid(request, form, "that budget period")
     return redirect("budgets:index")
 
 
@@ -218,7 +231,7 @@ def budget_add(request):
             budget.save()
             messages.success(request, "Budget added.")
         else:
-            messages.error(request, "Could not add budget — check the form.")
+            _report_invalid(request, form, "that budget")
     return redirect("budgets:index")
 
 
@@ -240,6 +253,8 @@ def income_add(request):
             src.user = request.user
             src.save()
             messages.success(request, "Income source added — plan recalculated.")
+        else:
+            _report_invalid(request, form, "that income source")
     return redirect("budgets:index")
 
 
@@ -261,6 +276,8 @@ def expense_add(request):
             exp.user = request.user
             exp.save()
             messages.success(request, "Recurring expense added — plan recalculated.")
+        else:
+            _report_invalid(request, form, "that recurring expense")
     return redirect("budgets:index")
 
 

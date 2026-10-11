@@ -9,10 +9,14 @@
     {% for field in form %}
     <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
     {% endfor %}
+    {% for error in form.non_field_errors %}<p class="field-error">{{ error }}</p>{% endfor %}
     <div class="modal-actions">
       <a class="button ghost" href="{% url 'budgets:transaction_list' %}">Cancel</a>
       <button type="submit" class="button">Save</button>
     </div>
   </form>
+  {% if transaction %}
+  <p class="muted" style="margin-top:16px;"><a class="danger-link" href="{% url 'budgets:transaction_delete' transaction.pk %}">Delete this transaction</a></p>
+  {% endif %}
 </section>
 {% endblock %}

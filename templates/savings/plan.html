@@ -41,10 +41,10 @@
       <input type="hidden" name="action" value="pause">
       <button class="button ghost" type="submit">Pause recommendations</button>
     </form>
-    {% elif plan.status == "paused" %}
+    {% else %}
     <form method="post" action="{% url 'savings:plan_status' %}">{% csrf_token %}
       <input type="hidden" name="action" value="resume">
-      <button class="button" type="submit">Resume</button>
+      <button class="button" type="submit">{% if plan.status == "disabled" %}Turn recommendations back on{% else %}Resume{% endif %}</button>
     </form>
     {% endif %}
     {% if plan.status != "disabled" %}

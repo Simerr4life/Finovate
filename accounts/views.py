@@ -1,3 +1,4 @@
+import hmac
 import json
 import logging
 import time
@@ -339,9 +340,19 @@ def _begin_auth0(request, screen_hint=None, login_hint=None, next_url="", max_ag
     return apply_auth0_cookies(request, redirect(url))
 
 
+def _client_ip(request):
+    # X-Forwarded-For is only trustworthy behind a proxy that sets it (Vercel
+    # does). Anywhere else a client could send a fresh value per request and
+    # never hit the limit.
+    if settings.ON_VERCEL:
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
 def _rate_limited(request, action, limit, period):
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    ip = (forwarded.split(",")[0].strip() if forwarded else "") or request.META.get("REMOTE_ADDR", "")
+    ip = _client_ip(request)
     key = f"auth-rl:{action}:{ip}"
     current = cache.get(key, 0)
     if current >= limit:
@@ -496,7 +507,7 @@ def auth0_signup_webhook(request):
     if not expected:
         return JsonResponse({"error": "not_configured"}, status=503)
     provided = _action_secret(request)
-    if not provided or provided != expected:
+    if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
         return JsonResponse({"error": "unauthorized"}, status=401)
     if _rate_limited(request, "auth0-action", limit=120, period=60):
         return JsonResponse({"error": "rate_limited"}, status=429)

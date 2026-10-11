@@ -80,6 +80,17 @@ class Goal(TimeStampedModel):
         pct = (self.current_amount / self.target_amount) * 100
         return int(min(max(pct, 0), 100))
 
+    def sync_achieved(self) -> None:
+        """Keep achieved_at in step with the balance after any change to
+        current_amount or target_amount. Doesn't save."""
+        from django.utils import timezone
+
+        if self.target_amount > 0 and self.current_amount >= self.target_amount:
+            if self.achieved_at is None:
+                self.achieved_at = timezone.now()
+        else:
+            self.achieved_at = None
+
     @property
     def remaining_amount(self):
         remaining = self.target_amount - self.current_amount

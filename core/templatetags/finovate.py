@@ -18,13 +18,6 @@ def merchant_mark(value: str) -> str:
 def money(value) -> str:
     if value is None:
         return "$0.00"
+    if value < 0:
+        return f"-${-value:,.2f}"
     return f"${value:,.2f}"
-
-
-@register.filter
-def signed_money(value, kind="expense") -> str:
-    amount = abs(float(value or 0))
-    formatted = f"${amount:,.2f}"
-    if kind == "income" or (hasattr(value, "__gt__") and value > 0 and kind == "signed"):
-        return f"+{formatted}"
-    return f"-{formatted}"

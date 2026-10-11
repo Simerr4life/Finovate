@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.db import transaction
 from django.utils import timezone
 
 from core.services import quantize_money
@@ -10,6 +11,7 @@ from core.services import quantize_money
 MILESTONES = [25, 50, 75, 100]
 
 
+@transaction.atomic
 def apply_contribution(goal, kind: str, amount: Decimal, note: str = "", source: str = "manual"):
     """Create a Contribution and update the goal's current_amount.
 
@@ -17,24 +19,28 @@ def apply_contribution(goal, kind: str, amount: Decimal, note: str = "", source:
     whether to raise a NotificationEvent for a crossed milestone — kept out
     of this function so the savings app doesn't depend on accounts.
     """
-    from .models import Contribution  # local import avoids import-time cycle
+    from .models import Contribution, Goal  # local import avoids import-time cycle
+
+    # Work from a locked, fresh row so two contributions saved at the same
+    # time both land instead of one overwriting the other.
+    locked = Goal.objects.select_for_update().get(pk=goal.pk)
+    goal.current_amount = locked.current_amount
+    goal.target_amount = locked.target_amount
+    goal.achieved_at = locked.achieved_at
+    goal.highest_milestone_notified = locked.highest_milestone_notified
 
     amount = quantize_money(amount)
     before_percent = goal.progress_percent
 
     if kind == Contribution.Kind.WITHDRAWAL:
+        # Record what actually left the goal, so the history adds up to
+        # the balance even if more was requested than was there.
+        amount = min(amount, goal.current_amount)
         goal.current_amount = quantize_money(goal.current_amount - amount)
     else:
         goal.current_amount = quantize_money(goal.current_amount + amount)
 
-    if goal.current_amount < 0:
-        goal.current_amount = Decimal("0.00")
-
-    if goal.current_amount >= goal.target_amount and goal.achieved_at is None:
-        goal.achieved_at = timezone.now()
-    elif goal.current_amount < goal.target_amount:
-        goal.achieved_at = None
-
+    goal.sync_achieved()
     goal.save(update_fields=["current_amount", "achieved_at", "updated_at"])
 
     contribution = Contribution.objects.create(

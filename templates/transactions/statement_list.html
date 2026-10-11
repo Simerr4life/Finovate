@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Statements — Finovate{% endblock %}
 {% block content %}
-<div class="flex justify-between items-center mb-6">
+<div class="flex justify-between items-center mb-6" style="flex-wrap:wrap;gap:12px;">
   <h1 class="text-2xl font-bold">Statements</h1>
-  <div class="flex gap-2">
+  <div class="flex gap-2" style="flex-wrap:wrap;">
     <a href="{% url 'imports:history' %}" class="button ghost">Import history</a>
     <a href="{% url 'imports:upload' %}" class="button">Import a statement</a>
   </div>
@@ -11,7 +11,7 @@
 {% if accounts %}
 <ul class="space-y-3">
   {% for acc in accounts %}
-  <li class="bg-white rounded-2xl border border-slate-200 p-5 flex justify-between items-center">
+  <li class="bg-white rounded-2xl border border-slate-200 p-5 flex justify-between items-center" style="flex-wrap:wrap;gap:8px;">
     <div>
       <p class="font-semibold">{{ acc.institution_name }} <span class="text-slate-400">{{ acc.masked_number }}</span></p>
       <p class="text-xs text-slate-400">{{ acc.account_type }} · {{ acc.statement_start_date }} – {{ acc.statement_end_date }}

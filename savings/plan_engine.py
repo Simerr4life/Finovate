@@ -591,7 +591,7 @@ def _materially_changed(plan: SavingsPlan, recommendation: PlanRecommendation) -
         base = max(old, new, Decimal("1"))
         if delta / base >= RECALC_PERCENT_THRESHOLD:
             return True
-    return True
+    return False
 
 
 def _analysis_to_dict(analysis: FinancialAnalysis) -> dict:
@@ -616,8 +616,9 @@ def _analysis_to_dict(analysis: FinancialAnalysis) -> dict:
 def refresh_savings_plan(user, reason: str = "manual", force: bool = False) -> SavingsPlan | None:
     """Create or update the user's plan when data supports it.
 
-    Idempotent for unchanged fingerprints. Respects paused/disabled status
-    unless force=True (used when the user explicitly requests a refresh).
+    Idempotent for unchanged fingerprints. A paused/disabled plan is only
+    recalculated when force=True (the user explicitly asked), and even then
+    keeps its status.
     """
     ensure_default_pools(user)
     analysis = analyze_finances(user)
@@ -640,11 +641,16 @@ def refresh_savings_plan(user, reason: str = "manual", force: bool = False) -> S
     recommendation = build_recommendation(analysis, override_percents=override)
 
     created = plan is None
+    # Small drifts still refresh the figures shown, but only a material
+    # change is worth a revision in the history and a notification.
+    material = created or (
+        plan.fingerprint != recommendation.fingerprint and _materially_changed(plan, recommendation)
+    )
     if plan is None:
         plan = SavingsPlan(user=user, status=SavingsPlan.Status.ACTIVE)
-    elif not force and not _materially_changed(plan, recommendation):
+    elif not force and plan.fingerprint == recommendation.fingerprint:
         return plan
-    else:
+    elif force or material:
         SavingsPlanRevision.objects.create(
             plan=plan,
             reason=reason,
@@ -660,7 +666,6 @@ def refresh_savings_plan(user, reason: str = "manual", force: bool = False) -> S
             },
         )
 
-    previous_fingerprint = plan.fingerprint
     plan.scenario = recommendation.scenario
     plan.name = recommendation.name
     plan.objective = recommendation.objective
@@ -686,10 +691,10 @@ def refresh_savings_plan(user, reason: str = "manual", force: bool = False) -> S
     plan.analysis = _analysis_to_dict(analysis)
     plan.fingerprint = recommendation.fingerprint
     plan.calculated_at = timezone.now()
-    if force and plan.status != SavingsPlan.Status.DISABLED:
-        plan.status = SavingsPlan.Status.ACTIVE
+    # Status only changes through the explicit pause/resume/disable actions;
+    # recalculating (even when forced) never resumes a paused plan.
     plan.save()
-    if created or previous_fingerprint != plan.fingerprint:
+    if material:
         _record_plan_notification(user, plan, created=created, reason=reason)
     return plan
 

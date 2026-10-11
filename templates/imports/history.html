@@ -30,10 +30,12 @@
           {% if batch.status == "failed" %}
           <form method="post" action="{% url 'imports:retry' pk=batch.pk %}" style="display:inline;">{% csrf_token %}<button type="submit" class="button ghost">Retry</button></form>
           {% endif %}
+          {% if batch.status != "committed" or batch.has_source_file %}
           <form method="post" action="{% url 'imports:delete' pk=batch.pk %}" style="display:inline;">
             {% csrf_token %}
             <button type="submit" class="button ghost">{% if batch.status == "committed" %}Delete source file{% else %}Discard{% endif %}</button>
           </form>
+          {% endif %}
         </td>
       </tr>
       {% empty %}

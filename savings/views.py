@@ -100,7 +100,9 @@ def plan_status(request):
     elif action == "disable":
         plan.status = SavingsPlan.Status.DISABLED
         plan.save(update_fields=["status", "updated_at"])
-        messages.success(request, "Recommendations disabled.")
+        messages.success(request, "Recommendations disabled. You can turn them back on here at any time.")
+    else:
+        messages.error(request, "That action isn't available.")
     return redirect("savings:plan")
 
 
@@ -143,8 +145,7 @@ def debt_add(request):
         if form.is_valid():
             debt = form.save(commit=False)
             debt.user = request.user
-            debt.save()
-            refresh_savings_plan(request.user, reason="debt_added", force=True)
+            debt.save()  # the savings signals recalculate the plan on commit
             messages.success(request, "Debt recorded for planning. No payment was made.")
             return redirect("savings:debts")
     else:
@@ -158,8 +159,7 @@ def debt_edit(request, pk):
     if request.method == "POST":
         form = DebtObligationForm(request.POST, instance=debt)
         if form.is_valid():
-            form.save()
-            refresh_savings_plan(request.user, reason="debt_updated", force=True)
+            form.save()  # the savings signals recalculate the plan on commit
             messages.success(request, "Debt updated.")
             return redirect("savings:debts")
     else:
@@ -266,7 +266,7 @@ def goal_add(request):
             goal.save()
             refresh_savings_plan(request.user, reason="goal_created")
             messages.success(request, "Savings goal created.")
-            return redirect("savings:pools" if return_to_pools else "savings:index")
+            return redirect("savings:pools" if return_to_pools else "savings:goals")
     else:
         form = GoalForm()
     return render(
@@ -288,7 +288,7 @@ def goal_edit(request, pk):
             form.save()
             refresh_savings_plan(request.user, reason="goal_updated")
             messages.success(request, "Goal updated.")
-            return redirect("savings:pools" if return_to_pools else "savings:index")
+            return redirect("savings:pools" if return_to_pools else "savings:goals")
     else:
         form = GoalForm(instance=goal)
     return render(
@@ -301,18 +301,27 @@ def goal_edit(request, pk):
 @login_required
 def goal_delete(request, pk):
     goal = get_object_or_404(Goal, pk=pk, user=request.user)
+    if goal.system_key:
+        # Default pools are recreated (empty) on the next page load, so a
+        # delete would only look like it worked while wiping the balance.
+        messages.error(
+            request,
+            f'"{goal.name}" is one of your default pools and can\'t be deleted. '
+            "You can rename it, change its target, or withdraw its balance instead.",
+        )
+        return redirect("savings:goal_detail", pk=goal.pk)
     if request.method == "POST":
         goal.delete()
         messages.success(request, "Goal deleted.")
-        return redirect("savings:index")
-    return render(request, "confirm_delete.html", {"object": goal, "cancel_url": "savings:index"})
+        return redirect("savings:goals")
+    return render(request, "confirm_delete.html", {"object": goal, "cancel_url": "savings:goals"})
 
 
 @login_required
 def goal_detail(request, pk):
     goal = get_object_or_404(Goal, pk=pk, user=request.user)
     if request.method == "POST":
-        form = ContributionForm(request.POST)
+        form = ContributionForm(request.POST, goal=goal)
         if form.is_valid():
             from .services import apply_contribution
 
@@ -335,7 +344,7 @@ def goal_detail(request, pk):
                 messages.success(request, "Contribution recorded.")
             return redirect("savings:goal_detail", pk=goal.pk)
     else:
-        form = ContributionForm()
+        form = ContributionForm(goal=goal)
     invested_snapshot = None
     if goal.is_investable:
         invested_snapshot = PortfolioSnapshot.objects.filter(user=request.user, pool=goal).order_by("-as_of").first()

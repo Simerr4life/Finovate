@@ -9,7 +9,7 @@
   </h1>
   <div class="flex gap-2">
     <a href="{% url 'savings:goal_edit' goal.pk %}" class="border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 focus-ring">Edit</a>
-    <a href="{% url 'savings:goal_delete' goal.pk %}" class="border border-coral-300 text-coral-600 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-coral-50 focus-ring">Delete</a>
+    {% if not goal.system_key %}<a href="{% url 'savings:goal_delete' goal.pk %}" class="border border-coral-300 text-coral-600 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-coral-50 focus-ring">Delete</a>{% endif %}
   </div>
 </div>
 
@@ -59,10 +59,12 @@
       {% csrf_token %}
       {% for field in form %}
       <div>
-        <label class="block text-xs font-medium text-slate-500 mb-1">{{ field.label }}</label>
+        <label class="block text-xs font-medium text-slate-500 mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
         {{ field }}
+        {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
       </div>
       {% endfor %}
+      {% for error in form.non_field_errors %}<p class="field-error">{{ error }}</p>{% endfor %}
       <button type="submit" class="w-full bg-mint-500 text-white font-semibold py-2 rounded-lg hover:bg-mint-600 focus-ring">Record</button>
     </form>
   </div>

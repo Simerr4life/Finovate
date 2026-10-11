@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from accounts.identity import safe_next
 from accounts.models import NotificationEvent
 
 from .forms import HypotheticalScenarioForm, RoundUpSettingsForm, VerifiedScenarioForm
@@ -43,6 +44,7 @@ from .services import (
     generate_demo_investment_suggestions,
     get_or_create_settings,
     investable_pools,
+    max_surplus_proposal,
     pool_investment_summaries,
     propose_surplus_investment,
     reject_order,
@@ -535,12 +537,14 @@ def decline_demo_suggestion_view(request, pk):
 @login_required
 def propose_surplus(request):
     if request.method == "POST":
-        surplus = compute_investable_surplus(request.user)
+        available = max_surplus_proposal(request.user)
         try:
             requested = Decimal(request.POST.get("amount", "0"))
         except InvalidOperation:
             requested = Decimal("0")
-        amount = min(requested, surplus.investable_surplus) if requested > 0 else Decimal("0")
+        if not requested.is_finite():
+            requested = Decimal("0")
+        amount = min(requested, available) if requested > 0 else Decimal("0")
         pool = None
         pool_id = request.POST.get("pool")
         if pool_id:
@@ -550,9 +554,13 @@ def propose_surplus(request):
             target = f'"{pool.name}"' if pool else "the general bucket"
             messages.success(request, f"Proposed investing ${amount} into {target} — pending your approval below.")
         else:
-            messages.info(request, "No investable surplus available to propose right now.")
-        next_url = request.POST.get("next", "")
-        if next_url.startswith("/") and not next_url.startswith("//"):
+            messages.info(
+                request,
+                "No investable surplus available to propose right now. "
+                "Pending and approved proposals already use what's available.",
+            )
+        next_url = safe_next(request.POST.get("next", ""))
+        if next_url:
             return redirect(next_url)
     return redirect("investing:index")
 
@@ -574,8 +582,12 @@ def approve_order_view(request, pk):
 def reject_order_view(request, pk):
     order = get_object_or_404(SimulatedOrder, pk=pk, user=request.user, status=SimulatedOrder.Status.PENDING)
     if request.method == "POST":
-        reject_order(order)
-        messages.info(request, "Proposed investment rejected.")
+        try:
+            reject_order(order)
+        except ValueError as error:
+            messages.error(request, str(error))
+        else:
+            messages.info(request, "Proposed investment rejected.")
     return redirect("investing:index")
 
 
