@@ -1,0 +1,31 @@
+1
+00:00:00,300 --> 00:00:03,900
+Finovate — personal finance, made clear
+
+2
+00:00:04,500 --> 00:00:06,400
+First impressions: a calm place to see your money
+
+3
+00:00:07,000 --> 00:00:29,200
+Landing page to sample dashboard with recorded totals
+
+4
+00:00:29,800 --> 00:00:31,700
+Track spending, plan savings, and watch goals grow
+
+5
+00:00:32,300 --> 00:01:02,933
+Transactions, savings plan, goals, and pools — on your data
+
+6
+00:01:03,533 --> 00:01:05,433
+Explainable plans. Simulated investing — clearly labeled
+
+7
+00:01:06,033 --> 00:01:41,300
+Investing tools are simulated. Insights highlight spending patterns.
+
+8
+00:01:41,900 --> 00:01:45,500
+Clarity over complexity. Track. Budget. Save. Preview.

@@ -63,6 +63,19 @@ class Auth0UnconfiguredFallbackTests(TestCase):
             self.assertNotContains(response, 'type="password"')
             self.assertContains(response, "isn't configured")
 
+    @override_settings(DEBUG=True)
+    def test_debug_demo_login_opens_seeded_fixture(self):
+        User.objects.create_user("demo", password="demo-pass-1234")
+        response = self.client.get(reverse("accounts:login"))
+        self.assertContains(response, "Explore with sample data")
+        response = self.client.post(reverse("accounts:demo_login"))
+        self.assertRedirects(response, reverse("accounts:onboarding"))
+
+    def test_demo_login_unavailable_when_debug_is_false(self):
+        User.objects.create_user("demo", password="demo-pass-1234")
+        response = self.client.post(reverse("accounts:demo_login"))
+        self.assertEqual(response.status_code, 404)
+
     def test_a_django_password_alone_no_longer_creates_an_account(self):
         cache.clear()
         response = self.client.post(reverse("accounts:signup"), {

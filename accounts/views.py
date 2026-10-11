@@ -6,11 +6,11 @@ import time
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import get_user_model, login
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -185,12 +185,20 @@ def _email_login(request, form):
     return profile_for_supabase_user(supabase_user).user
 
 
+def _local_demo_available() -> bool:
+    """True when DEBUG is on and the seeded local demo fixture user exists."""
+    if not settings.DEBUG:
+        return False
+    return get_user_model().objects.filter(username="demo").exists()
+
+
 def login_view(request):
     nxt = safe_next(request.POST.get("next") or request.GET.get("next"))
     if request.user.is_authenticated:
         return redirect(destination_for(request.user, nxt))
     auth0_ready = auth0_configured()
     email_ready = supabase_configured()
+    demo_ready = _local_demo_available()
     email_form = EmailLoginForm() if email_ready else None
     status = 200
     rate_limited = False
@@ -214,11 +222,32 @@ def login_view(request):
             "email_form": email_form,
             "auth0_ready": auth0_ready,
             "email_ready": email_ready,
+            "demo_ready": demo_ready,
             "rate_limited": rate_limited,
             "next": nxt,
         },
         status=status,
     )
+
+
+@require_POST
+def demo_login(request):
+    """DEBUG-only: open the seeded local demo fixture without Auth0/Supabase.
+
+    Used for local product demos and walkthrough recordings. Refuses when
+    DEBUG is false or the `demo` fixture user is missing.
+    """
+    if not _local_demo_available():
+        raise Http404()
+    nxt = safe_next(request.POST.get("next") or request.GET.get("next"))
+    if request.user.is_authenticated:
+        return redirect(destination_for(request.user, nxt))
+    if _rate_limited(request, "demo_login", limit=30, period=600):
+        messages.error(request, "Please wait a moment and try again.")
+        return redirect("accounts:login")
+    user = get_user_model().objects.get(username="demo")
+    _session_login(request, user)
+    return redirect(destination_for(user, nxt))
 
 
 def auth0_login(request):
