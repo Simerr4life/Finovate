@@ -5,6 +5,7 @@ from asgiref.sync import async_to_sync
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm
 from django.core.cache import cache
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -19,7 +20,7 @@ from assistant.models import MessagingLinkCode
 from budgets.services import build_budget_plan
 
 from .auth0 import apply_auth0_cookies, auth0_configured, get_auth0_client, logout_return_url
-from .forms import ManualSetupForm, OnboardingForm, ProfileSettingsForm, RegistrationForm
+from .forms import LocalSignUpForm, ManualSetupForm, OnboardingForm, ProfileSettingsForm, RegistrationForm
 from .manual_setup import apply_manual_setup, initial_from_existing
 from .identity import (
     ACCOUNT_BLOCKED,
@@ -38,62 +39,91 @@ logger = logging.getLogger(__name__)
 
 
 def signup(request):
-    """Collect name, email, and an optional phone number, then send the
-    person to Auth0 Universal Login. This view never creates a user.
+    """Auth0 is the recommended way to register. A local Finovate account
+    (username and password) is offered beside it, and is the only option
+    when Auth0 isn't configured on this server.
     """
     if request.user.is_authenticated:
         return redirect(destination_for(request.user))
-    if not auth0_configured():
-        return render(request, "accounts/signup.html", {"form": None, "auth0_ready": False})
+    auth0_ready = auth0_configured()
+    nxt = safe_next(request.POST.get("next") or request.GET.get("next"))
+    form = RegistrationForm() if auth0_ready else None
+    local_form = LocalSignUpForm()
+    status = 200
+    rate_limited = False
     if request.method == "POST":
-        form = RegistrationForm(request.POST)
-        if form.is_valid():
-            if _rate_limited(request, "signup", limit=10, period=600):
-                return render(
+        if _rate_limited(request, "signup", limit=10, period=600):
+            rate_limited, status = True, 429
+        elif auth0_ready and request.POST.get("method") != "local":
+            form = RegistrationForm(request.POST)
+            if form.is_valid():
+                request.session["auth0_pending"] = {
+                    "name": form.cleaned_data["name"],
+                    "phone": form.cleaned_data["phone"],
+                }
+                request.session["auth_status"] = REGISTRATION_STARTED
+                return _begin_auth0(
                     request,
-                    "accounts/signup.html",
-                    {"form": form, "auth0_ready": True, "rate_limited": True},
-                    status=429,
+                    screen_hint="signup",
+                    login_hint=form.cleaned_data["email"],
+                    next_url=nxt,
                 )
-            request.session["auth0_pending"] = {
-                "name": form.cleaned_data["name"],
-                "phone": form.cleaned_data["phone"],
-            }
-            request.session["auth_status"] = REGISTRATION_STARTED
-            return _begin_auth0(
-                request,
-                screen_hint="signup",
-                login_hint=form.cleaned_data["email"],
-                next_url=safe_next(request.POST.get("next")),
-            )
-    else:
-        form = RegistrationForm()
-    return render(request, "accounts/signup.html", {"form": form, "auth0_ready": True})
+        else:
+            local_form = LocalSignUpForm(request.POST)
+            if local_form.is_valid():
+                user = local_form.save()
+                login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+                return redirect(destination_for(user, nxt))
+    return render(
+        request,
+        "accounts/signup.html",
+        {
+            "form": form,
+            "local_form": local_form,
+            "auth0_ready": auth0_ready,
+            "rate_limited": rate_limited,
+            "next": nxt,
+        },
+        status=status,
+    )
 
 
 def login_view(request):
     nxt = safe_next(request.POST.get("next") or request.GET.get("next"))
     if request.user.is_authenticated:
         return redirect(destination_for(request.user, nxt))
-    if not auth0_configured():
-        return render(request, "accounts/login.html", {"auth0_ready": False, "next": nxt})
-    if request.method == "POST" or nxt:
+    auth0_ready = auth0_configured()
+    local_form = AuthenticationForm(request)
+    status = 200
+    rate_limited = False
+    if request.method == "POST":
         if _rate_limited(request, "login", limit=20, period=600):
-            return render(
-                request,
-                "accounts/login.html",
-                {"auth0_ready": True, "next": nxt, "rate_limited": True},
-                status=429,
-            )
-        return _begin_auth0(request, next_url=nxt)
-    return render(request, "accounts/login.html", {"auth0_ready": True, "next": nxt})
+            rate_limited, status = True, 429
+        elif auth0_ready and request.POST.get("method") != "local":
+            return _begin_auth0(request, next_url=nxt)
+        else:
+            local_form = AuthenticationForm(request, data=request.POST)
+            if local_form.is_valid():
+                login(request, local_form.get_user())
+                return redirect(destination_for(local_form.get_user(), nxt))
+    return render(
+        request,
+        "accounts/login.html",
+        {
+            "local_form": local_form,
+            "auth0_ready": auth0_ready,
+            "rate_limited": rate_limited,
+            "next": nxt,
+        },
+        status=status,
+    )
 
 
 def auth0_login(request):
     if request.user.is_authenticated:
         return redirect(destination_for(request.user, safe_next(request.GET.get("next"))))
     if get_auth0_client() is None:
-        messages.error(request, "Auth0 isn't configured, so sign-in is unavailable.")
+        messages.error(request, "Auth0 isn't configured on this server. Use a Finovate account instead.")
         return redirect("accounts:login")
     screen_hint = request.GET.get("screen_hint") if request.GET.get("screen_hint") in {"signup", "login"} else None
     return _begin_auth0(
@@ -111,7 +141,7 @@ def auth0_callback(request):
     """
     client = get_auth0_client()
     if client is None:
-        messages.error(request, "Auth0 isn't configured, so sign-in is unavailable.")
+        messages.error(request, "Auth0 isn't configured on this server. Use a Finovate account instead.")
         return redirect("accounts:login")
 
     try:
@@ -174,7 +204,7 @@ def _auth_failure(request, exc):
 def _begin_auth0(request, screen_hint=None, login_hint=None, next_url="", max_age=None):
     client = get_auth0_client()
     if client is None:
-        messages.error(request, "Auth0 isn't configured, so sign-in is unavailable.")
+        messages.error(request, "Auth0 isn't configured on this server. Use a Finovate account instead.")
         return redirect("accounts:login")
     authorization_params = {}
     if screen_hint:

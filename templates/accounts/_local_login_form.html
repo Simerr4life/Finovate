@@ -1,0 +1,10 @@
+<form method="post" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="method" value="local">
+  <input type="hidden" name="next" value="{{ next }}">
+  {% for field in local_form %}
+  <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
+  {% endfor %}
+  {% for error in local_form.non_field_errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  <button type="submit" class="button ghost" style="width:100%;margin-top:18px;">Log in</button>
+</form>

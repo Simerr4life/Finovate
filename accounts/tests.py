@@ -26,6 +26,7 @@ from .models import NotificationEvent, Profile
 
 
 @override_settings(
+    AUTH0_AUDIENCE="",
     AUTH0_DOMAIN="",
     AUTH0_CLIENT_ID="",
     AUTH0_CLIENT_SECRET="",
@@ -47,23 +48,42 @@ class Auth0UnconfiguredFallbackTests(TestCase):
         messages = list(response.context["messages"])
         self.assertTrue(any("isn't configured" in str(m) for m in messages))
 
-    def test_signup_does_not_create_a_local_user(self):
+    def test_signup_creates_a_local_account_when_auth0_is_off(self):
+        cache.clear()
         response = self.client.post(reverse("accounts:signup"), {
-            "name": "Local User",
+            "username": "localuser",
             "email": "local@example.com",
             "password1": "a-strong-pass-123",
             "password2": "a-strong-pass-123",
         })
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(User.objects.count(), 0)
-        self.assertNotContains(response, "already registered")
-        self.assertNotContains(response, 'type="password"')
+        self.assertRedirects(response, reverse("accounts:onboarding"))
+        user = User.objects.get(username="localuser")
+        self.assertTrue(user.has_usable_password())
+        self.assertIsNone(user.profile.auth0_sub)
 
-    def test_login_page_does_not_offer_a_local_password(self):
+    def test_login_page_offers_only_the_local_form(self):
         response = self.client.get(reverse("accounts:login"))
         self.assertNotContains(response, "Continue with Auth0")
-        self.assertNotContains(response, 'type="password"')
-        self.assertContains(response, "isn't configured")
+        self.assertContains(response, 'type="password"')
+
+    def test_local_login_and_wrong_password(self):
+        cache.clear()
+        User.objects.create_user(username="localuser", password="a-strong-pass-123")
+        bad = self.client.post(reverse("accounts:login"), {"username": "localuser", "password": "nope"})
+        self.assertEqual(bad.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        good = self.client.post(reverse("accounts:login"), {"username": "localuser", "password": "a-strong-pass-123"})
+        self.assertRedirects(good, reverse("accounts:onboarding"))
+
+    def test_local_login_ignores_an_off_site_next(self):
+        cache.clear()
+        user = User.objects.create_user(username="localuser", password="a-strong-pass-123")
+        user.profile.onboarding_completed = True
+        user.profile.save()
+        response = self.client.post(reverse("accounts:login"), {
+            "username": "localuser", "password": "a-strong-pass-123", "next": "https://evil.example/",
+        })
+        self.assertRedirects(response, reverse("dashboard"))
 
     def test_login_page_shows_the_logo_and_no_demo_banner(self):
         response = self.client.get(reverse("accounts:login"))
@@ -75,6 +95,7 @@ class Auth0UnconfiguredFallbackTests(TestCase):
 
 
 @override_settings(
+    AUTH0_AUDIENCE="",
     AUTH0_DOMAIN="test.auth0.com",
     AUTH0_CLIENT_ID="cid",
     AUTH0_CLIENT_SECRET="secret",
@@ -87,8 +108,33 @@ class Auth0ConfiguredTests(TestCase):
 
     def test_login_page_shows_auth0_button(self):
         response = self.client.get(reverse("accounts:login"))
-        self.assertContains(response, "Continue with Auth0")
-        self.assertNotContains(response, 'type="password"')
+        self.assertContains(response, "Continue with Auth0 (recommended)")
+        self.assertContains(response, 'type="password"')
+
+    def test_local_account_still_works_when_auth0_is_configured(self):
+        cache.clear()
+        response = self.client.post(reverse("accounts:signup"), {
+            "method": "local",
+            "username": "localuser",
+            "password1": "a-strong-pass-123",
+            "password2": "a-strong-pass-123",
+        })
+        self.assertRedirects(response, reverse("accounts:onboarding"))
+        self.client.post(reverse("accounts:logout"))
+        response = self.client.post(reverse("accounts:login"), {
+            "method": "local", "username": "localuser", "password": "a-strong-pass-123",
+        })
+        self.assertRedirects(response, reverse("accounts:onboarding"))
+        self.assertEqual(self.client.get(reverse("accounts:onboarding")).status_code, 200)
+
+    def test_auth0_user_cannot_log_in_with_a_local_password(self):
+        cache.clear()
+        profile, _ = sync_profile_from_claims({"sub": "auth0|x", "email": "x@example.com", "email_verified": True})
+        response = self.client.post(reverse("accounts:login"), {
+            "method": "local", "username": profile.user.username, "password": "",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
 
     def _client(self, result=None, error=None):
         if isinstance(result, dict):
@@ -255,6 +301,7 @@ class SafeRedirectTests(TestCase):
 
 
 @override_settings(
+    AUTH0_AUDIENCE="",
     AUTH0_DOMAIN="test.auth0.com",
     AUTH0_CLIENT_ID="cid",
     AUTH0_CLIENT_SECRET="secret",
@@ -490,6 +537,7 @@ class AccessTokenApiTests(TestCase):
 
 
 @override_settings(
+    AUTH0_AUDIENCE="",
     AUTH0_DOMAIN="test.auth0.com",
     AUTH0_CLIENT_ID="cid",
     AUTH0_CLIENT_SECRET="secret",

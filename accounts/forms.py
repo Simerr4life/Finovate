@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 
@@ -44,6 +46,17 @@ class RegistrationForm(forms.Form):
         if phone is None:
             raise ValidationError("Enter a phone number with 8 to 15 digits, or leave it blank.")
         return phone
+
+
+class LocalSignUpForm(UserCreationForm):
+    """A Finovate-only account with a password stored (hashed) by Django.
+    Offered alongside Auth0, which stays the recommended way to sign up."""
+
+    email = forms.EmailField(required=False, label="Email (optional)")
+
+    class Meta:
+        model = User
+        fields = ["username", "email", "password1", "password2"]
 
 
 class OnboardingForm(forms.ModelForm):
