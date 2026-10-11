@@ -28,3 +28,13 @@ def signed_money(value, kind="expense") -> str:
     if kind == "income" or (hasattr(value, "__gt__") and value > 0 and kind == "signed"):
         return f"+{formatted}"
     return f"-{formatted}"
+
+
+@register.simple_tag
+def submission_key():
+    """Hidden field that lets the server ignore an accidental double submit."""
+    import uuid
+
+    from django.utils.html import format_html
+
+    return format_html('<input type="hidden" name="idempotency_key" value="{}">', uuid.uuid4().hex)

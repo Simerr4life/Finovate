@@ -7,27 +7,123 @@
   <div>
     <div class="eyebrow">FINOVATE</div>
     <div class="page-title">Savings Pools</div>
-    <div class="page-subtitle">Create your own savings goals and track your progress.</div>
+    <div class="page-subtitle">Your three automatic pools, plus any pools you create yourself.</div>
   </div>
   <a class="button" href="{% url 'savings:goal_add' %}?from=pools">{% include "partials/icon.html" with name="plus" size=17 %} Create a pool</a>
 </div>
 
 <div class="goal-overview">
-  <div><span>Total in pools</span><div class="money">{{ saved_total|money }}</div></div>
-  <div><span>Combined targets</span><div class="money">{{ target_total|money }}</div></div>
-  <div><span>Active pools</span><div class="money">{{ pool_count }}</div></div>
+  <div><span>Deposited in pools</span><div class="money">{{ saved_total|money }}</div></div>
+  <div><span>Recommended each month</span><div class="money">{{ plan_total|money }}</div></div>
+  <div><span>Pools</span><div class="money">{{ pool_count }}</div></div>
 </div>
 
+{% if not capacity.is_complete %}
+<div class="notice warning">{% include "partials/icon.html" with name="target" size=18 %}<span>{{ capacity.missing|first }} <a class="text-link" href="{% url 'accounts:manual_setup' %}">Add it now</a></span></div>
+{% elif capacity.has_shortfall %}
+<div class="notice danger">{% include "partials/icon.html" with name="shield" size=18 %}<span>Your monthly costs exceed your income by {{ capacity.shortfall|money }}, so no contributions are recommended. <a class="text-link" href="{% url 'savings:index' %}">See the breakdown</a></span></div>
+{% elif savings_plan.status == 'active' %}
+<div class="notice">{% include "partials/icon.html" with name="check" size=18 %}<span>You can afford to save about <strong>{{ capacity.available|money }}</strong> a month. It's split across your pools below. <a class="text-link" href="{% url 'savings:index' %}">How we calculated this</a></span></div>
+{% endif %}
+
+<div class="pool-plan-grid">
+  {% for row in plan_rows %}
+  {% with pool=row.pool %}
+  <article class="card pool-plan-card" id="pool-{{ pool.pk }}" style="--swatch: {{ pool.color }};">
+    <header>
+      <div>
+        <h3>{{ pool.name }}</h3>
+        <p>{{ row.purpose }}</p>
+      </div>
+      <span class="pill">{{ row.percent }}%</span>
+    </header>
+    <div class="pool-stats">
+      <div class="pool-stat projection">
+        <span>RECOMMENDED</span>
+        <strong>{{ row.recommended_per_period|money }}</strong>
+        <small>per {% if savings_plan.cadence == 'weekly' %}week{% else %}month{% endif %} · projection</small>
+      </div>
+      <div class="pool-stat">
+        <span>DEPOSITED</span>
+        <strong>{{ row.deposited|money }}</strong>
+        <small>recorded by you</small>
+      </div>
+    </div>
+    {% if pool.has_target %}
+    <div>
+      <div class="progress-label"><span>{{ pool.progress_percent }}% of {{ pool.target_amount|money }}</span><strong>{{ pool.remaining_amount|money }} to go</strong></div>
+      <div class="progress" role="progressbar" aria-label="{{ pool.name }} progress" aria-valuenow="{{ pool.progress_percent }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ pool.progress_percent }}%;"></i></div>
+    </div>
+    {% endif %}
+    <div class="pool-plan-meta">
+      {% if not pool.has_target %}
+        <span>No target set yet.{% if pool.pool_kind == 'rainy_day' and suggested_rainy_target %} Suggested: <strong>{{ suggested_rainy_target|money }}</strong> (about 3 months of costs).{% endif %}</span>
+      {% elif pool.remaining_amount <= 0 %}
+        <span><strong>Target reached.</strong></span>
+      {% elif row.estimated_completion %}
+        <span>Estimated completion: <strong>{{ row.estimated_completion|date:"F Y" }}</strong> at the recommended pace.</span>
+      {% else %}
+        <span>No completion estimate until the plan recommends a contribution.</span>
+      {% endif %}
+      {% if row.target_unreachable %}
+        <span class="field-error">{% if row.required_monthly %}Reaching this target by {{ pool.target_date|date:"M j, Y" }} needs {{ row.required_monthly|money }}/month — more than your budget currently supports.{% else %}The target date has passed.{% endif %}</span>
+      {% endif %}
+    </div>
+    <div class="pool-plan-actions">
+      <a class="button" href="{% url 'savings:goal_detail' pool.pk %}{% if row.recommended_monthly > 0 %}?amount={{ row.recommended_per_period }}{% endif %}">Record a deposit</a>
+      {% if pool.pool_kind == 'rainy_day' and not pool.has_target and suggested_rainy_target %}
+      <form method="post" action="{% url 'savings:apply_suggested_target' pool.pk %}">{% csrf_token %}<button class="button secondary" type="submit">Use suggested target</button></form>
+      {% endif %}
+      <a class="button ghost" href="{% url 'savings:goal_edit' pool.pk %}?from=pools">{% include "partials/icon.html" with name="pencil" size=14 %} Edit</a>
+    </div>
+  </article>
+  {% endwith %}
+  {% endfor %}
+</div>
+
+<section class="card plan-settings" id="plan">
+  <div class="card-header">
+    <div>
+      <div class="section-title">Savings plan settings</div>
+      <div class="muted">Choose how your available savings are split and how often you plan to contribute. Changes recalculate your plan immediately.</div>
+    </div>
+    <span class="status-badge {{ savings_plan.status }}">{{ savings_plan.get_status_display }}</span>
+  </div>
+  <form method="post" action="{% url 'savings:plan_update' %}" data-plan-form novalidate>
+    {% csrf_token %}
+    {% if plan_form.non_field_errors %}<div class="notice danger" role="alert" style="margin-top:14px;">{% for error in plan_form.non_field_errors %}{{ error }}{% endfor %}</div>{% endif %}
+    <div class="plan-form-grid">
+      {% for field in plan_form %}
+      <label class="field-label{% if field.name == 'cadence' or field.name == 'status' %} wide{% endif %}" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
+      {% endfor %}
+    </div>
+    <div class="button-row" style="justify-content: space-between; margin-top: 14px;">
+      <span class="percent-total" data-percent-total aria-live="polite">Total: {{ savings_plan.rainy_day_percent|add:savings_plan.investment_percent|add:savings_plan.regular_percent }}%</span>
+      <div class="button-row">
+        <a class="button ghost" href="{% url 'savings:pools' %}#plan">Cancel</a>
+        <button class="button" type="submit" data-loading-text="Saving…">Save plan</button>
+      </div>
+    </div>
+    <p class="muted">Defaults: Rainy Day 40%, Investment 20%, Regular Savings 40%. Pausing keeps your pools and balances; it only stops new recommendations.</p>
+  </form>
+</section>
+
+<div class="section-heading">
+  <div>
+    <div class="section-title">Your other pools</div>
+    <div class="muted">Pools you created for specific goals</div>
+  </div>
+</div>
 {% if pool_rows %}
 <div class="goals-grid">
   {% for row in pool_rows %}
   {% with pool=row.goal %}
   <article class="card goal-card">
     <div class="goal-icon">{% include "partials/icon.html" with name="vault" %}</div>
-    <a class="goal-menu" href="{% url 'savings:goal_edit' pool.pk %}?from=pools">Edit</a>
+    <a class="goal-menu" href="{% url 'savings:goal_edit' pool.pk %}?from=pools" aria-label="Edit {{ pool.name }}">Edit</a>
     <div class="recommend-title">{{ pool.name }}</div>
-    <div class="goal-money"><strong>{{ pool.current_amount|money }}</strong><span>of {{ pool.target_amount|money }}</span></div>
-    <div class="progress"><i style="width: {{ pool.progress_percent }}%; background: {{ pool.color }};"></i></div>
+    <div class="goal-money"><strong>{{ pool.current_amount|money }}</strong><span>{% if pool.has_target %}of {{ pool.target_amount|money }}{% else %}no target set{% endif %}</span></div>
+    <div class="progress" role="progressbar" aria-label="{{ pool.name }} progress" aria-valuenow="{{ pool.progress_percent }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ pool.progress_percent }}%; background: {{ pool.color }};"></i></div>
     <div class="progress-label"><strong>{{ pool.progress_percent }}% complete</strong><span>{{ pool.remaining_amount|money }} remaining</span></div>
     <div class="goal-footer"><span>{% if pool.target_date %}Target · {{ pool.target_date|date:"F Y" }}{% elif row.estimated_completion %}Estimate · {{ row.estimated_completion|date:"F Y" }}{% else %}No target date{% endif %}</span></div>
     <a class="text-link" href="{% url 'savings:goal_detail' pool.pk %}">Open pool {% include "partials/icon.html" with name="arrow" size=15 %}</a>
@@ -36,11 +132,12 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="card">
-  <h3>Create your first savings pool</h3>
-  <p class="muted">Pools let you separate your savings into goals like vacations, a new car, an emergency fund, or anything else you're saving for.</p>
+<div class="card goal-empty">
+  <div class="goal-icon">{% include "partials/icon.html" with name="vault" %}</div>
+  <h2>Create a pool for a specific goal</h2>
+  <p>Separate savings for things like a vacation or a new car. Your three automatic pools stay as they are.</p>
   <a class="button" href="{% url 'savings:goal_add' %}?from=pools">Create a pool</a>
 </div>
 {% endif %}
-<p class="muted">Money added to your pools is included in your total savings.</p>
+<p class="muted">Deposited amounts are money you've recorded as moved into a pool. Recommended amounts are projections and are never counted as savings until you record them.</p>
 {% endblock %}

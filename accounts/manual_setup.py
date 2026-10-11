@@ -10,6 +10,7 @@ budgets UI, without adding a source column to IncomeSource/RecurringExpense.
 
 from decimal import Decimal
 
+from django.db import transaction
 from django.utils import timezone
 
 from budgets.models import IncomeSource, RecurringExpense
@@ -50,11 +51,13 @@ def _set_recurring_expense(user, name, amount):
         RecurringExpense.objects.filter(user=user, name=name).update(is_active=False)
 
 
+@transaction.atomic
 def apply_manual_setup(user, cleaned_data: dict) -> None:
     """Writes the quick-setup form's cleaned_data as IncomeSource,
     RecurringExpense, and Profile rows. Idempotent: resubmitting the form
     (e.g. to update one number) updates the same reserved-name rows rather
-    than piling up duplicates.
+    than piling up duplicates. Atomic, so the rows land together and the
+    savings plan recalculates once from the final figures.
     """
     _set_income_source(user, TAKE_HOME_INCOME_NAME, cleaned_data.get("take_home_income"))
     _set_income_source(user, ADDITIONAL_INCOME_NAME, cleaned_data.get("additional_income"))

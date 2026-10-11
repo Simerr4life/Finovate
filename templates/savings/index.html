@@ -7,60 +7,66 @@
   <div>
     <div class="eyebrow">FINOVATE</div>
     <div class="page-title">Savings Center</div>
-    <div class="page-subtitle">Build a plan around what is recorded as safe to consider.</div>
+    <div class="page-subtitle">How much you can afford to save each month, and where it should go.</div>
   </div>
-  <button class="button" type="button" data-open-review {% if surplus.investable_surplus <= 0 %}disabled{% endif %}>Review savings plan</button>
+  <a class="button" href="{% url 'savings:pools' %}#plan">Manage savings plan {% include "partials/icon.html" with name="arrow" size=17 %}</a>
+</div>
+
+{% for row in unreachable_targets %}
+<div class="notice warning">{% include "partials/icon.html" with name="target" size=18 %}<span>Your current budget can't reach the <strong>{{ row.pool.name }}</strong> target by {{ row.pool.target_date|date:"F j, Y" }}{% if row.required_monthly %}: it needs {{ row.required_monthly|money }}/month, and the plan recommends {{ row.recommended_monthly|money }}{% else %}: the target date has passed{% endif %}. <a class="text-link" href="{% url 'savings:goal_edit' row.pool.pk %}?from=pools">Adjust the target</a></span></div>
+{% endfor %}
+
+<div class="plan-hero">
+  <section class="card" aria-labelledby="capacity-title">
+    <div class="label" id="capacity-title">MONTHLY SAVINGS CAPACITY</div>
+    {% include "savings/_capacity.html" %}
+  </section>
+  <section class="card">
+    {% include "savings/_plan_split.html" %}
+    <a class="text-link" href="{% url 'savings:pools' %}">See your pools {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+  </section>
 </div>
 
 <div class="savings-hero">
   <section class="card savings-total">
-    <div class="label">CURRENT SAVINGS</div>
-    <div class="money">{{ saved_total|money }}</div>
-    {% if emergency %}
-    <div class="progress-label"><span>{{ emergency.name }}</span><strong>{{ emergency.progress_percent }}%</strong></div>
-    <div class="progress" role="progressbar" aria-valuenow="{{ emergency.progress_percent }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ emergency.progress_percent }}%"></i></div>
-    <div class="muted">{{ emergency.remaining_amount|money }} remaining toward the {{ emergency.target_amount|money }} target</div>
-    {% elif goals %}
-    <div class="muted">Cash recorded across {{ goals|length }} goal{{ goals|length|pluralize }}. This is not invested market value.</div>
-    {% else %}
-    <div class="muted">No savings goals yet. <a class="text-link" href="{% url 'savings:goal_add' %}">Create one</a></div>
-    {% endif %}
+    <div class="label">DEPOSITED IN POOLS</div>
+    <div class="money" data-count-to="{{ saved_total }}">{{ saved_total|money }}</div>
+    <div class="muted">Money you've recorded as deposited across {{ goals|length }} pool{{ goals|length|pluralize }}. Recommendations aren't counted until you record a deposit.</div>
+    {% for row in plan_rows %}
+    <div class="progress-label"><span>{{ row.pool.name }}</span><strong>{{ row.deposited|money }}{% if row.pool.has_target %} of {{ row.pool.target_amount|money }}{% endif %}</strong></div>
+    <div class="progress" role="progressbar" aria-label="{{ row.pool.name }} progress" aria-valuenow="{{ row.pool.progress_percent }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ row.pool.progress_percent }}%; background: {{ row.pool.color }};"></i></div>
+    {% endfor %}
   </section>
   <section class="card surplus-card">
     <div>
-      <div class="label">POTENTIAL SURPLUS</div>
+      <div class="label">CASH YOU COULD INVEST</div>
       <div class="money">{{ surplus.investable_surplus|money }}</div>
-      <div class="muted">Estimated, not yet saved</div>
-    </div>
-    <div class="surplus-ring" style="background: radial-gradient(circle, white 60%, transparent 61%), conic-gradient(var(--green) 0 100%, #e8ece8 0);">
-      <strong>{{ surplus.investable_surplus|money }}</strong>
-      <span>available</span>
+      <div class="muted">From your recorded cash balance after reserves. Estimated, not yet saved.</div>
+      <button class="button secondary mt-3" type="button" data-open-review {% if surplus.investable_surplus <= 0 %}disabled title="No cash is available after your reserves"{% endif %}>Review investment idea</button>
     </div>
   </section>
 </div>
 
 <div class="two-column">
   <section class="card">
-    <div class="section-title">How we calculated your surplus</div>
+    <div class="section-title">How the investable cash is calculated</div>
     <div class="waterfall">
       <div><span>Cash balance</span><strong>{{ surplus.cash_balance|money }}</strong></div>
-      <div><span>Goal allocations</span><strong>-{{ surplus.goal_allocations|money }}</strong></div>
+      <div><span>Already in pools</span><strong>-{{ surplus.goal_allocations|money }}</strong></div>
       <div><span>Upcoming bills buffer</span><strong>-{{ surplus.upcoming_bills_buffer|money }}</strong></div>
       <div><span>Minimum reserve</span><strong>-{{ surplus.minimum_cash_reserve|money }}</strong></div>
-      <div class="total"><span>Potential surplus</span><strong>{{ surplus.investable_surplus|money }}</strong></div>
+      <div class="total"><span>Cash you could invest</span><strong>{{ surplus.investable_surplus|money }}</strong></div>
     </div>
     <div class="callout">{% include "partials/icon.html" with name="shield" %}<span>Your {{ surplus.minimum_cash_reserve|money }} minimum cash reserve is protected in this estimate.</span></div>
   </section>
   <section class="card">
-    <div class="section-title">Proposed allocation</div>
-    <div class="allocation-bar"><i id="alloc-bar-emergency" style="width: 60%"></i><i></i><i></i></div>
-    <div class="allocation-list">
-      <label><span><i class="dot green"></i>Emergency savings</span><strong id="alloc-emergency">$0</strong></label>
-      <input id="emergency-alloc" type="range" min="30" max="80" value="60" data-surplus="{{ surplus.investable_surplus }}" aria-label="Emergency savings allocation">
-      <label><span><i class="dot gold"></i>Short-term goals</span><strong id="alloc-short">$0</strong></label>
-      <label><span><i class="dot navy"></i>Long-term investing</span><strong id="alloc-long">$0</strong></label>
+    <div class="section-title">Recommended, transferred, deposited</div>
+    <div class="waterfall">
+      <div><span>Recommended this month</span><strong>{{ plan_total|money }}</strong></div>
+      <div><span>Transferred by Finovate</span><strong>$0.00</strong></div>
+      <div><span>Deposited (recorded by you)</span><strong>{{ saved_total|money }}</strong></div>
     </div>
-    <div class="muted">Adjusting this preview does not move money.</div>
+    <div class="callout">{% include "partials/icon.html" with name="shield" %}<span>No bank is connected, so Finovate never moves money. After you transfer money yourself, record the deposit on the pool so its balance stays accurate.</span></div>
   </section>
 </div>
 
@@ -83,21 +89,21 @@
   {% endif %}
   {% if surplus.investable_surplus > 0 %}
   <section class="card recommendation">
-    <span class="pill good">Surplus</span>
+    <span class="pill good">Cash</span>
     <div class="recommend-title">Review before anything is proposed</div>
     <div class="money small">{{ surplus.investable_surplus|money }}</div>
     <p>This amount is still cash. Saving a proposal does not move it until you approve a simulated order.</p>
     <button class="text-link" type="button" data-open-review>Explore idea {% include "partials/icon.html" with name="arrow" size=15 %}</button>
   </section>
   {% endif %}
-  {% if not goals %}
+  {% if suggested_rainy_target %}{% for row in plan_rows %}{% if row.pool.pool_kind == 'rainy_day' and not row.pool.has_target %}
   <section class="card recommendation">
-    <span class="pill">Goals</span>
-    <div class="recommend-title">Name a savings goal</div>
-    <div class="money small">$0.00</div>
-    <p>Goal cash is tracked separately from this surplus estimate.</p>
-    <a class="text-link" href="{% url 'savings:goal_add' %}">Create a goal {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+    <span class="pill">Rainy Day</span>
+    <div class="recommend-title">Set a 3-month emergency target</div>
+    <div class="money small">{{ suggested_rainy_target|money }}</div>
+    <p>About three months of your current costs. You can change it any time.</p>
+    <form method="post" action="{% url 'savings:apply_suggested_target' row.pool.pk %}">{% csrf_token %}<button class="text-link" type="submit">Use this target {% include "partials/icon.html" with name="arrow" size=15 %}</button></form>
   </section>
-  {% endif %}
+  {% endif %}{% endfor %}{% endif %}
 </div>
 {% endblock %}

@@ -6,7 +6,10 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
@@ -17,10 +20,12 @@ from assistant.linking import code_is_active, issue_link_code
 from assistant.models import MessagingLinkCode
 
 from budgets.services import build_budget_plan
+from core.display import display_name, user_initials
 
 from .auth0 import apply_auth0_cookies, auth0_configured, get_auth0_client, logout_return_url
-from .forms import EmailLoginForm, EmailSignUpForm, ManualSetupForm, OnboardingForm, ProfileSettingsForm, RegistrationForm
+from .forms import DisplayNameForm, EmailLoginForm, EmailSignUpForm, ManualSetupForm, OnboardingForm, ProfileSettingsForm, RegistrationForm
 from .manual_setup import apply_manual_setup, initial_from_existing
+from .models import THEME_CHOICES
 from .identity import (
     ACCOUNT_BLOCKED,
     AUTHENTICATION_FAILED,
@@ -463,6 +468,7 @@ def settings_view(request):
             return redirect("accounts:settings")
     else:
         form = ProfileSettingsForm(instance=profile)
+    name_form = DisplayNameForm(initial={"name": display_name(request.user)})
     connected_accounts = request.user.connected_accounts.all()
     roundup_settings = getattr(request.user, "roundup_settings", None)
     link_code = request.session.get("messaging_link_preview") or ""
@@ -474,6 +480,7 @@ def settings_view(request):
         "accounts/settings.html",
         {
             "form": form,
+            "name_form": name_form,
             "connected_accounts": connected_accounts,
             "roundup_settings": roundup_settings,
             "link_code": link_code,
@@ -507,3 +514,55 @@ def messaging_unlink(request):
     request.session.pop("messaging_link_preview", None)
     messages.success(request, "Messaging chat unlinked. It can no longer change this account.")
     return redirect("accounts:settings")
+
+
+def _wants_json(request):
+    return "application/json" in request.headers.get("Accept", "")
+
+
+@login_required
+@require_POST
+def update_name(request):
+    """Change the display name. Touches first_name/last_name only."""
+    form = DisplayNameForm(request.POST)
+    if not form.is_valid():
+        error = form.errors.get("name", ["Enter a valid name."])[0]
+        if _wants_json(request):
+            return JsonResponse({"ok": False, "error": error}, status=400)
+        messages.error(request, error)
+        return redirect(reverse("accounts:settings") + "#profile")
+
+    name = form.cleaned_data["name"]
+    first, _, rest = name.partition(" ")
+    user = request.user
+    with transaction.atomic():
+        user.first_name = first
+        user.last_name = rest
+        user.save(update_fields=["first_name", "last_name"])
+        profile = user.profile
+        profile.name_customized_at = timezone.now()
+        profile.save(update_fields=["name_customized_at", "updated_at"])
+
+    payload = {"ok": True, "name": display_name(user), "initials": user_initials(user)}
+    if _wants_json(request):
+        return JsonResponse(payload)
+    messages.success(request, "Your name was updated.")
+    return redirect(reverse("accounts:settings") + "#profile")
+
+
+@login_required
+@require_POST
+def update_theme(request):
+    """Persist the color theme chosen with the header toggle."""
+    theme = request.POST.get("theme", "")
+    if theme not in {value for value, _ in THEME_CHOICES}:
+        if _wants_json(request):
+            return JsonResponse({"ok": False, "error": "Unknown theme."}, status=400)
+        messages.error(request, "That theme isn't available.")
+        return redirect("accounts:settings")
+    profile = request.user.profile
+    profile.theme = theme
+    profile.save(update_fields=["theme", "updated_at"])
+    if _wants_json(request):
+        return JsonResponse({"ok": True, "theme": theme})
+    return redirect(safe_next(request.POST.get("next")) or reverse("accounts:settings"))

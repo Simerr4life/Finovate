@@ -283,6 +283,11 @@ def _find_goal(user, name_hint: str):
             return None, f"That matches more than one goal: {', '.join(g.name for g in matches)}. Be more specific."
     if qs.count() == 1:
         return qs.first(), None
+    # Every user also has three default pools; a lone goal the user created
+    # themselves is still unambiguous. The change still needs a "yes".
+    custom = qs.filter(pool_kind="")
+    if custom.count() == 1:
+        return custom.first(), None
     return None, "I couldn't tell which goal you meant — include part of its name."
 
 

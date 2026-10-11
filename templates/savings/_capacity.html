@@ -1,0 +1,47 @@
+{% load finovate %}
+{# Breakdown of the monthly savings capacity. Expects `capacity`; pass compact=True to hide line items. #}
+{% if capacity.is_complete %}
+<div class="plan-figure">
+  {% if capacity.has_shortfall %}
+  <div class="money negative" data-count-to="-{{ capacity.shortfall }}">-{{ capacity.shortfall|money }}</div><small>per month shortfall</small>
+  {% else %}
+  <div class="money" data-count-to="{{ capacity.available }}">{{ capacity.available|money }}</div><small>per month available to save</small>
+  {% endif %}
+</div>
+<div class="waterfall">
+  <div class="group"><span>Income</span><strong>{{ capacity.monthly_income|money }}</strong></div>
+  {% if not compact %}{% for line in capacity.income_lines %}
+  <div class="sub"><span>{{ line.label }}{% if line.note %} · {{ line.note }}{% endif %}</span><strong>{{ line.amount|money }}</strong></div>
+  {% endfor %}{% endif %}
+  <div class="group"><span>Costs &amp; obligations</span><strong>-{{ capacity.total_costs|money }}</strong></div>
+  {% if not compact %}{% for line in capacity.cost_lines %}
+  <div class="sub"><span>{{ line.label }}{% if line.note %} · {{ line.note }}{% endif %}</span><strong>-{{ line.amount|money }}</strong></div>
+  {% endfor %}{% endif %}
+  {% if capacity.has_shortfall %}
+  <div class="total negative"><span>Shortfall</span><strong>-{{ capacity.shortfall|money }}</strong></div>
+  {% else %}
+  <div class="total"><span>Available to save</span><strong>{{ capacity.available|money }}</strong></div>
+  {% endif %}
+</div>
+{% if capacity.excluded_lines %}
+<p class="muted">Not counted:
+  {% for line in capacity.excluded_lines %}{{ line.label }} ({{ line.amount|money }}/mo) — {{ line.note }}{% if not forloop.last %}; {% endif %}{% endfor %}
+</p>
+{% endif %}
+{% if capacity.has_shortfall %}
+<div class="notice danger" style="margin-top:14px;">{% include "partials/icon.html" with name="shield" size=18 %}<span>Your costs are higher than your income, so no savings are recommended. Nothing is allocated from money you don't have. Review your <a class="text-link" href="{% url 'budgets:index' %}">income and expenses</a>.</span></div>
+{% endif %}
+{% if compact %}<a class="text-link" href="{% url 'savings:index' %}">See the full breakdown {% include "partials/icon.html" with name="arrow" size=15 %}</a>{% else %}
+<details class="assumptions">
+  <summary>How this is calculated</summary>
+  <p><strong>Available savings = income − costs &amp; obligations.</strong> If that's negative, it's shown as a shortfall and nothing is allocated.</p>
+  <ul class="list-disc">{% for note in capacity.assumptions %}<li>{{ note }}</li>{% endfor %}</ul>
+</details>{% endif %}
+{% else %}
+<div class="notice warning" style="margin-top:12px;">{% include "partials/icon.html" with name="target" size=18 %}<span>We need a bit more information before we can recommend how much to save.</span></div>
+<ul class="missing-list">{% for item in capacity.missing %}<li>{{ item }}</li>{% endfor %}</ul>
+<div class="button-row">
+  <a class="button" href="{% url 'accounts:manual_setup' %}">Enter income &amp; expenses</a>
+  <a class="button secondary" href="{% url 'imports:upload' %}">Import a statement</a>
+</div>
+{% endif %}

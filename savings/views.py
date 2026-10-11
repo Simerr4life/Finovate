@@ -1,16 +1,50 @@
 from decimal import Decimal
 
 from django.contrib import messages
-from django.utils import timezone
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from accounts.models import NotificationEvent
+from core.idempotency import claim_submission
 from investing.models import PortfolioSnapshot
 
-from .forms import ContributionForm, GoalForm
-from .models import Goal
+from .forms import ContributionForm, GoalForm, SavingsPlanForm
+from .models import Goal, SavingsPlan
+from .planning import (
+    DEFAULT_POOLS,
+    allocate,
+    pool_plan_rows,
+    recalculate_plan,
+    suggested_rainy_day_target,
+)
 from .services import MILESTONES, contribution_pace, estimate_completion_date
+
+
+def plan_context(user, today=None):
+    """Everything a page needs to show the automated plan. Recalculates first
+    (idempotent) so figures always reflect the latest income and expenses."""
+    result = recalculate_plan(user, today=today)
+    plan, capacity = result.plan, result.capacity
+    rows = pool_plan_rows(plan, today=today)
+    preview = allocate(capacity.available, plan.percents())
+    return {
+        "savings_plan": plan,
+        "capacity": capacity,
+        "plan_rows": rows,
+        "plan_total": sum((row.recommended_monthly for row in rows), Decimal("0.00")),
+        "plan_total_per_period": sum((row.recommended_per_period for row in rows), Decimal("0.00")),
+        "plan_preview": [
+            {"name": spec["name"], "kind": spec["pool_kind"], "color": spec["color"],
+             "percent": plan.percents()[spec["pool_kind"]], "amount": preview[spec["pool_kind"]]}
+            for spec in DEFAULT_POOLS
+        ],
+        "suggested_rainy_target": suggested_rainy_day_target(capacity),
+        "unreachable_targets": [row for row in rows if row.target_unreachable],
+    }
 
 
 @login_required
@@ -19,44 +53,95 @@ def index(request):
 
     goals = list(Goal.objects.filter(user=request.user))
     saved = sum((g.current_amount for g in goals), Decimal("0"))
-    emergency = next((g for g in goals if g.category == Goal.Category.EMERGENCY), None)
     surplus = compute_investable_surplus(request.user)
-    return render(
-        request,
-        "savings/index.html",
-        {
-            "goals": goals,
-            "saved_total": saved,
-            "emergency": emergency,
-            "surplus": surplus,
-        },
-    )
+    context = {
+        "goals": goals,
+        "saved_total": saved,
+        "surplus": surplus,
+    }
+    context.update(plan_context(request.user))
+    return render(request, "savings/index.html", context)
 
 
 @login_required
 def pools(request):
+    context = plan_context(request.user)
     goals = list(Goal.objects.filter(user=request.user))
+    custom = [goal for goal in goals if not goal.is_default_pool]
     pool_rows = [
         {"goal": goal, "estimated_completion": estimate_completion_date(goal)}
-        for goal in goals
+        for goal in custom
     ]
-    saved_total = sum((goal.current_amount for goal in goals), Decimal("0"))
-    target_total = sum((goal.target_amount for goal in goals), Decimal("0"))
-    return render(
-        request,
-        "savings/pools.html",
+    context.update(
         {
             "pool_rows": pool_rows,
-            "saved_total": saved_total,
-            "target_total": target_total,
-            "pool_count": len(pool_rows),
-        },
+            "saved_total": sum((goal.current_amount for goal in goals), Decimal("0")),
+            "target_total": sum((goal.target_amount for goal in goals), Decimal("0")),
+            "pool_count": len(goals),
+            "plan_form": SavingsPlanForm(instance=context["savings_plan"]),
+        }
     )
+    return render(request, "savings/pools.html", context)
+
+
+@login_required
+@require_POST
+def plan_update(request):
+    plan, _ = SavingsPlan.objects.get_or_create(user=request.user)
+    form = SavingsPlanForm(request.POST, instance=plan)
+    if not form.is_valid():
+        context = plan_context(request.user)
+        goals = list(Goal.objects.filter(user=request.user))
+        context.update(
+            {
+                "pool_rows": [
+                    {"goal": g, "estimated_completion": estimate_completion_date(g)}
+                    for g in goals if not g.is_default_pool
+                ],
+                "saved_total": sum((g.current_amount for g in goals), Decimal("0")),
+                "target_total": sum((g.target_amount for g in goals), Decimal("0")),
+                "pool_count": len(goals),
+                "plan_form": form,
+            }
+        )
+        messages.error(request, "Your plan wasn't saved. Check the highlighted fields.")
+        return render(request, "savings/pools.html", context, status=400)
+    with transaction.atomic():
+        form.save()
+    recalculate_plan(request.user)
+    status = form.cleaned_data["status"]
+    if status == SavingsPlan.Status.PAUSED:
+        messages.success(request, "Savings plan paused. Recommendations are on hold until you resume it.")
+    elif status == SavingsPlan.Status.DISABLED:
+        messages.success(request, "Savings plan turned off. Your pools and their balances are unchanged.")
+    else:
+        messages.success(request, "Savings plan saved and recalculated.")
+    return redirect(f"{reverse("savings:pools")}#plan")
+
+
+@login_required
+@require_POST
+def apply_suggested_target(request, pk):
+    pool = get_object_or_404(Goal, pk=pk, user=request.user, pool_kind=Goal.PoolKind.RAINY_DAY)
+    suggested = suggested_rainy_day_target(recalculate_plan(request.user).capacity)
+    if suggested is None:
+        messages.error(request, "Add your income and expenses first so we can suggest a target.")
+    else:
+        pool.target_amount = suggested
+        if pool.current_amount < suggested:
+            pool.achieved_at = None
+        pool.save(update_fields=["target_amount", "achieved_at", "updated_at"])
+        messages.success(request, f"{pool.name} target set to ${suggested:,.2f} (about 3 months of costs).")
+    return redirect(f"{reverse("savings:pools")}#pool-{pool.pk}")
 
 
 @login_required
 def goals(request):
-    goals = Goal.objects.filter(user=request.user)
+    # Default pools only appear as goals once they have a target.
+    goals = [
+        goal for goal in Goal.objects.filter(user=request.user)
+        if not goal.is_default_pool or goal.has_target
+    ]
     today = timezone.localdate()
     goal_rows = []
     for goal in goals:
@@ -144,7 +229,9 @@ def goal_add(request):
 def goal_edit(request, pk):
     goal = get_object_or_404(Goal, pk=pk, user=request.user)
     return_to_pools = (
-        request.GET.get("from") == "pools" or request.POST.get("from") == "pools"
+        goal.is_default_pool
+        or request.GET.get("from") == "pools"
+        or request.POST.get("from") == "pools"
     )
     if request.method == "POST":
         form = GoalForm(request.POST, instance=goal)
@@ -157,13 +244,16 @@ def goal_edit(request, pk):
     return render(
         request,
         "savings/goal_form.html",
-        {"form": form, "mode": "edit", "return_to_pools": return_to_pools},
+        {"form": form, "mode": "edit", "return_to_pools": return_to_pools, "goal": goal},
     )
 
 
 @login_required
 def goal_delete(request, pk):
     goal = get_object_or_404(Goal, pk=pk, user=request.user)
+    if goal.is_default_pool:
+        messages.error(request, f"{goal.name} is one of your three default pools and can't be deleted. You can rename it or change its target instead.")
+        return redirect("savings:pools")
     if request.method == "POST":
         goal.delete()
         messages.success(request, "Goal deleted.")
@@ -175,7 +265,10 @@ def goal_delete(request, pk):
 def goal_detail(request, pk):
     goal = get_object_or_404(Goal, pk=pk, user=request.user)
     if request.method == "POST":
-        form = ContributionForm(request.POST)
+        form = ContributionForm(request.POST, goal=goal)
+        if form.is_valid() and not claim_submission(request, request.POST.get("idempotency_key")):
+            messages.info(request, "That entry was already recorded, so it wasn't added twice.")
+            return redirect("savings:goal_detail", pk=goal.pk)
         if form.is_valid():
             from .services import apply_contribution
 
@@ -197,7 +290,16 @@ def goal_detail(request, pk):
                 messages.success(request, "Contribution recorded.")
             return redirect("savings:goal_detail", pk=goal.pk)
     else:
-        form = ContributionForm()
+        initial = {}
+        suggested = request.GET.get("amount")
+        if suggested:
+            try:
+                value = Decimal(suggested)
+                if value > 0:
+                    initial["amount"] = value.quantize(Decimal("0.01"))
+            except (ArithmeticError, ValueError):
+                pass
+        form = ContributionForm(goal=goal, initial=initial)
     invested_snapshot = None
     if goal.is_investable:
         invested_snapshot = PortfolioSnapshot.objects.filter(user=request.user, pool=goal).order_by("-as_of").first()

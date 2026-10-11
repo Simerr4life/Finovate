@@ -1,20 +1,41 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" data-theme="{% if user.is_authenticated %}{{ user.profile.theme }}{% else %}light{% endif %}">
+{% with theme_pref=user.profile.theme|default:"system" %}
+<html lang="en" data-theme="{% if user.is_authenticated %}{{ theme_pref }}{% else %}system{% endif %}" data-theme-pref="{% if user.is_authenticated %}{{ theme_pref }}{% endif %}">
+{% endwith %}
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}Finovate{% endblock %}</title>
+  <script>
+    /* Resolve the theme before first paint so the page never flashes the
+       wrong colors. An account's saved preference wins; signed-out visitors
+       use the choice stored in this browser; otherwise follow the OS. */
+    (function () {
+      var root = document.documentElement;
+      root.classList.add("js");
+      var pref = root.getAttribute("data-theme-pref");
+      if (!pref) {
+        try { pref = localStorage.getItem("finovate-theme"); } catch (e) { pref = null; }
+      }
+      if (pref !== "light" && pref !== "dark") pref = "system";
+      var dark = pref === "dark" || (pref === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      root.setAttribute("data-theme-pref", pref);
+      root.setAttribute("data-theme", dark ? "dark" : "light");
+    })();
+  </script>
   <link rel="icon" href="{% static 'brand/favicon.ico' %}" sizes="32x32">
   <link rel="icon" href="{% static 'brand/Finovate_Logo.svg' %}" type="image/svg+xml">
   <link rel="icon" href="{% static 'brand/favicon-32.png' %}" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="{% static 'brand/apple-touch-icon.png' %}">
   <meta name="application-name" content="Finovate">
   <meta name="apple-mobile-web-app-title" content="Finovate">
-  <link rel="stylesheet" href="{% static 'css/finovate.css' %}">
+  <link rel="stylesheet" href="{% static 'css/finovate.css' %}?v=3">
   {% block extra_head %}{% endblock %}
 </head>
-<body class="{% if not user.is_authenticated %}guest{% endif %}" data-theme="{% if user.is_authenticated %}{{ user.profile.theme }}{% else %}light{% endif %}">
+<body class="{% if not user.is_authenticated %}guest{% endif %}"{% if user.is_authenticated %} data-theme-endpoint="{% url 'accounts:update_theme' %}"{% endif %}>
+  {% csrf_token %}
   <a href="#main-content" class="skip-link">Skip to content</a>
 
   <header class="auth-top guest-only">
@@ -23,6 +44,7 @@
       <span>finovate</span>
     </a>
     <div class="button-row">
+      <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode"><span class="icon-moon">{% include "partials/icon.html" with name="moon" size=18 %}</span><span class="icon-sun">{% include "partials/icon.html" with name="sun" size=18 %}</span></button>
       <a class="button ghost" href="{% url 'accounts:login' %}">Log in</a>
       <a class="button" href="{% url 'accounts:signup' %}">Get started</a>
     </div>
@@ -58,9 +80,9 @@
           </div>
         </div>
         <a class="profile" href="{% url 'accounts:settings' %}">
-          <span class="avatar">{{ user_initials }}</span>
+          <span class="avatar" data-user-initials>{{ user_initials }}</span>
           <span>
-            <strong>{{ user_display_name }}</strong>
+            <strong data-user-name>{{ user_display_name }}</strong>
             <small>{{ user.email|default:user.username }}</small>
           </span>
           {% include "partials/icon.html" with name="chevron" size=16 %}
@@ -73,9 +95,12 @@
         {% include "partials/brand_logo.html" %}
         <span>finovate</span>
       </a>
-      <button class="icon-button" type="button" data-menu-toggle aria-label="Open menu">{% include "partials/icon.html" with name="menu" %}</button>
+      <div class="mobile-header-actions">
+        <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode"><span class="icon-moon">{% include "partials/icon.html" with name="moon" size=18 %}</span><span class="icon-sun">{% include "partials/icon.html" with name="sun" size=18 %}</span></button>
+        <button class="icon-button" type="button" data-menu-toggle aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">{% include "partials/icon.html" with name="menu" %}</button>
+      </div>
     </header>
-    <div class="mobile-menu hidden" data-mobile-menu>
+    <nav class="mobile-menu hidden" id="mobile-menu" data-mobile-menu aria-label="More navigation">
       <a class="{% if nav_active == 'overview' %}active{% endif %}" href="{% url 'dashboard' %}">{% include "partials/icon.html" with name="grid" %} Overview</a>
       <a class="{% if nav_active == 'transactions' %}active{% endif %}" href="{% url 'budgets:transaction_list' %}">{% include "partials/icon.html" with name="card" %} Transactions</a>
       <a class="{% if nav_active == 'savings' %}active{% endif %}" href="{% url 'savings:index' %}">{% include "partials/icon.html" with name="vault" %} Savings</a>
@@ -84,17 +109,18 @@
       <a class="{% if nav_active == 'goals' %}active{% endif %}" href="{% url 'savings:goals' %}">{% include "partials/icon.html" with name="target" %} Financial Goals</a>
       <a class="{% if nav_active == 'insights' %}active{% endif %}" href="{% url 'insights' %}">{% include "partials/icon.html" with name="chart" %} Insights</a>
       <a class="{% if nav_active == 'settings' %}active{% endif %}" href="{% url 'accounts:settings' %}">{% include "partials/icon.html" with name="settings" %} Settings</a>
-    </div>
+    </nav>
 
     <main class="main" id="main-content">
       <div class="desktop-topbar">
         <div class="breadcrumbs">{% block breadcrumbs %}{% if nav_active == 'overview' %}Your financial home{% else %}Home / {% block crumb %}{% endblock %}{% endif %}{% endblock %}</div>
         <div class="top-actions">
-          <a class="icon-button" href="{% url 'accounts:settings' %}" aria-label="Notifications">
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode"><span class="icon-moon">{% include "partials/icon.html" with name="moon" size=18 %}</span><span class="icon-sun">{% include "partials/icon.html" with name="sun" size=18 %}</span></button>
+          <a class="icon-button" href="{% url 'accounts:settings' %}#notification-history" aria-label="Notifications{% if unread_notifications %} ({{ unread_notifications }} unread){% endif %}" title="Notifications">
             {% include "partials/icon.html" with name="bell" %}
             {% if unread_notifications %}<i class="notification-dot"></i>{% endif %}
           </a>
-          <span class="avatar small">{{ user_initials }}</span>
+          <a class="avatar small" href="{% url 'accounts:settings' %}#profile" title="Edit your profile" aria-label="Edit your profile" data-user-initials>{{ user_initials }}</a>
           <form method="post" action="{% url 'accounts:logout' %}">
             {% csrf_token %}
             <button type="submit" class="button ghost">Log out</button>
@@ -103,9 +129,9 @@
       </div>
       <div class="content">
         {% if messages %}
-        <div class="messages" role="status">
+        <div class="messages" role="status" aria-live="polite">
           {% for message in messages %}
-          <div class="message {% if message.tags == 'error' %}error{% endif %}">{{ message }}</div>
+          <div class="message {{ message.tags }}" data-message><span>{{ message }}</span><button type="button" class="message-close" data-dismiss-message aria-label="Dismiss">{% include "partials/icon.html" with name="x" size=14 %}</button></div>
           {% endfor %}
         </div>
         {% endif %}
@@ -124,8 +150,9 @@
     </nav>
   </div>
 
+  <div class="toast-region" data-toast-region role="status" aria-live="polite"></div>
   {% include "partials/review_modal.html" %}
-  <script src="{% static 'js/finovate.js' %}?v=2"></script>
+  <script src="{% static 'js/finovate.js' %}?v=3"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>

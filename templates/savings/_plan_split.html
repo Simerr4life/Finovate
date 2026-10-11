@@ -1,0 +1,24 @@
+{% load finovate %}
+{# Recommended split across the three default pools. Expects savings_plan, plan_preview, capacity. #}
+<div class="card-header">
+  <div>
+    <div class="section-title">Recommended split</div>
+    <div class="muted">Rainy Day {{ savings_plan.rainy_day_percent }}% · Investment {{ savings_plan.investment_percent }}% · Regular {{ savings_plan.regular_percent }}%</div>
+  </div>
+  <span class="status-badge {{ savings_plan.status }}">{{ savings_plan.get_status_display }}</span>
+</div>
+<div class="split-bar" role="img" aria-label="Allocation: {% for row in plan_preview %}{{ row.name }} {{ row.percent }}%{% if not forloop.last %}, {% endif %}{% endfor %}">
+  {% for row in plan_preview %}{% if row.percent %}<i style="width: {{ row.percent }}%; background: {{ row.color }};"></i>{% endif %}{% endfor %}
+</div>
+<div class="split-list">
+  {% for row in plan_preview %}
+  <div><span><i class="dot" style="--swatch: {{ row.color }}"></i>{{ row.name }} · {{ row.percent }}%</span><strong>{% if savings_plan.status == 'active' %}{{ row.amount|money }}/mo{% else %}—{% endif %}</strong></div>
+  {% endfor %}
+</div>
+<p class="muted" style="margin-top:14px;">
+  {% if savings_plan.status == 'paused' %}Your plan is paused, so no contributions are being recommended right now.
+  {% elif savings_plan.status == 'disabled' %}Your plan is turned off. Your pools and their balances are unchanged.
+  {% elif not capacity.is_complete %}Amounts appear once your income and expenses are known.
+  {% elif capacity.has_shortfall %}Nothing is allocated while costs exceed income.
+  {% else %}Recommendations only. No money moves and nothing is invested until you record a deposit yourself.{% endif %}
+</p>

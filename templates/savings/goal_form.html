@@ -4,6 +4,7 @@
 {% block content %}
 <section class="card form-card">
   <div class="page-title">{% if mode == "add" %}{% if return_to_pools %}Create a savings pool{% else %}Create a financial goal{% endif %}{% elif return_to_pools %}Edit savings pool{% else %}Edit goal{% endif %}</div>
+  {% if goal.is_default_pool %}<p class="page-subtitle">This is one of your three automatic pools. You can rename it and set a target; its balance changes only through recorded deposits and withdrawals.</p>{% endif %}
   <form method="post" novalidate>
     {% csrf_token %}
     {% if return_to_pools %}<input type="hidden" name="from" value="pools">{% endif %}
@@ -12,7 +13,7 @@
     {% endfor %}
     <div class="modal-actions">
       <a class="button ghost" href="{% if return_to_pools %}{% url 'savings:pools' %}{% else %}{% url 'savings:goals' %}{% endif %}">Cancel</a>
-      <button type="submit" class="button">{% if mode == "add" and return_to_pools %}Create pool{% elif return_to_pools %}Save pool{% else %}Save goal{% endif %}</button>
+      <button type="submit" class="button" data-loading-text="Saving…">{% if mode == "add" and return_to_pools %}Create pool{% elif return_to_pools %}Save pool{% else %}Save goal{% endif %}</button>
     </div>
   </form>
 </section>

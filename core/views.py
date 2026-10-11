@@ -23,6 +23,7 @@ from core.display import (
 from investing.models import PortfolioSnapshot, RoundUpLedgerEntry
 from investing.services import compute_investable_surplus
 from savings.models import Goal
+from savings.views import plan_context
 from transactions.models import Transaction
 
 
@@ -58,7 +59,7 @@ def dashboard(request):
         for budget in Budget.objects.filter(period=active_period).select_related("category"):
             budget_progress.append(compute_budget_progress(budget))
 
-    goals = Goal.objects.filter(user=user)[:4]
+    goals = Goal.objects.filter(user=user, pool_kind="")[:4]
 
     pending_roundups_total = RoundUpLedgerEntry.objects.filter(
         user=user, status=RoundUpLedgerEntry.Status.PENDING
@@ -106,6 +107,7 @@ def dashboard(request):
         "plan": plan,
         "has_manual_estimate": has_manual_estimate(user),
     }
+    context.update(plan_context(user, today=today))
     return render(request, "core/dashboard.html", context)
 
 

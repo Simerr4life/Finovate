@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.db import transaction
 from django.utils import timezone
 
 from core.services import quantize_money
@@ -19,41 +20,52 @@ def apply_contribution(goal, kind: str, amount: Decimal, note: str = "", source:
     """
     from .models import Contribution  # local import avoids import-time cycle
 
-    amount = quantize_money(amount)
-    before_percent = goal.progress_percent
+    # The balance update and the Contribution row succeed or fail together,
+    # and the row lock stops two concurrent deposits from losing an update.
+    with transaction.atomic():
+        locked = type(goal).objects.select_for_update().get(pk=goal.pk)
+        goal.current_amount = locked.current_amount
+        goal.achieved_at = locked.achieved_at
+        goal.highest_milestone_notified = locked.highest_milestone_notified
 
-    if kind == Contribution.Kind.WITHDRAWAL:
-        goal.current_amount = quantize_money(goal.current_amount - amount)
-    else:
-        goal.current_amount = quantize_money(goal.current_amount + amount)
+        amount = quantize_money(amount)
+        before_percent = goal.progress_percent
 
-    if goal.current_amount < 0:
-        goal.current_amount = Decimal("0.00")
+        if kind == Contribution.Kind.WITHDRAWAL:
+            goal.current_amount = quantize_money(goal.current_amount - amount)
+        else:
+            goal.current_amount = quantize_money(goal.current_amount + amount)
 
-    if goal.current_amount >= goal.target_amount and goal.achieved_at is None:
-        goal.achieved_at = timezone.now()
-    elif goal.current_amount < goal.target_amount:
-        goal.achieved_at = None
+        if goal.current_amount < 0:
+            goal.current_amount = Decimal("0.00")
 
-    goal.save(update_fields=["current_amount", "achieved_at", "updated_at"])
+        # A pool with no target yet (target 0) is never "achieved" -- otherwise
+        # its first deposit would mark it complete.
+        if goal.target_amount > 0 and goal.current_amount >= goal.target_amount:
+            if goal.achieved_at is None:
+                goal.achieved_at = timezone.now()
+        else:
+            goal.achieved_at = None
 
-    contribution = Contribution.objects.create(
-        user_id=goal.user_id,
-        goal=goal,
-        kind=kind,
-        amount=amount,
-        note=note,
-        source=source,
-    )
+        goal.save(update_fields=["current_amount", "achieved_at", "updated_at"])
 
-    after_percent = goal.progress_percent
-    crossed = None
-    for milestone in MILESTONES:
-        if before_percent < milestone <= after_percent and goal.highest_milestone_notified < milestone:
-            crossed = milestone
-    if crossed:
-        goal.highest_milestone_notified = crossed
-        goal.save(update_fields=["highest_milestone_notified"])
+        contribution = Contribution.objects.create(
+            user_id=goal.user_id,
+            goal=goal,
+            kind=kind,
+            amount=amount,
+            note=note,
+            source=source,
+        )
+
+        after_percent = goal.progress_percent
+        crossed = None
+        for milestone in MILESTONES:
+            if before_percent < milestone <= after_percent and goal.highest_milestone_notified < milestone:
+                crossed = milestone
+        if crossed:
+            goal.highest_milestone_notified = crossed
+            goal.save(update_fields=["highest_milestone_notified"])
 
     return contribution, crossed
 
@@ -65,7 +77,7 @@ def estimate_completion_date(goal, lookback_days: int = 90) -> date | None:
     estimate (no contributions yet, or no net progress), rather than
     guessing. This is always an estimate, never a guarantee.
     """
-    if goal.current_amount >= goal.target_amount:
+    if goal.target_amount <= 0 or goal.current_amount >= goal.target_amount:
         return None
 
     cutoff = timezone.now() - timedelta(days=lookback_days)

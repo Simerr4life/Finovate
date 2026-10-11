@@ -5,7 +5,7 @@
 {% block content %}
 <div class="overview-heading">
   <div>
-    <div class="page-title">{{ greeting }}, {{ user_display_name }}.</div>
+    <div class="page-title">{{ greeting }}, <span data-user-name>{{ user_display_name }}</span>.</div>
     <div class="page-subtitle">{{ today|date:"l, F j" }} · Here is how your recorded money is doing.</div>
   </div>
   {% if banks_connected %}
@@ -16,7 +16,7 @@
 </div>
 
 {% if has_manual_estimate and not has_transactions %}
-<div class="card" style="padding:14px 18px;margin-bottom:16px;border-left:4px solid var(--coral-500, #f97066);">
+<div class="card" style="padding:14px 18px;margin-bottom:16px;border-left:4px solid var(--gold);">
   <strong>Showing a manual estimate, not verified bank data.</strong>
   Estimated monthly income {{ plan.monthly_income|money }}, expenses {{ plan.monthly_recurring_expenses|money }},
   {% if plan.leftover_after_plan >= 0 %}surplus {{ plan.leftover_after_plan|money }}{% else %}shortfall {{ plan.leftover_after_plan|money }}{% endif %}.
@@ -43,11 +43,19 @@
       {% if budget_progress %}{{ budget_remaining|money }} still inside active limits{% else %}No active budget limits{% endif %}
     </div>
   </section>
-  <section class="card summary-card">
-    <div class="label">Potential savings</div>
-    <div class="money">{{ surplus.investable_surplus|money }}</div>
-    <div class="summary-detail">Estimated after reserves</div>
-  </section>
+  <a class="card summary-card" href="{% url 'savings:index' %}" aria-label="Available to save each month: see the breakdown">
+    <div class="label">Available to save</div>
+    {% if not capacity.is_complete %}
+    <div class="money">—</div>
+    <div class="summary-detail">Add income &amp; expenses to calculate</div>
+    {% elif capacity.has_shortfall %}
+    <div class="money negative">-{{ capacity.shortfall|money }}</div>
+    <div class="summary-detail" style="color:var(--danger)">Monthly shortfall · nothing allocated</div>
+    {% else %}
+    <div class="money" data-count-to="{{ capacity.available }}">{{ capacity.available|money }}</div>
+    <div class="summary-detail good">Per month, after costs &amp; obligations</div>
+    {% endif %}
+  </a>
 </div>
 
 <div class="dashboard-grid">
@@ -68,7 +76,7 @@
     <div class="chart-wrap">
       <div class="chart-y">{% for label in chart.y_labels %}<span>{{ label }}</span>{% endfor %}</div>
       <svg class="line-chart" viewBox="0 0 800 260" preserveAspectRatio="none" role="img" aria-label="Cash balance from recorded transactions">
-        <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2f7d62" stop-opacity=".18" /><stop offset="100%" stop-color="#2f7d62" stop-opacity="0" /></linearGradient></defs>
+        <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" style="stop-color: var(--green); stop-opacity: .18" /><stop offset="100%" style="stop-color: var(--green); stop-opacity: 0" /></linearGradient></defs>
         <path class="gridline" d="M0 30H800M0 95H800M0 160H800M0 225H800" />
         <path class="area" d="{{ chart.area }}" />
         <path class="current" d="{{ chart.current }}" />
@@ -98,6 +106,30 @@
     </div>
     <button type="button" class="button" data-open-review {% if surplus.investable_surplus <= 0 %}disabled{% endif %}>Review savings plan {% include "partials/icon.html" with name="arrow" size=17 %}</button>
     <small class="estimate-note">Estimate only. No funds will move without your approval.</small>
+  </section>
+
+  <section class="card recent-card">
+    <div class="card-header">
+      <div>
+        <div class="section-title">Savings plan</div>
+        <div class="muted">{% if savings_plan.status == 'active' and capacity.is_complete and not capacity.has_shortfall %}{{ plan_total|money }} recommended this month across your pools{% elif savings_plan.status != 'active' %}Plan {{ savings_plan.get_status_display|lower }}{% elif capacity.has_shortfall %}Costs exceed income, so nothing is recommended{% else %}Waiting for your income and expenses{% endif %}</div>
+      </div>
+      <a class="text-link" href="{% url 'savings:pools' %}">Manage {% include "partials/icon.html" with name="arrow" size=15 %}</a>
+    </div>
+    <div class="split-list" style="margin-top:14px;">
+      {% for row in plan_rows %}
+      <div>
+        <span><i class="dot" style="--swatch: {{ row.pool.color }}"></i>{{ row.pool.name }} · {{ row.percent }}%</span>
+        <span><strong style="color:var(--ink)">{{ row.recommended_monthly|money }}</strong>&nbsp;/mo · {{ row.deposited|money }} deposited</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="muted" style="margin-top:12px;">Recommended amounts are projections. Only deposits you record change a pool's balance.</p>
+  </section>
+
+  <section class="card insights-card">
+    <div class="section-title">This month at a glance</div>
+    {% include "savings/_capacity.html" with compact=True %}
   </section>
 
   <section class="card recent-card">

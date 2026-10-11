@@ -83,7 +83,7 @@ class ReconciliationTests(TestCase):
     def test_peachtree_statement_reconciles_exactly(self):
         from django.core.management import call_command
 
-        call_command("seed_peachtree_demo", username="recon-test")
+        call_command("seed_peachtree_demo", password="test-only-pass-9876", username="recon-test")
         user = User.objects.get(username="recon-test")
         account = Account.objects.get(user=user)
         report = reconcile_account(account)
@@ -97,9 +97,9 @@ class PeachtreeSeedIdempotencyTests(TestCase):
     def test_running_twice_does_not_duplicate_transactions(self):
         from django.core.management import call_command
 
-        call_command("seed_peachtree_demo", username="idempotent-test")
+        call_command("seed_peachtree_demo", password="test-only-pass-9876", username="idempotent-test")
         first_count = Transaction.objects.filter(user__username="idempotent-test").count()
-        call_command("seed_peachtree_demo", username="idempotent-test")
+        call_command("seed_peachtree_demo", password="test-only-pass-9876", username="idempotent-test")
         second_count = Transaction.objects.filter(user__username="idempotent-test").count()
         self.assertEqual(first_count, 23)
         self.assertEqual(second_count, first_count)
@@ -107,12 +107,12 @@ class PeachtreeSeedIdempotencyTests(TestCase):
     def test_reset_only_touches_this_demo_accounts_transactions(self):
         from django.core.management import call_command
 
-        call_command("seed_peachtree_demo", username="reset-test")
+        call_command("seed_peachtree_demo", password="test-only-pass-9876", username="reset-test")
         user = User.objects.get(username="reset-test")
         unrelated = Transaction.objects.create(
             user=user, kind=Transaction.Kind.EXPENSE, amount=Decimal("1.00"), occurred_on="2026-05-01"
         )
-        call_command("seed_peachtree_demo", username="reset-test", reset=True)
+        call_command("seed_peachtree_demo", password="test-only-pass-9876", username="reset-test", reset=True)
         self.assertTrue(Transaction.objects.filter(pk=unrelated.pk).exists())
         self.assertEqual(Transaction.objects.filter(user=user, account__isnull=False).count(), 23)
 
@@ -123,5 +123,5 @@ class PeachtreeSeedIdempotencyTests(TestCase):
         Transaction.objects.create(
             user=other_user, kind=Transaction.Kind.EXPENSE, amount=Decimal("1.00"), occurred_on="2026-05-01"
         )
-        call_command("seed_peachtree_demo", username="seed-target")
+        call_command("seed_peachtree_demo", password="test-only-pass-9876", username="seed-target")
         self.assertEqual(Transaction.objects.filter(user=other_user).count(), 1)

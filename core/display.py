@@ -179,7 +179,7 @@ def category_totals(user, start: date, end: date):
     )
     items = [{"name": row["category__name"], "total": quantize_money(row["total"])} for row in rows]
     grand = quantize_money(sum((item["total"] for item in items), Decimal("0")))
-    palette = ["#2f7d62", "#d2a44d", "#112b2b", "#aab2af"]
+    palette = ["var(--green)", "var(--gold)", "#4f7cac", "var(--chart-label)"]
     cursor = 0
     for index, item in enumerate(items):
         pct = int((item["total"] / grand) * 100) if grand else 0
@@ -192,7 +192,7 @@ def category_totals(user, start: date, end: date):
 
 def conic_style(items) -> str:
     if not items:
-        return "radial-gradient(circle, white 58%, transparent 59%), conic-gradient(#e8ece8 0 100%)"
+        return "radial-gradient(circle, var(--surface) 58%, transparent 59%), conic-gradient(var(--track) 0 100%)"
     stops = []
     cursor = 0
     for item in items:
@@ -200,9 +200,9 @@ def conic_style(items) -> str:
         stops.append(f"{item['color']} {cursor}% {nxt}%")
         cursor = nxt
     if cursor < 100:
-        stops.append(f"#e8ece8 {cursor}% 100%")
+        stops.append(f"var(--track) {cursor}% 100%")
     return (
-        "radial-gradient(circle, white 58%, transparent 59%), conic-gradient("
+        "radial-gradient(circle, var(--surface) 58%, transparent 59%), conic-gradient("
         + ", ".join(stops)
         + ")"
     )

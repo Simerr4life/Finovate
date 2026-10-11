@@ -158,6 +158,15 @@ class Profile(TimeStampedModel):
         blank=True,
         help_text="When the manual income/expense setup form was last submitted.",
     )
+    name_customized_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "When the user last changed their display name in Finovate. Once "
+            "set, signing in again never overwrites the name with the "
+            "identity provider's copy."
+        ),
+    )
 
     def __str__(self) -> str:
         return f"Profile<{self.user_id}>"
@@ -178,6 +187,7 @@ class NotificationEvent(TimeStampedModel):
         ACCOUNT_CREATED = "account_created", "Auth0 account created"
         WELCOME = "welcome", "Welcome"
         SYSTEM = "system", "System message"
+        SAVINGS_PLAN = "savings_plan", "Savings plan updated"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notification_events"

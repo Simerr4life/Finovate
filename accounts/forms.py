@@ -71,6 +71,27 @@ class EmailSignUpForm(forms.Form):
         return cleaned
 
 
+class DisplayNameForm(forms.Form):
+    """Changes only the user's display name: never email, username, or credentials."""
+
+    name = forms.CharField(
+        max_length=150,
+        label="Display name",
+        widget=forms.TextInput(attrs={"autocomplete": "name", "maxlength": "150"}),
+    )
+
+    def clean_name(self):
+        name = " ".join((self.cleaned_data.get("name") or "").split())
+        if not name:
+            raise ValidationError("Enter a name.")
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in name):
+            raise ValidationError("Use letters, numbers, and ordinary punctuation only.")
+        first, _, rest = name.partition(" ")
+        if len(first) > 150 or len(rest) > 150:
+            raise ValidationError("That name is too long.")
+        return name
+
+
 class EmailLoginForm(forms.Form):
     email = forms.CharField(label="Email", max_length=254, widget=forms.TextInput(attrs={"autocomplete": "username"}))
     password = forms.CharField(label="Password", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}))

@@ -11,10 +11,11 @@
   </div>
 </div>
 <div class="settings-layout">
-  <nav class="card settings-nav" aria-label="Settings sections">
-    <a class="active" href="#profile">Profile {% include "partials/icon.html" with name="chevron" size=15 %}</a>
-    <a href="#appearance">Appearance {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+  <nav class="card settings-nav" aria-label="Settings sections" data-scrollspy>
+    <a class="active" aria-current="true" href="#profile">Profile {% include "partials/icon.html" with name="chevron" size=15 %}</a>
     <a href="#accounts">Connected accounts {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+    <a href="#imports">Statement imports {% include "partials/icon.html" with name="chevron" size=15 %}</a>
+    <a href="#appearance">Appearance {% include "partials/icon.html" with name="chevron" size=15 %}</a>
     <a href="#savings">Savings preferences {% include "partials/icon.html" with name="chevron" size=15 %}</a>
     <a href="#investing">Investment preferences {% include "partials/icon.html" with name="chevron" size=15 %}</a>
     <a href="#notifications">Notifications {% include "partials/icon.html" with name="chevron" size=15 %}</a>
@@ -27,12 +28,24 @@
       <div class="muted">You are always in control of your information and preferences.</div>
       <div class="settings-form">
         <div class="profile-large">
-          <span class="avatar">{{ user_initials }}</span>
-          <div><strong>{{ user_display_name }}</strong><span>Local account</span></div>
+          <span class="avatar" data-user-initials>{{ user_initials }}</span>
+          <div><strong data-user-name>{{ user_display_name }}</strong><span>{{ user.email|default:user.username }}</span></div>
         </div>
-        <div class="form-grid">
-          <label class="field-label">Username<input value="{{ user.username }}" readonly></label>
-          <label class="field-label">Email address<input value="{{ user.email }}" readonly></label>
+        <form method="post" action="{% url 'accounts:update_name' %}" class="name-form" data-name-form novalidate>
+          {% csrf_token %}
+          <label class="field-label" for="{{ name_form.name.id_for_label }}">{{ name_form.name.label }}
+            {{ name_form.name }}
+            <span class="help-text">Shown on your dashboard and across Finovate. Changing it doesn't change your email or sign-in.</span>
+            <span class="field-error" data-name-error role="alert"></span>
+          </label>
+          <div class="form-actions">
+            <button class="button ghost" type="reset" data-name-cancel disabled>Cancel</button>
+            <button class="button" type="submit" data-name-save data-loading-text="Saving…" disabled>Save name</button>
+          </div>
+        </form>
+        <div class="form-grid" style="margin-top:18px;">
+          <label class="field-label">Username<input value="{{ user.username }}" readonly aria-readonly="true"></label>
+          <label class="field-label">Email address<input value="{{ user.email }}" readonly aria-readonly="true"></label>
         </div>
       </div>
     </section>
@@ -69,14 +82,14 @@
       {% csrf_token %}
       <div id="appearance">
         <div class="section-title">Appearance</div>
-        <p class="muted">Choose a light or dark look, or follow your device setting.</p>
+        <p class="muted">Choose a light or dark look, or follow your device setting. The sun/moon button at the top of every page switches instantly and is saved to your account.</p>
         {% for field in form %}
           {% if field.name == 'theme' %}
           <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% if field.help_text %}<span class="help-text">{{ field.help_text }}</span>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
           {% endif %}
         {% endfor %}
       </div>
-      <div id="savings">
+      <div id="savings" style="margin-top:28px;">
         <div class="section-title">Savings preferences</div>
         {% for field in form %}
           {% if field.name == 'income_cadence' or field.name == 'cash_reserve_target' or field.name == 'budget_warning_threshold_percent' %}
@@ -107,7 +120,7 @@
           {% endfor %}
         </div>
       </div>
-      <button class="button" type="submit" style="margin-top:18px;">Save changes</button>
+      <button class="button" type="submit" style="margin-top:18px;" data-loading-text="Saving…">Save changes</button>
     </form>
 
     <section class="card settings-panel" id="messaging">
@@ -129,7 +142,7 @@
         <button class="button" type="submit">Create link code</button>
       </form>
       {% endif %}
-      <div class="section-title" style="margin-top:28px;">Notification history</div>
+      <div class="section-title" style="margin-top:28px;" id="notification-history">Notification history</div>
       <p class="muted">These are stored events. Delivery status stays recorded because outbound messaging is not connected.</p>
       <ul>
         {% for event in notification_events %}

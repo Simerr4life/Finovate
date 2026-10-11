@@ -266,15 +266,18 @@ class SavingsPoolTargetingTests(TestCase):
             propose_surplus_investment(self.user, Decimal("10.00"), pool=other)
 
     def test_investable_pools_excludes_non_investable_goals(self):
-        Goal.objects.create(user=self.user, name="Just a goal", target_amount=Decimal("100"))
+        just_a_goal = Goal.objects.create(user=self.user, name="Just a goal", target_amount=Decimal("100"))
         pools = list(investable_pools(self.user))
-        self.assertEqual(pools, [self.pool])
+        default_investment = Goal.objects.get(user=self.user, pool_kind=Goal.PoolKind.INVESTMENT)
+        self.assertCountEqual(pools, [self.pool, default_investment])
+        self.assertNotIn(just_a_goal, pools)
 
     def test_pool_investment_summaries_reflects_invested_amount(self):
         sweep_pending_roundups(self.user)
-        summaries = pool_investment_summaries(self.user)
-        self.assertEqual(len(summaries), 1)
-        self.assertEqual(summaries[0]["snapshot"].net_contributions, Decimal("0.65"))
+        summaries = {row["pool"]: row["snapshot"] for row in pool_investment_summaries(self.user)}
+        # The user's own investable pool plus their default Investment pool.
+        self.assertEqual(len(summaries), 2)
+        self.assertEqual(summaries[self.pool].net_contributions, Decimal("0.65"))
 
     def test_pool_cash_balance_is_never_mixed_with_invested_amount(self):
         from savings.services import apply_contribution

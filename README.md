@@ -89,7 +89,7 @@ what's unverified until you've configured real credentials.
 python manage.py test
 ```
 
-35 tests cover: round-up math (including the exact $4.35 → $0.65 example
+The suite covers (among others): round-up math (including the exact $4.35 → $0.65 example
 from the spec), idempotent transaction imports (duplicate `external_id`
 never double-counts), budget progress/plan calculations and
 recalculation when inputs change, savings goal milestone crossing and
@@ -120,6 +120,41 @@ template.
 `user=request.user` (or goes through a `ForeignKey`/`get_object_or_404`
 that includes it), so one user can never read or edit another's records.
 See the isolation tests in `budgets/tests.py`.
+
+## Automated savings
+
+`savings/planning.py` is the single place the savings formula lives:
+
+    Available savings = confirmed monthly income − (recurring obligations + budgeted spending)
+
+- **Income** is active, non-irregular `IncomeSource` rows, normalized to a
+  month (weekly × 4.33, biweekly × 2.17). Irregular income, transfers,
+  reimbursements, credit and borrowed money are never counted.
+- **Costs** are active `RecurringExpense` rows (housing, utilities,
+  transport, debt payments, subscriptions…) plus the active budget period's
+  limits for categories that aren't already a recurring expense. If the
+  manual-setup estimate exists it already covers all costs, so budget
+  limits aren't added on top (no double counting).
+- With nothing declared, the last 3 *complete* months of recorded
+  transactions are averaged instead.
+- Missing income or expenses → no figure is invented; the UI asks for them.
+  Costs above income → a shortfall is shown and nothing is allocated.
+
+Every user has three default pools (`Goal.pool_kind`): **Rainy Day 40%**,
+**Investment 20%**, **Regular Savings 40%**. They're created when the
+account is created, and migration `savings/0004` backfills existing users
+(adopting an existing "Emergency fund" goal as Rainy Day rather than
+duplicating it). A unique constraint on `(user, pool_kind)` makes
+duplicates impossible. The split is configurable per user (`SavingsPlan`,
+must total 100%) with monthly/weekly cadence and active/paused/disabled
+status. Shares are rounded *down* to the cent and leftover cents go to the
+largest remainder, so the total never exceeds what's available.
+
+`recalculate_plan()` is idempotent: it runs after income/expense/budget
+changes (on commit) and on the dashboard and savings pages, and writes or
+notifies only when a figure actually changes. Recommendations are
+projections only. Pool balances change solely through recorded
+`Contribution`s; Finovate never moves money or places trades.
 
 ## Demo mode and sample data
 
