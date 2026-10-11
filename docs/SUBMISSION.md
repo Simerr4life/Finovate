@@ -1,18 +1,79 @@
-# Hacklanta 2026 Submission — Finovate
+# Hacklanta 2026 Devpost Submission — Finovate
 
-> The platform, fields, and character limits come from the official Hacker Guide, which could not be read while this was prepared ([HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md)). Descriptions are therefore provided at several lengths with exact counts. Trim to the official limits once known. Section headings in the extended description follow the common Devpost format; rename them if the platform differs.
+> **Deadline (official guide): hacking ends Sunday, October 11, 2026 at 9:00 AM EDT. All materials must be submitted on Devpost (https://hacklanta.devpost.com/) by then. No exceptions.** Then one team member submits the Google Form (Devpost link, project name, team members, track, challenges). See [HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md).
+
+## Devpost checklist (from the official guide)
+
+| Item | Ready? | Where |
+|---|---|---|
+| Project title and description | ✅ | Below |
+| Problem and who it serves | ✅ | Write-up → Inspiration / Who it's for |
+| Team roster (max 4) | ❗ Team to fill in | — |
+| Main track (one) | ✅ **Fintech** | — |
+| Side challenges (max 3) | ✅ **MLH: Best Use of Auth0**, **Photon: Agents in iMessage**, **MLH: Best Domain Name from GoDaddy Registry** (GoDaddy only if `finovate.biz` is registered; see below) | — |
+| Public GitHub repo with useful README | ❗ Make repo **public**; merge this branch | `https://github.com/Simerr4life/Finovate` |
+| Working demo link **or** clear run instructions | ✅ run instructions (README); demo link ❗ only if verified | README → Run it locally |
+| Demo video, 2–3 min, **public** | ❗ Record and upload | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) |
+| Technologies, APIs, datasets, sponsor tools | ✅ | "Built with" below |
+| Disclosure of anything made before Hacklanta | ✅ | "Disclosure" below |
+| Test credentials / special instructions for judges | ✅ | "Instructions for judges" below |
+| Google Form (one member) | ❗ After Devpost | Discord announcement |
 
 | Field | Value |
 |---|---|
 | **Project title** | Finovate |
 | **Team** | Turn It Off and On Again |
-| **Members** | *To be filled in by the team.* Commit authors use the GitHub handles `Simerr4life` and `Bigmike0814` |
-| **Main track** | Finance |
-| **Side tracks** | Auth0 · Photon · GoDaddy (**claim only with evidence**, see [THIRD_PARTY_SERVICES.md §3](THIRD_PARTY_SERVICES.md#3-godaddy)) |
-| **Repository** | `https://github.com/Simerr4life/Finovate` (remote verified; public visibility **not verified**) |
-| **Live demo** | *Not verified.* Vercel project `finovate` exists; add the production URL after testing it |
-| **Demo video** | *Not recorded yet* |
-| **Built with** | Python, Django, SQLite/PostgreSQL, Auth0 (auth0-server-python, Authlib), Photon Spectrum (spectrum-ts, Bun, TypeScript), Twelve Data API, Supabase (optional), Vercel, HTML/CSS/JavaScript |
+| **Members** | *Fill in (max 4).* Commit authors: GitHub `Simerr4life`, `Bigmike0814` |
+| **Main track** | Fintech |
+| **Side challenges** | MLH: Best Use of Auth0 · Photon: Agents in iMessage · MLH: Best Domain Name from GoDaddy Registry |
+| **Repository** | https://github.com/Simerr4life/Finovate |
+| **Built with** | Python, Django, SQLite, PostgreSQL, Auth0 (auth0-server-python, Authlib), Photon Spectrum (spectrum-ts), Bun, TypeScript, Twelve Data API, Supabase, Vercel, HTML, CSS, JavaScript |
+
+## Devpost write-up (paste into the description; covers ideation and development process)
+
+**Finovate — make your money move, and always know why.**
+
+### Inspiration (ideation)
+Our team kept running into the same problem: budgets live in one app, savings goals in a spreadsheet, and investing in a brokerage that never talks to either, so nobody can say how much money is actually spare. Automated money tools make it worse by acting without explaining. For the Fintech track ("rethink how money moves"), we set three rules before writing code: every dollar has a purpose, every automated action is explainable, and the user stays in control.
+
+### Who it's for
+Students and early-career earners, often with irregular income, who want one honest view of cash, savings, and investing, and who want to learn investing without risking real money.
+
+### What it does
+- **Budgeting from real data:** enter transactions or import a bank CSV. Finovate detects columns, handles messy exports, skips duplicates, flags rows it can't read instead of guessing, and reconciles statements against their stated totals.
+- **A savings plan that shows its work:** a rule-based engine reads income, bills, debts, and emergency savings, picks one of five scenarios, computes a *safe-to-save* amount after a safety buffer, and splits it across Rainy Day, Investment, and Regular Savings pools, with every assumption on screen.
+- **Goals with a pace:** targets, deadlines, 25/50/75/100% milestones, the weekly/monthly pace needed, and projected completion.
+- **Honest round-ups:** a $4.35 purchase creates a $0.65 *pending* round-up. A simulated sweep respects your cash reserve and cap.
+- **Simulated investing with guardrails:** proposals wait for your approval, can't reuse the same surplus twice, and keep cash, invested principal, and market value as separate numbers.
+- **An agent in iMessage (Photon Spectrum):** text "how's my budget" or "I got paid $500". Anything that changes data waits for "yes", and withdrawals are always refused.
+- **Auth0 sign-in:** Universal Login, an email-verification gate, and access-token-protected API. Accounts map to Auth0's user ID, never just an email.
+
+### How we built it (development process)
+We started from a Figma Make layout and built a Django 6.1 / Python 3.13 server-rendered app, with Decimal arithmetic for every dollar. Each domain (budgets, savings, investing, imports, assistant) keeps its logic in service functions, so the website and the iMessage agent call the same code and can't disagree. We integrated Auth0 with the official `auth0-server-python` SDK (encrypted cookie sessions, Management API verification refresh, Post-Registration Action webhook, RS256 API token checks). For Photon, a Bun/TypeScript adapter built on Spectrum (`spectrum-ts`, iMessage provider) relays messages to a secret-protected Django bridge with duplicate protection, and a second endpoint verifies Spectrum's HMAC webhook signatures. Twelve Data provides optional live quotes behind a shared quota cache. On the last morning we ran a full audit: it found and fixed 27 bugs (including round-ups never being created for real transactions), added 48 regression tests, and brought the suite to **381 passing tests**.
+
+### Challenges
+Keeping numbers honest was harder than computing them. Making automation safe meant row locks so double-clicks can't approve an order twice, idempotent imports, and plans that stay paused when paused. Identity was subtle too: two accounts with the same email must never merge.
+
+### Accomplishments
+An explainable savings engine, a CSV importer that refuses to guess, an iMessage agent that cannot move money, and 381 automated tests.
+
+### What we learned
+In finance, trust comes from transparency and consent. Labeling something "pending" or "simulated" is a product decision, not a footnote.
+
+### What's next
+Read-only bank connections with explicit consent, notification delivery and weekly summaries, auto-categorization, and a brokerage partner behind the approval flow we already built.
+
+### Disclosure (built before Hacklanta / not ours)
+- The UI layout started from a **Figma Make** design export (in `.figma-make-inspect/`).
+- Open-source libraries and SDKs: Django, auth0-server-python, Authlib, psycopg, python-dotenv, spectrum-ts. APIs and services: Auth0, Photon Spectrum, Twelve Data, Supabase, Vercel, Google Fonts.
+- Datasets: a bundled historical market-data sample (`demo_data/`, Excel-derived), plus fictional demo statements generated by our seed commands.
+- AI coding assistants (Cursor, Claude Code) helped write and review code. The team designed, reviewed, and integrated everything during the event. All 49 commits are dated October 10–11, 2026.
+
+### Instructions for judges
+- **Run locally:** `pip install -r requirements.txt && python manage.py migrate && python manage.py seed_demo && python manage.py runserver`. Website sign-in uses Auth0. Without Auth0 credentials, see `docs/USER_GUIDE.md` (section 1, option C) for a local walkthrough with sample data.
+- **Try the iMessage agent without Photon:** `python manage.py chat_demo --username demo`.
+- **Simulated:** no bank or brokerage is connected and no money moves. Live prices need a `TWELVE_DATA_API_KEY`.
+- **Tests:** `python manage.py test` (381 passing).
 
 ## Tagline (15 words · 104 characters)
 
@@ -88,9 +149,9 @@ Architecture: [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md). Feature ev
 
 | Track | What we built | Evidence | Gap |
 |---|---|---|---|
-| **Auth0** | Universal Login sign-up/login/logout via `auth0-server-python`; sub-based identity; email-verification gate with Management API refresh and resend; Post-User-Registration Action webhook; RS256 access-token validation for `/api/me/` | `accounts/` code; mocked tests pass | Record a live login against the tenant |
-| **Photon** | Spectrum adapter (`spectrum-ts`, iMessage provider) relaying to a secret-protected bridge; HMAC-verified webhook; confirmation-gated assistant; one-time-code chat linking; duplicate protection | `assistant/`, `spectrum/`; 43 tests; in-process transcript | Record a live iMessage exchange |
-| **GoDaddy** | Only the `finovate.biz` domain configuration is in the code | None in the repo | Show registrar/DNS evidence or don't claim this track |
+| **MLH: Best Use of Auth0** | Universal Login sign-up/login/logout via `auth0-server-python`; sub-based identity; email-verification gate with Management API refresh and resend; Post-User-Registration Action webhook; RS256 access-token validation for `/api/me/` | `accounts/` code; mocked tests pass | Record a live login against the tenant |
+| **Photon: Agents in iMessage** | Spectrum adapter (`spectrum-ts`, iMessage provider) relaying to a secret-protected bridge; HMAC-verified webhook; confirmation-gated assistant; one-time-code chat linking; duplicate protection | `assistant/`, `spectrum/`; 43 tests; in-process transcript | Record a live iMessage exchange |
+| **MLH: Best Domain Name from GoDaddy Registry** | The app is configured for **finovate.biz** (`.biz` is a GoDaddy Registry TLD) | Domain in `finovate/settings.py`; registration not verified from our build environment | Confirm `finovate.biz` is registered and resolves before selecting this challenge |
 
 ## Known limitations
 
