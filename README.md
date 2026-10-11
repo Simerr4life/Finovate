@@ -104,6 +104,7 @@ Six Django apps, each owning one slice of the domain:
 | `budgets` | `BudgetPeriod`, `Budget`, `IncomeSource`, `RecurringExpense`, the budget-plan calculator |
 | `savings` | `Goal`, `Contribution`, milestone + completion-estimate logic |
 | `investing` | Simulated `RoundUpSettings`, `RoundUpLedgerEntry`, `PortfolioSnapshot`, `SimulatedOrder` |
+| `imports` | CSV bank-statement upload → review → commit pipeline, `ImportBatch` tracking. See [docs/bank-statement-import.md](docs/bank-statement-import.md) |
 
 Each app's `services.py` holds pure business logic (no HTTP, no
 templates) so it's independently testable and so a future messaging
@@ -132,6 +133,10 @@ not label those rows. Re-running the command updates the same records by
 - **Real:** everything you enter yourself — transactions, categories,
   budgets, goals, contributions — persists in SQLite and survives
   restarts. Budget-plan math and round-up math run for real on your data.
+  CSV bank-statement import is also real: it creates ordinary
+  `Transaction` rows after a review step, with duplicate detection and no
+  fabricated data. See [docs/bank-statement-import.md](docs/bank-statement-import.md)
+  for supported formats and limitations.
 - **Simulated, clearly labeled:** the entire Investing page. No brokerage
   is connected; "sweeping" round-ups and "filling" orders are local
   database updates, not real trades. The investing page and dashboard

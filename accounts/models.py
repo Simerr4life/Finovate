@@ -86,6 +86,44 @@ class Profile(TimeStampedModel):
         default=False,
         help_text="Opt in to local records when a simulated investment proposal is created. This does not send iMessage.",
     )
+    identity_status = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=(
+            "Latest Auth0 account state. Empty for local fixture users that "
+            "were never created through Auth0. Never set to verified just "
+            "because a form was submitted."
+        ),
+    )
+    email_verified = models.BooleanField(
+        default=False,
+        help_text="True only when Auth0's email_verified claim is true.",
+    )
+    phone_number = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Contact number collected for messaging. Ownership is not verified by saving this value.",
+    )
+    phone_verified = models.BooleanField(
+        default=False,
+        help_text="True only when Auth0 reports phone_number_verified. A typed number never sets this.",
+    )
+    messaging_consent = models.BooleanField(
+        default=False,
+        help_text="The user agreed to receive Finovate messages. Consent alone does not verify the phone.",
+    )
+    account_created_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the Finovate profile was first created for this Auth0 subject.",
+    )
+    welcome_recorded_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the one-time welcome record was written. Stops retries from sending it again.",
+    )
 
     def __str__(self) -> str:
         return f"Profile<{self.user_id}>"
@@ -103,6 +141,8 @@ class NotificationEvent(TimeStampedModel):
         BUDGET_WARNING = "budget_warning", "Budget warning threshold reached"
         GOAL_MILESTONE = "goal_milestone", "Savings goal milestone reached"
         ROUNDUP_PAUSED = "roundup_paused", "Round-ups paused"
+        ACCOUNT_CREATED = "account_created", "Auth0 account created"
+        WELCOME = "welcome", "Welcome"
         SYSTEM = "system", "System message"
 
     user = models.ForeignKey(

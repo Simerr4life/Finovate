@@ -1,16 +1,32 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 
+from .identity import normalize_phone
 from .models import Profile
 
 
-class SignUpForm(UserCreationForm):
-    email = forms.EmailField(required=False)
+class RegistrationForm(forms.Form):
+    """Details collected before Auth0 Universal Login. Passwords are not accepted."""
 
-    class Meta:
-        model = User
-        fields = ["username", "email", "password1", "password2"]
+    name = forms.CharField(max_length=150, label="Name")
+    email = forms.EmailField(label="Email")
+    phone = forms.CharField(
+        required=False,
+        label="Phone number",
+        help_text="Optional. Saving a number here does not prove you control that phone.",
+    )
+
+    def clean_name(self):
+        name = " ".join(self.cleaned_data["name"].split())
+        if not name or any(ord(ch) < 32 for ch in name):
+            raise ValidationError("Enter your name.")
+        return name
+
+    def clean_phone(self):
+        phone = normalize_phone(self.cleaned_data.get("phone"))
+        if phone is None:
+            raise ValidationError("Enter a phone number with 8 to 15 digits, or leave it blank.")
+        return phone
 
 
 class OnboardingForm(forms.ModelForm):
@@ -23,7 +39,13 @@ class OnboardingForm(forms.ModelForm):
             "budget_warning_threshold_percent",
             "notify_budget_warnings",
             "notify_goal_milestones",
+            "phone_number",
+            "messaging_consent",
         ]
+        help_texts = {
+            "phone_number": "Optional contact number. Saving it does not verify ownership.",
+            "messaging_consent": "I agree to receive Finovate messages after my phone is verified and a chat is linked.",
+        }
         widgets = {
             "cash_reserve_target": forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
             "budget_warning_threshold_percent": forms.NumberInput(attrs={"min": "1", "max": "100"}),

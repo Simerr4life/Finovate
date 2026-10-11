@@ -55,6 +55,15 @@
       </div>
     </section>
 
+    <section class="card settings-panel" id="imports">
+      <div class="section-title">Statement imports</div>
+      <div class="muted">Add or update data from a bank statement, or review past imports.</div>
+      <div class="button-row">
+        <a class="button" href="{% url 'imports:upload' %}">Import a statement</a>
+        <a class="button ghost" href="{% url 'imports:history' %}">View import history</a>
+      </div>
+    </section>
+
     <form method="post" class="card settings-panel" id="preferences" novalidate>
       {% csrf_token %}
       <div id="appearance">

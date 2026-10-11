@@ -1,7 +1,7 @@
 """Auth0 login via the official Auth0 Python server SDK.
 
-The client is built only when Auth0 is configured. Views call
-get_auth0_client() and fall back to local demo auth when it returns None.
+The client is built only when Auth0 is configured. Website registration
+and login go through this client. They do not create a local password.
 """
 
 from django.conf import settings
@@ -102,16 +102,20 @@ def get_auth0_client():
         settings.AUTH0_CLIENT_ID,
         settings.AUTH0_CLIENT_SECRET,
         settings.AUTH0_SECRET,
+        settings.AUTH0_AUDIENCE,
         settings.APP_BASE_URL,
     )
     if _client is None or _client_key != key:
         secret = settings.AUTH0_SECRET
+        authorization_params = {"scope": "openid profile email offline_access"}
+        if settings.AUTH0_AUDIENCE:
+            authorization_params["audience"] = settings.AUTH0_AUDIENCE
         _client = ServerClient(
             domain=settings.AUTH0_DOMAIN,
             client_id=settings.AUTH0_CLIENT_ID,
             client_secret=settings.AUTH0_CLIENT_SECRET,
             redirect_uri=callback_url(),
-            authorization_params={"scope": "openid profile email"},
+            authorization_params=authorization_params,
             secret=secret,
             state_store=DjangoCookieStore(secret, "_a0_session", 259200, StateData),
             transaction_store=DjangoCookieStore(secret, "_a0_tx", 300, TransactionData),
